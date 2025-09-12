@@ -1,134 +1,195 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowRight, Code } from 'lucide-react';
+import { ArrowRight, Code, Mail, CheckCircle, Search, Zap, Shield } from 'lucide-react';
 
 const HeroSection: React.FC = () => {
+  const [demoEmail, setDemoEmail] = useState('');
+  const [demoResult, setDemoResult] = useState<any>(null);
+  const [isValidating, setIsValidating] = useState(false);
+
+  const handleDemoValidation = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!demoEmail.trim()) return;
+
+    setIsValidating(true);
+    
+    // Simulate API call with realistic delay
+    setTimeout(() => {
+      const mockResult = {
+        email: demoEmail,
+        is_valid: demoEmail.includes('@') && demoEmail.includes('.'),
+        score: Math.floor(Math.random() * 30) + 70,
+        verdict: demoEmail.includes('@') && demoEmail.includes('.') ? 'Valid' : 'Invalid',
+        breakdown: {
+          syntax: { valid: demoEmail.includes('@') },
+          dns: { valid: true, score: 95 },
+          smtp: { valid: true, catch_all: false },
+          reputation: { reputation_score: 85 }
+        },
+        validation_time: Math.random() * 0.5 + 0.2
+      };
+      setDemoResult(mockResult);
+      setIsValidating(false);
+    }, 1200);
+  };
+
   return (
-    <section className="relative overflow-hidden bg-gradient-to-br from-[#F4F5F7] to-white dark:from-gray-900 dark:to-gray-800">
-      {/* Low-poly background effect */}
-      <div className="absolute inset-0 overflow-hidden">
-        <div className="absolute -top-40 -right-40 w-80 h-80 bg-gradient-to-br from-[#2ED8A3]/20 to-[#004E8A]/20 rounded-full blur-3xl"></div>
-        <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-gradient-to-tr from-[#00C48C]/20 to-[#2ED8A3]/20 rounded-full blur-3xl"></div>
-        <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-gradient-to-r from-[#004E8A]/10 to-[#2ED8A3]/10 rounded-full blur-3xl"></div>
-        
-        {/* Low-poly shapes */}
-        <div className="absolute top-20 left-10 w-32 h-32 bg-gradient-to-br from-[#2ED8A3]/30 to-transparent transform rotate-45 blur-sm"></div>
-        <div className="absolute top-40 right-20 w-24 h-24 bg-gradient-to-bl from-[#004E8A]/30 to-transparent transform -rotate-12 blur-sm"></div>
-        <div className="absolute bottom-20 left-1/4 w-20 h-20 bg-gradient-to-tr from-[#00C48C]/30 to-transparent transform rotate-30 blur-sm"></div>
-        <div className="absolute bottom-40 right-1/3 w-28 h-28 bg-gradient-to-tl from-[#2ED8A3]/30 to-transparent transform -rotate-45 blur-sm"></div>
-        
-        {/* Additional geometric shapes */}
-        <div className="absolute top-1/3 left-1/3 w-16 h-16 bg-gradient-to-r from-[#004E8A]/20 to-[#2ED8A3]/20 transform rotate-12 blur-sm"></div>
-        <div className="absolute top-2/3 right-1/4 w-12 h-12 bg-gradient-to-l from-[#00C48C]/20 to-[#2ED8A3]/20 transform -rotate-30 blur-sm"></div>
-        <div className="absolute bottom-1/3 left-1/2 w-18 h-18 bg-gradient-to-b from-[#004E8A]/20 to-[#00C48C]/20 transform rotate-60 blur-sm"></div>
-      </div>
+    <section className="relative overflow-hidden bg-white dark:bg-gray-900 min-h-screen flex items-center">
+      {/* Subtle background pattern */}
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(46,216,163,0.05),transparent_50%)] dark:bg-[radial-gradient(circle_at_50%_50%,rgba(46,216,163,0.1),transparent_50%)]"></div>
+      
+      <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20">
+        <div className="text-center max-w-4xl mx-auto mb-16">
+          {/* Main Headline */}
+          <h1 className="text-4xl sm:text-5xl lg:text-6xl font-normal text-gray-900 dark:text-white mb-8 leading-tight">
+            Validate emails with
+            <span className="block text-[#2ED8A3] font-medium">professional precision</span>
+          </h1>
+          
+          <p className="text-xl sm:text-2xl text-gray-600 dark:text-gray-300 mb-12 font-light leading-relaxed">
+            Enterprise-grade email validation API trusted by developers worldwide. 
+            Clean your lists, improve deliverability, and protect your sender reputation.
+          </p>
 
-      <div className="relative mx-auto px-4  sm:px-6 lg:pl-8 lg:pr-0 py-24">
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
-          {/* Left Content */}
-          <div className="text-left">
-            <h1 className="text-5xl md:text-6xl font-bold text-[#333333] dark:text-white mb-6">
-              The Most Advanced
-              <span className="bg-gradient-to-r from-[#2ED8A3] to-[#004E8A] bg-clip-text text-transparent"> Email Validation</span>
-              <br />
-              Platform
-            </h1>
-            <p className="text-xl text-[#333333]/70 dark:text-gray-300 mb-8">
-              Validate emails in real-time with 99.9% accuracy. Detect disposable emails, 
-              catch-all domains, and spam traps with our enterprise-grade validation API.
-            </p>
-            <div className="flex flex-col sm:flex-row gap-4">
-              <Link
-                to="/register"
-                className="inline-flex items-center px-8 py-4 bg-gradient-to-r from-[#2ED8A3] to-[#004E8A] text-white font-semibold rounded-lg hover:from-[#00C48C] hover:to-[#2ED8A3] transition-all duration-200 shadow-lg hover:shadow-xl"
-              >
-                Start Free Trial
-                <ArrowRight className="w-5 h-5 ml-2" />
-              </Link>
-              <Link
-                to="/api-docs"
-                className="inline-flex items-center px-8 py-4 border-2 border-[#004E8A] text-[#004E8A] dark:text-[#2ED8A3] font-semibold rounded-lg hover:bg-[#004E8A] hover:text-white dark:hover:bg-[#2ED8A3] transition-all duration-200"
-              >
-                <Code className="w-5 h-5 mr-2" />
-                View API Docs
-              </Link>
-            </div>
-            
-            {/* Quick Stats */}
-            <div className="grid grid-cols-3 gap-6 mt-12">
-              <div className="text-center">
-                <div className="text-2xl font-bold text-[#333333] dark:text-white mb-1">10M+</div>
-                <div className="text-sm text-[#333333]/70 dark:text-gray-400">Emails Validated</div>
+          {/* Interactive Demo */}
+          <div className="max-w-2xl mx-auto mb-16">
+            <form onSubmit={handleDemoValidation} className="relative">
+              <div className="relative flex items-center bg-white dark:bg-gray-800 rounded-full shadow-lg border border-gray-200 dark:border-gray-700 p-2 hover:shadow-xl transition-shadow duration-300">
+                <Mail className="w-6 h-6 text-gray-400 ml-4" />
+                <input
+                  type="email"
+                  value={demoEmail}
+                  onChange={(e) => setDemoEmail(e.target.value)}
+                  placeholder="Enter an email to validate instantly..."
+                  className="flex-1 px-4 py-4 text-lg bg-transparent border-none outline-none text-gray-900 dark:text-white placeholder-gray-500"
+                />
+                <button
+                  type="submit"
+                  disabled={isValidating || !demoEmail.trim()}
+                  className="bg-[#2ED8A3] hover:bg-[#00C48C] text-white px-8 py-4 rounded-full font-medium transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
+                >
+                  {isValidating ? (
+                    <>
+                      <div className="animate-spin rounded-full h-5 w-5 border-2 border-white border-t-transparent mr-2"></div>
+                      Validating...
+                    </>
+                  ) : (
+                    <>
+                      <Search className="w-5 h-5 mr-2" />
+                      Validate
+                    </>
+                  )}
+                </button>
               </div>
-              <div className="text-center">
-                <div className="text-2xl font-bold text-[#333333] dark:text-white mb-1">99.9%</div>
-                <div className="text-sm text-[#333333]/70 dark:text-gray-400">Accuracy Rate</div>
-              </div>
-              <div className="text-center">
-                <div className="text-2xl font-bold text-[#333333] dark:text-white mb-1">500ms</div>
-                <div className="text-sm text-[#333333]/70 dark:text-gray-400">Response Time</div>
-              </div>
-            </div>
-          </div>
+            </form>
 
-          {/* Right Content - Computer Screen with API Logs */}
-          <div className="relative">
-            <div className="relative mx-auto max-w-2xl transform translate-x-8">
-              {/* Computer Monitor Frame */}
-              <div className="relative bg-gray-800 rounded-lg p-4 shadow-2xl transform rotate-3 translate-x-8 translate-y-4 -mr-8">
-                {/* Screen */}
-                <div className="bg-black rounded-lg p-2">
-                  <div className="bg-gray-900 rounded-lg p-6 h-96 overflow-hidden">
-                    {/* Terminal Header */}
-                    <div className="flex items-center justify-between mb-6">
-                      <div className="flex items-center space-x-2">
-                        <div className="w-3 h-3 bg-red-500 rounded-full"></div>
-                        <div className="w-3 h-3 bg-yellow-500 rounded-full"></div>
-                        <div className="w-3 h-3 bg-green-500 rounded-full"></div>
+            {/* Demo Result */}
+            {demoResult && (
+              <div className="mt-6 p-6 bg-gray-50 dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 text-left">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center">
+                    {demoResult.is_valid ? (
+                      <CheckCircle className="w-6 h-6 text-green-500 mr-3" />
+                    ) : (
+                      <div className="w-6 h-6 rounded-full bg-red-500 mr-3 flex items-center justify-center">
+                        <span className="text-white text-sm">✕</span>
                       </div>
-                      <div className="text-gray-400 text-sm font-mono">Terminal</div>
+                    )}
+                    <div>
+                      <div className="font-semibold text-gray-900 dark:text-white">{demoResult.email}</div>
+                      <div className={`text-sm ${demoResult.is_valid ? 'text-green-600' : 'text-red-600'}`}>
+                        {demoResult.verdict} • Score: {demoResult.score}/100
+                      </div>
                     </div>
-                    
-                    {/* API Logs Content */}
-                    <div className="font-mono text-sm text-green-400 space-y-2">
-                      <div className="flex items-center">
-                        <span className="text-gray-500 mr-2">$</span>
-                        <span>curl -X POST https://api.scrubimail.com/v1/validate</span>
-                      </div>
-                      <div className="text-gray-300 ml-4">
-                        -H "Authorization: Bearer YOUR_API_KEY"
-                      </div>
-                      <div className="text-gray-300 ml-4">
-                        -H "Content-Type: application/json"
-                      </div>
-                      <div className="text-gray-300 ml-4">
-                        -d &apos;&#123;&quot;email&quot;: &quot;user@example.com&quot;&#125;&apos;
-                      </div>
-                      <div className="mt-4"></div>
-                      <div className="text-blue-400">&#123;</div>
-                      <div className="text-gray-300 ml-4">"email": "user@example.com",</div>
-                      <div className="text-gray-300 ml-4">"valid": true,</div>
-                      <div className="text-gray-300 ml-4">"score": 0.95,</div>
-                      <div className="text-gray-300 ml-4">"disposable": false,</div>
-                      <div className="text-gray-300 ml-4">"catch_all": false,</div>
-                      <div className="text-gray-300 ml-4">"role": false,</div>
-                      <div className="text-gray-300 ml-4">"domain": "example.com",</div>
-                      <div className="text-gray-300 ml-4">"mx_record": true,</div>
-                      <div className="text-gray-300 ml-4">"smtp_check": true,</div>
-                      <div className="text-blue-400">&#125;</div>
-                      <div className="mt-4"></div>
-                      <div className="text-green-400">✓ Validation completed in 245ms</div>
-                      <div className="text-green-400">✓ Credits remaining: 9,847</div>
+                  </div>
+                  <div className="text-sm text-gray-500">
+                    {demoResult.validation_time.toFixed(2)}s
+                  </div>
+                </div>
+                
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-sm">
+                  <div className="text-center">
+                    <div className={`font-medium ${demoResult.breakdown.syntax.valid ? 'text-green-600' : 'text-red-600'}`}>
+                      {demoResult.breakdown.syntax.valid ? '✓' : '✗'}
                     </div>
+                    <div className="text-gray-600 dark:text-gray-400">Syntax</div>
+                  </div>
+                  <div className="text-center">
+                    <div className={`font-medium ${demoResult.breakdown.dns.valid ? 'text-green-600' : 'text-red-600'}`}>
+                      {demoResult.breakdown.dns.valid ? '✓' : '✗'}
+                    </div>
+                    <div className="text-gray-600 dark:text-gray-400">DNS</div>
+                  </div>
+                  <div className="text-center">
+                    <div className={`font-medium ${demoResult.breakdown.smtp.valid ? 'text-green-600' : 'text-red-600'}`}>
+                      {demoResult.breakdown.smtp.valid ? '✓' : '✗'}
+                    </div>
+                    <div className="text-gray-600 dark:text-gray-400">SMTP</div>
+                  </div>
+                  <div className="text-center">
+                    <div className="font-medium text-blue-600">{demoResult.breakdown.reputation.reputation_score}</div>
+                    <div className="text-gray-600 dark:text-gray-400">Reputation</div>
                   </div>
                 </div>
               </div>
-              
-              {/* Floating Elements */}
-              <div className="absolute -top-6 -right-6 w-20 h-20 bg-gradient-to-r from-[#2ED8A3] to-[#004E8A] rounded-full opacity-20 animate-pulse"></div>
-              <div className="absolute -bottom-6 -left-6 w-16 h-16 bg-[#00C48C] rounded-full opacity-30 animate-bounce"></div>
-              <div className="absolute top-1/2 -right-8 w-12 h-12 bg-[#2ED8A3] rounded-full opacity-25 animate-ping"></div>
+            )}
+          </div>
+
+          {/* CTA Buttons */}
+          <div className="flex flex-col sm:flex-row gap-4 justify-center items-center mb-16">
+            <Link
+              to="/register"
+              className="inline-flex items-center px-8 py-4 bg-[#2ED8A3] text-white font-medium rounded-full hover:bg-[#00C48C] transition-colors duration-200 shadow-lg hover:shadow-xl"
+            >
+              Get started for free
+              <ArrowRight className="w-5 h-5 ml-2" />
+            </Link>
+            <Link
+              to="/api-docs"
+              className="inline-flex items-center px-8 py-4 text-gray-700 dark:text-gray-300 font-medium rounded-full border border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors duration-200"
+            >
+              <Code className="w-5 h-5 mr-2" />
+              View documentation
+            </Link>
+          </div>
+
+          {/* Trust Indicators */}
+          <div className="text-center">
+            <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">
+              Trusted by 10,000+ developers worldwide
+            </p>
+            
+            {/* Feature Pills */}
+            <div className="flex flex-wrap justify-center gap-4">
+              <div className="inline-flex items-center px-4 py-2 bg-gray-100 dark:bg-gray-800 rounded-full text-sm text-gray-700 dark:text-gray-300">
+                <Zap className="w-4 h-4 mr-2 text-[#2ED8A3]" />
+                Real-time validation
+              </div>
+              <div className="inline-flex items-center px-4 py-2 bg-gray-100 dark:bg-gray-800 rounded-full text-sm text-gray-700 dark:text-gray-300">
+                <Shield className="w-4 h-4 mr-2 text-[#2ED8A3]" />
+                99.9% accuracy
+              </div>
+              <div className="inline-flex items-center px-4 py-2 bg-gray-100 dark:bg-gray-800 rounded-full text-sm text-gray-700 dark:text-gray-300">
+                <Code className="w-4 h-4 mr-2 text-[#2ED8A3]" />
+                RESTful API
+              </div>
             </div>
+          </div>
+        </div>
+
+        {/* Bottom Stats */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-8 max-w-3xl mx-auto text-center">
+          <div>
+            <div className="text-3xl sm:text-4xl font-light text-gray-900 dark:text-white mb-2">50M+</div>
+            <div className="text-gray-600 dark:text-gray-400">Emails validated monthly</div>
+          </div>
+          <div>
+            <div className="text-3xl sm:text-4xl font-light text-gray-900 dark:text-white mb-2">&lt;300ms</div>
+            <div className="text-gray-600 dark:text-gray-400">Average response time</div>
+          </div>
+          <div>
+            <div className="text-3xl sm:text-4xl font-light text-gray-900 dark:text-white mb-2">99.9%</div>
+            <div className="text-gray-600 dark:text-gray-400">Uptime SLA</div>
           </div>
         </div>
       </div>

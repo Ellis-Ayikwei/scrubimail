@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { 
   CheckCircle, 
@@ -10,13 +10,61 @@ import {
   ArrowRight,
   Activity
 } from 'lucide-react';
+import { validationService, ValidationHistory, ValidationAnalytics } from '../services/validationService';
 
 const Dashboard: React.FC = () => {
+  const [analytics, setAnalytics] = useState<ValidationAnalytics | null>(null);
+  const [history, setHistory] = useState<ValidationHistory | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchDashboardData = async () => {
+      try {
+        const [analyticsData, historyData] = await Promise.all([
+          validationService.getValidationAnalytics(),
+          validationService.getValidationHistory({ page_size: 4 })
+        ]);
+        setAnalytics(analyticsData);
+        setHistory(historyData);
+      } catch (error) {
+        console.error('Error fetching dashboard data:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchDashboardData();
+  }, []);
+
   const stats = [
-    { label: 'Total Validations', value: '12,847', change: '+12%', changeType: 'positive', icon: Activity },
-    { label: 'Valid Emails', value: '11,234', change: '+8%', changeType: 'positive', icon: CheckCircle },
-    { label: 'Invalid Emails', value: '1,613', change: '-3%', changeType: 'negative', icon: TrendingDown },
-    { label: 'Credits Remaining', value: '1,250', change: '', changeType: 'neutral', icon: Activity },
+    { 
+      label: 'Total Validations', 
+      value: analytics?.overview.total_validations.toLocaleString() || '0', 
+      change: '+12%', 
+      changeType: 'positive' as const, 
+      icon: Activity 
+    },
+    { 
+      label: 'Valid Emails', 
+      value: history?.summary.valid_emails.toLocaleString() || '0', 
+      change: '+8%', 
+      changeType: 'positive' as const, 
+      icon: CheckCircle 
+    },
+    { 
+      label: 'Invalid Emails', 
+      value: history?.summary.invalid_emails.toLocaleString() || '0', 
+      change: '-3%', 
+      changeType: 'negative' as const, 
+      icon: TrendingDown 
+    },
+    { 
+      label: 'Success Rate', 
+      value: `${analytics?.overview.success_rate.toFixed(1) || '0'}%`, 
+      change: '', 
+      changeType: 'neutral' as const, 
+      icon: Activity 
+    },
   ];
 
   const quickActions = [
@@ -50,11 +98,12 @@ const Dashboard: React.FC = () => {
     },
   ];
 
-  const recentActivity = [
-    { email: 'john@example.com', status: 'valid', time: '2 minutes ago' },
-    { email: 'invalid-email', status: 'invalid', time: '5 minutes ago' },
-    { email: 'sarah@company.com', status: 'valid', time: '10 minutes ago' },
-    { email: 'test@domain', status: 'invalid', time: '15 minutes ago' },
+  const recentActivity = history?.results.slice(0, 4).map(result => ({
+    email: result.email,
+    status: result.is_valid ? 'valid' : 'invalid',
+    time: new Date(result.id).toLocaleString() // Using ID as timestamp placeholder
+  })) || [
+    { email: 'Loading...', status: 'valid', time: '' },
   ];
 
   return (
@@ -63,7 +112,9 @@ const Dashboard: React.FC = () => {
       <div className="bg-gradient-to-r from-[#2ED8A3] to-[#004E8A] rounded-2xl p-8 text-white">
         <h1 className="text-3xl font-bold mb-2">Welcome back! 👋</h1>
         <p className="text-white/90 text-lg">
-          Ready to validate some emails? You have <span className="font-semibold">1,250 credits</span> remaining.
+          {loading ? 'Loading your dashboard...' : (
+            <>Ready to validate some emails? You have validated <span className="font-semibold">{analytics?.overview.total_validations.toLocaleString() || '0'} emails</span> so far.</>
+          )}
         </p>
       </div>
 
@@ -149,7 +200,9 @@ const Dashboard: React.FC = () => {
           <div className="space-y-4">
             <div className="flex justify-between items-center">
               <span className="text-[#333333]/70 dark:text-gray-400">This month</span>
-              <span className="font-semibold text-[#333333] dark:text-white">847 validations</span>
+              <span className="font-semibold text-[#333333] dark:text-white">
+                {analytics?.overview.total_validations.toLocaleString() || '0'} validations
+              </span>
             </div>
             <div className="w-full bg-[#F4F5F7] dark:bg-gray-700 rounded-full h-2">
               <div className="bg-gradient-to-r from-[#2ED8A3] to-[#004E8A] h-2 rounded-full" style={{ width: '67%' }}></div>

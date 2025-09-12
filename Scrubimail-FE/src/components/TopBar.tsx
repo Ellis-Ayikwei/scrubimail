@@ -35,16 +35,42 @@ const TopBar: React.FC = () => {
   // If not authenticated, show minimal header with just logo and auth buttons
   if (!isAuthenticated) {
     return (
-      <header className="sticky top-0 z-50 bg-white/80 dark:bg-gray-900/80 backdrop-blur-md border-b border-gray-200 dark:border-gray-700">
+      <header className="sticky top-0 z-50 bg-white/95 dark:bg-gray-900/95 backdrop-blur-sm border-b border-gray-200 dark:border-gray-700">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             {/* Logo and Brand */}
             <div className="flex items-center">
-              <Link to="/dashboard" className="flex items-center space-x-2">
-              <img src='/assets/images/scrubi.png' alt="Logo" className='w-10' />
-                
+              <Link to="/" className="flex items-center space-x-3">
+                <div className="w-8 h-8 bg-gradient-to-r from-[#2ED8A3] to-[#00C48C] rounded-lg flex items-center justify-center">
+                  <CheckCircle className="w-5 h-5 text-white" />
+                </div>
+                <span className="text-xl font-medium text-gray-900 dark:text-white">
+                  ScrubiMail
+                </span>
               </Link>
             </div>
+
+            {/* Navigation Links for unauthenticated users */}
+            <nav className="hidden md:flex items-center space-x-8">
+              <Link
+                to="/api-docs"
+                className="text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white text-sm font-medium transition-colors"
+              >
+                API Docs
+              </Link>
+              <Link
+                to="/pricing"
+                className="text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white text-sm font-medium transition-colors"
+              >
+                Pricing
+              </Link>
+              <Link
+                to="/about"
+                className="text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white text-sm font-medium transition-colors"
+              >
+                About
+              </Link>
+            </nav>
 
             {/* Right side actions for non-authenticated users */}
             <div className="flex items-center space-x-4">
@@ -52,18 +78,18 @@ const TopBar: React.FC = () => {
               <DarkModeToggle />
 
               {/* Auth buttons */}
-              <div className="flex items-center space-x-2">
+              <div className="flex items-center space-x-3">
                 <Link
                   to="/login"
-                  className="px-4 py-2 text-sm font-medium text-[#333333] dark:text-gray-300 hover:text-[#004E8A] dark:hover:text-white transition-colors duration-200"
+                  className="text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white text-sm font-medium transition-colors"
                 >
-                  Sign In
+                  Sign in
                 </Link>
                 <Link
                   to="/register"
-                  className="px-4 py-2 text-sm font-medium bg-[#2ED8A3] text-white rounded-lg hover:bg-[#2ED8A3]/90 transition-colors duration-200"
+                  className="inline-flex items-center px-4 py-2 text-sm font-medium bg-[#2ED8A3] text-white rounded-full hover:bg-[#00C48C] transition-colors duration-200 shadow-sm"
                 >
-                  Get Started
+                  Get started
                 </Link>
               </div>
             </div>

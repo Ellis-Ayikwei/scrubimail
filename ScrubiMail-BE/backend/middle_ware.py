@@ -25,17 +25,30 @@ class ConditionalSlashMiddleware:
 
 class APIKeyAuthentication(BaseAuthentication):
     """
-    Custom authentication for API keys. Supports both 'X-API-Key' and 'Authorization: Api-Key ...' headers.
+    Custom authentication for API keys. Supports multiple header formats:
+    - X-API-Key: <key>
+    - Authorization: Api-Key <key>
+    - Authorization: Bearer <key> (for API keys)
     Sets request.user to the user associated with the API key.
     """
 
     def authenticate(self, request):
         api_key = request.headers.get("X-API-Key")
         if not api_key:
-            # Also support 'Authorization: Api-Key ...'
+            # Also support 'Authorization: Api-Key ...' and 'Authorization: Bearer ...'
             auth_header = request.headers.get("Authorization")
-            if auth_header and auth_header.lower().startswith("api-key "):
-                api_key = auth_header[8:].strip()
+            if auth_header:
+                if auth_header.lower().startswith("api-key "):
+                    api_key = auth_header[8:].strip()
+                elif auth_header.lower().startswith("bearer "):
+                    # Check if it's an API key (not JWT) by trying to find it in APIKey model
+                    potential_key = auth_header[7:].strip()
+                    try:
+                        key_obj = APIKey.objects.get(key=potential_key, is_active=True)
+                        return (key_obj.user, None)
+                    except APIKey.DoesNotExist:
+                        # Not an API key, let JWT authentication handle it
+                        return None
         if not api_key:
             return None
         try:
