@@ -16,6 +16,7 @@ const About = lazy(() => import('../pages/About'));
 const Blog = lazy(() => import('../pages/Blog'));
 const Contact = lazy(() => import('../pages/Contact'));
 const Help = lazy(() => import('../pages/Help'));
+const Pricing = lazy(() => import('../pages/Pricing'));
 const Login = lazy(() => import('../pages/auth/Login'));
 const Register = lazy(() => import('../pages/auth/Register'));
 const ForgotPassword = lazy(() => import('../pages/auth/ForgotPassword'));
@@ -73,6 +74,11 @@ const routes = [
     {
         path: '/help',
         element: <Help />,
+        layout: 'default',
+    },
+    {
+        path: '/pricing',
+        element: <Pricing />,
         layout: 'default',
     },
     {
