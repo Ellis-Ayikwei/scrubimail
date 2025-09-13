@@ -129,35 +129,35 @@ const HeroSection: React.FC = () => {
           </div>
 
           {/* CTA with email input */}
-          <div className="max-w-2xl mx-auto space-y-4 flex flex-row">
-            <div className="flex flex-col sm:flex-row gap-3 p-1 bg-white dark:bg-[#161b22] rounded-full border border-gray-200 dark:border-[#30363d] shadow-lg transition-colors duration-300">
+            <div className="max-w-2xl mx-auto space-y-4 flex flex-row items-center justify-center">
+            <div className="flex flex-col sm:flex-row gap-3 p-2 bg-white dark:bg-[#161b22] rounded-full border-2 border-[#10B981] shadow-2xl transition-colors duration-300 ring-4 ring-[#10B981]/10">
               <div className="relative flex-1">
-                <Mail className="absolute left-4 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400 dark:text-[#7d8590]" />
-                <input
-                  type="email"
-                  value={ctaEmail}
-                  onChange={(e) => setCTAEmail(e.target.value)}
-                  placeholder="Enter your email to get started"
-                  className="w-full pl-12 pr-4 py-4 text-lg bg-transparent border-none outline-none text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-[#7d8590] transition-colors duration-300"
-                />
+              <Mail className="absolute left-4 top-1/2 transform -translate-y-1/2 w-6 h-6 text-[#10B981] dark:text-[#10B981]" />
+              <input
+                type="email"
+                value={ctaEmail}
+                onChange={(e) => setCTAEmail(e.target.value)}
+                placeholder="Enter your email to get started"
+                className="w-full pl-14 pr-4 py-5 text-lg bg-transparent border-none outline-none text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-[#7d8590] font-semibold transition-colors duration-300"
+              />
               </div>
               <Link
-                to={`/onboarding${ctaEmail ? `?email=${encodeURIComponent(ctaEmail)}` : ''}`}
-                className="inline-flex items-center justify-center px-8 py-4 bg-[#10B981] text-white font-semibold rounded-full hover:bg-[#059669] transition-all duration-200 shadow-lg hover:shadow-xl transform hover:scale-105"
+              to={`/onboarding${ctaEmail ? `?email=${encodeURIComponent(ctaEmail)}` : ''}`}
+              className="inline-flex items-center justify-center px-10 py-5 bg-gradient-to-r from-[#10B981] to-[#059669] text-white font-bold rounded-full hover:from-[#059669] hover:to-[#10B981] transition-all duration-200 shadow-xl hover:shadow-2xl transform hover:scale-105 text-lg"
               >
-                Start validating for free
-                <ArrowRight className="w-4 h-4 ml-2" />
+              Start validating for free
+              <ArrowRight className="w-5 h-5 ml-3" />
               </Link>
             </div>
             
             <Link
               to="/api-docs"
-              className="inline-flex items-center justify-center px-8 py-4 text-gray-700 dark:text-white font-semibold rounded-3xl border border-gray-300 dark:border-[#30363d] hover:bg-gray-50 dark:hover:bg-[#21262d] transition-all duration-200"
+              className="inline-flex items-center justify-center px-10 py-5 ml-6 text-[#10B981] dark:text-[#10B981] font-bold rounded-3xl border-2 border-[#10B981] hover:bg-[#10B981]/10 dark:hover:bg-[#10B981]/10 transition-all duration-200 text-lg shadow-lg"
             >
-              <Code className="w-4 h-4 mr-2" />
+              <Code className="w-5 h-5 mr-3" />
               View documentation
             </Link>
-          </div>
+            </div>
 
           {/* Centered Dashboard Mockup - Main Feature */}
           <div className="relative max-w-4xl mx-auto mt-20">
