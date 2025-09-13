@@ -6,7 +6,7 @@ import {
   CheckCircle, 
   Settings, 
   Trash2,
-  MarkAsUnread,
+  Eye,
   Filter,
   Search
 } from 'lucide-react';
@@ -255,7 +255,7 @@ const Notifications: React.FC = () => {
                                     className="p-1 text-gray-400 hover:text-[#10B981] transition-colors"
                                     title="Mark as read"
                                   >
-                                    <MarkAsUnread className="w-4 h-4" />
+                                    <Eye className="w-4 h-4" />
                                   </button>
                                 )}
                                 <button
