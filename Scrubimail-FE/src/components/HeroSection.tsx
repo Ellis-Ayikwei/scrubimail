@@ -129,7 +129,7 @@ const HeroSection: React.FC = () => {
           </div>
 
           {/* CTA with email input */}
-            <div className="max-w-2xl mx-auto space-y-4 flex flex-row items-center justify-center">
+            <div className="max-w-5xl mx-auto space-y-4 flex flex-row items-center justify-center">
             <div className="flex flex-col sm:flex-row gap-3 p-2 bg-white dark:bg-[#161b22] rounded-full border-2 border-[#10B981] shadow-2xl transition-colors duration-300 ring-4 ring-[#10B981]/10">
               <div className="relative flex-1">
               <Mail className="absolute left-4 top-1/2 transform -translate-y-1/2 w-6 h-6 text-[#10B981] dark:text-[#10B981]" />
