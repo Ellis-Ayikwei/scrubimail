@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowRight, Code, Mail, CheckCircle, Search, Zap, Shield, Star, TrendingUp, Globe, Users, Clock } from 'lucide-react';
+import { ArrowRight, Code, Mail, CheckCircle, Search, Zap, Shield, Star, TrendingUp, Globe, Users, Clock, BarChart3, XCircle, AlertTriangle, Eye, Layers, Database, Activity } from 'lucide-react';
 
 const HeroSection: React.FC = () => {
   const [demoEmail, setDemoEmail] = useState('');
@@ -72,221 +72,276 @@ const HeroSection: React.FC = () => {
   };
 
   return (
-    <section className="relative min-h-screen bg-gradient-to-b from-white via-gray-50/50 to-white dark:from-gray-900 dark:via-gray-900/50 dark:to-gray-900 overflow-hidden">
-      {/* Animated background elements */}
+    <section className="relative min-h-screen bg-white dark:bg-gray-900 overflow-hidden">
+      {/* GitHub-inspired background with subtle tech patterns */}
       <div className="absolute inset-0">
-        {/* Floating particles */}
-        <div className="absolute top-20 left-[10%] w-2 h-2 bg-[#2ED8A3]/30 rounded-full animate-pulse"></div>
-        <div className="absolute top-40 right-[15%] w-1 h-1 bg-blue-400/40 rounded-full animate-ping"></div>
-        <div className="absolute top-60 left-[20%] w-1.5 h-1.5 bg-purple-400/30 rounded-full animate-pulse"></div>
-        <div className="absolute bottom-40 right-[25%] w-2 h-2 bg-[#2ED8A3]/20 rounded-full animate-bounce"></div>
-        <div className="absolute bottom-60 left-[30%] w-1 h-1 bg-blue-300/40 rounded-full animate-ping"></div>
+        {/* Subtle grid pattern */}
+        <div className="absolute inset-0 bg-[linear-gradient(rgba(30,58,138,0.03)_1px,transparent_1px),linear-gradient(90deg,rgba(30,58,138,0.03)_1px,transparent_1px)] bg-[size:64px_64px] dark:bg-[linear-gradient(rgba(255,255,255,0.02)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.02)_1px,transparent_1px)]"></div>
         
-        {/* Gradient orbs */}
-        <div className="absolute top-0 left-0 w-96 h-96 bg-gradient-to-r from-[#2ED8A3]/5 to-blue-500/5 rounded-full blur-3xl -translate-x-1/2 -translate-y-1/2"></div>
-        <div className="absolute bottom-0 right-0 w-96 h-96 bg-gradient-to-l from-purple-500/5 to-[#2ED8A3]/5 rounded-full blur-3xl translate-x-1/2 translate-y-1/2"></div>
-      </div>
-
-      <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-20 pb-16">
-        {/* Trust indicators at top */}
-        <div className="text-center mb-12">
-          <div className="inline-flex items-center px-4 py-2 bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm rounded-full border border-gray-200/50 dark:border-gray-700/50 shadow-sm">
-            <div className="flex items-center mr-3">
-              <Star className="w-4 h-4 text-yellow-400 fill-current" />
-              <Star className="w-4 h-4 text-yellow-400 fill-current" />
-              <Star className="w-4 h-4 text-yellow-400 fill-current" />
-              <Star className="w-4 h-4 text-yellow-400 fill-current" />
-              <Star className="w-4 h-4 text-yellow-400 fill-current" />
-            </div>
-            <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
-              Rated 5.0 by 10,000+ developers
-            </span>
+        {/* Floating email icons and elements */}
+        <div className="absolute top-20 left-[8%] opacity-60 animate-float-slow">
+          <div className="w-12 h-12 bg-gradient-to-br from-[#10B981] to-[#059669] rounded-lg flex items-center justify-center shadow-lg">
+            <Mail className="w-6 h-6 text-white" />
           </div>
         </div>
+        
+        <div className="absolute top-32 right-[12%] opacity-40 animate-float-medium">
+          <div className="w-10 h-10 bg-gradient-to-br from-[#1E3A8A] to-[#1E40AF] rounded-lg flex items-center justify-center shadow-lg">
+            <Shield className="w-5 h-5 text-white" />
+          </div>
+        </div>
+        
+        <div className="absolute top-48 left-[15%] opacity-50 animate-float-fast">
+          <div className="w-8 h-8 bg-gradient-to-br from-[#10B981] to-[#059669] rounded-full flex items-center justify-center shadow-lg">
+            <CheckCircle className="w-4 h-4 text-white" />
+          </div>
+        </div>
+        
+        <div className="absolute bottom-40 right-[20%] opacity-60 animate-float-slow">
+          <div className="w-14 h-14 bg-gradient-to-br from-[#1E3A8A] to-[#1E40AF] rounded-xl flex items-center justify-center shadow-lg">
+            <BarChart3 className="w-7 h-7 text-white" />
+          </div>
+        </div>
+        
+        <div className="absolute bottom-60 left-[25%] opacity-45 animate-float-medium">
+          <div className="w-6 h-6 bg-gradient-to-br from-[#EF4444] to-[#DC2626] rounded-lg flex items-center justify-center shadow-lg">
+            <XCircle className="w-3 h-3 text-white" />
+          </div>
+        </div>
+        
+        {/* Data flow lines */}
+        <div className="absolute top-1/4 left-1/4 w-32 h-px bg-gradient-to-r from-[#10B981]/20 to-transparent animate-pulse"></div>
+        <div className="absolute top-1/3 right-1/4 w-24 h-px bg-gradient-to-l from-[#1E3A8A]/20 to-transparent animate-pulse delay-1000"></div>
+        <div className="absolute bottom-1/3 left-1/3 w-28 h-px bg-gradient-to-r from-[#10B981]/20 to-transparent animate-pulse delay-2000"></div>
+      </div>
 
-        <div className="text-center max-w-5xl mx-auto mb-16">
-          {/* Dynamic headline with typewriter */}
-          <h1 className="text-5xl sm:text-6xl lg:text-7xl font-light text-gray-900 dark:text-white mb-8 leading-tight tracking-tight">
-            Validate emails with
-            <br />
-            <span className="text-[#2ED8A3] font-medium relative">
-              {typedText}
-              <span className="animate-pulse">|</span>
-            </span>
-          </h1>
+      <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-16 pb-16">
+        
+        {/* GitHub-inspired two-column layout */}
+        <div className="grid lg:grid-cols-2 gap-16 items-center min-h-[80vh]">
           
-          <p className="text-xl sm:text-2xl text-gray-600 dark:text-gray-300 mb-16 font-light leading-relaxed max-w-4xl mx-auto">
-            The most advanced email validation API trusted by industry leaders. 
-            <br className="hidden sm:block" />
-            Improve deliverability, reduce bounces, and protect your sender reputation with real-time validation.
-          </p>
-
-          {/* Enhanced Interactive Demo */}
-          <div className="max-w-3xl mx-auto mb-16">
-            <div className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm rounded-3xl p-8 shadow-2xl border border-gray-200/50 dark:border-gray-700/50">
-              <div className="mb-6">
-                <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">Try it now</h3>
-                <p className="text-gray-600 dark:text-gray-300 text-sm">Enter any email address to see instant validation results</p>
+          {/* Left Column - Content */}
+          <div className="space-y-8">
+            
+            {/* Trust badge */}
+            <div className="inline-flex items-center px-3 py-1 bg-[#1E3A8A]/5 dark:bg-[#1E3A8A]/20 rounded-full border border-[#1E3A8A]/10 dark:border-[#1E3A8A]/30">
+              <div className="flex items-center mr-2">
+                <Star className="w-3 h-3 text-[#10B981] fill-current" />
+                <Star className="w-3 h-3 text-[#10B981] fill-current" />
+                <Star className="w-3 h-3 text-[#10B981] fill-current" />
+                <Star className="w-3 h-3 text-[#10B981] fill-current" />
+                <Star className="w-3 h-3 text-[#10B981] fill-current" />
               </div>
+              <span className="text-xs font-medium text-[#1E3A8A] dark:text-[#60A5FA]">
+                Trusted by 10K+ developers
+              </span>
+            </div>
+
+            {/* Main headline */}
+            <div>
+              <h1 className="text-4xl sm:text-5xl lg:text-6xl font-semibold text-gray-900 dark:text-white leading-tight mb-6">
+                Emails flowing safely
+                <br />
+                into <span className="text-[#10B981] relative">
+                  inboxes
+                  <div className="absolute -bottom-2 left-0 w-full h-1 bg-gradient-to-r from-[#10B981] to-[#059669] rounded-full"></div>
+                </span>
+              </h1>
               
-              <form onSubmit={handleDemoValidation} className="relative mb-6">
-                <div className="relative flex items-center bg-white dark:bg-gray-900 rounded-2xl shadow-lg border-2 border-gray-100 dark:border-gray-700 p-3 hover:border-[#2ED8A3]/30 transition-all duration-300 focus-within:border-[#2ED8A3]/50 focus-within:shadow-xl">
-                  <Mail className="w-6 h-6 text-gray-400 ml-3" />
-                  <input
-                    type="email"
-                    value={demoEmail}
-                    onChange={(e) => setDemoEmail(e.target.value)}
-                    placeholder="john.doe@company.com"
-                    className="flex-1 px-4 py-4 text-lg bg-transparent border-none outline-none text-gray-900 dark:text-white placeholder-gray-400"
-                  />
+              <p className="text-lg sm:text-xl text-gray-600 dark:text-gray-300 leading-relaxed max-w-xl">
+                Validate email addresses with professional precision. Our advanced API ensures your messages reach real inboxes, protecting your sender reputation and boosting deliverability.
+              </p>
+            </div>
+
+            {/* CTA buttons */}
+            <div className="flex flex-col sm:flex-row gap-4">
+              <Link
+                to="/register"
+                className="inline-flex items-center justify-center px-6 py-3 bg-[#10B981] text-white font-medium rounded-lg hover:bg-[#059669] transition-all duration-200 shadow-lg hover:shadow-xl transform hover:scale-105"
+              >
+                Start validating for free
+                <ArrowRight className="w-4 h-4 ml-2" />
+              </Link>
+              <Link
+                to="/api-docs"
+                className="inline-flex items-center justify-center px-6 py-3 text-gray-700 dark:text-gray-300 font-medium rounded-lg border border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-800 transition-all duration-200"
+              >
+                <Code className="w-4 h-4 mr-2" />
+                View documentation
+              </Link>
+            </div>
+
+            {/* Quick stats */}
+            <div className="grid grid-cols-3 gap-6 pt-6">
+              {stats.slice(0, 3).map((stat, index) => (
+                <div key={index} className="text-center">
+                  <div className="text-2xl font-bold text-gray-900 dark:text-white">
+                    {stat.number}
+                  </div>
+                  <div className="text-sm text-gray-600 dark:text-gray-400 leading-tight">
+                    {stat.label}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Right Column - Dashboard Mockup */}
+          <div className="relative">
+            
+            {/* Main dashboard container */}
+            <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-700 overflow-hidden">
+              
+              {/* Dashboard header */}
+              <div className="bg-gray-50 dark:bg-gray-900 px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-3">
+                    <div className="w-8 h-8 bg-[#10B981] rounded-lg flex items-center justify-center">
+                      <Mail className="w-4 h-4 text-white" />
+                    </div>
+                    <div>
+                      <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Email Validation Dashboard</h3>
+                      <p className="text-xs text-gray-500 dark:text-gray-400">Real-time validation results</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <div className="w-2 h-2 bg-[#10B981] rounded-full animate-pulse"></div>
+                    <span className="text-xs text-gray-500 dark:text-gray-400">Live</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Email validation demo form */}
+              <div className="p-6 space-y-4">
+                <form onSubmit={handleDemoValidation} className="space-y-4">
+                  <div className="relative">
+                    <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+                    <input
+                      type="email"
+                      value={demoEmail}
+                      onChange={(e) => setDemoEmail(e.target.value)}
+                      placeholder="john.doe@company.com"
+                      className="w-full pl-10 pr-4 py-3 text-sm border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-[#10B981] focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400"
+                    />
+                  </div>
                   <button
                     type="submit"
                     disabled={isValidating || !demoEmail.trim()}
-                    className="bg-gradient-to-r from-[#2ED8A3] to-[#00C48C] hover:from-[#00C48C] hover:to-[#2ED8A3] text-white px-8 py-4 rounded-xl font-medium transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed flex items-center shadow-lg hover:shadow-xl transform hover:scale-105"
+                    className="w-full flex items-center justify-center space-x-2 bg-[#10B981] text-white py-3 px-4 rounded-lg text-sm font-medium hover:bg-[#059669] disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
                   >
                     {isValidating ? (
                       <>
-                        <div className="animate-spin rounded-full h-5 w-5 border-2 border-white border-t-transparent mr-2"></div>
-                        Validating...
+                        <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></div>
+                        <span>Validating...</span>
                       </>
                     ) : (
                       <>
-                        <Search className="w-5 h-5 mr-2" />
-                        Validate Email
+                        <Search className="w-4 h-4" />
+                        <span>Validate Email</span>
                       </>
                     )}
                   </button>
-                </div>
-              </form>
+                </form>
 
-              {/* Enhanced Demo Result */}
-              {demoResult && (
-                <div className="bg-gradient-to-r from-gray-50 to-white dark:from-gray-900 dark:to-gray-800 rounded-2xl p-6 border border-gray-200 dark:border-gray-700 shadow-inner">
-                  <div className="flex items-center justify-between mb-6">
-                    <div className="flex items-center">
-                      <div className={`w-12 h-12 rounded-full flex items-center justify-center mr-4 ${
-                        demoResult.is_valid 
-                          ? 'bg-green-100 dark:bg-green-900/20' 
-                          : 'bg-red-100 dark:bg-red-900/20'
-                      }`}>
-                        {demoResult.is_valid ? (
-                          <CheckCircle className="w-6 h-6 text-green-600 dark:text-green-400" />
-                        ) : (
-                          <div className="w-6 h-6 rounded-full bg-red-500 flex items-center justify-center">
-                            <span className="text-white text-sm font-bold">✕</span>
-                          </div>
-                        )}
+                {/* Sample validation results */}
+                <div className="space-y-3">
+                  <div className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Recent Validations</div>
+                  
+                  {/* Valid email example */}
+                  <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                    <div className="flex items-center space-x-3">
+                      <div className="w-6 h-6 bg-[#10B981] rounded-full flex items-center justify-center">
+                        <CheckCircle className="w-3 h-3 text-white" />
                       </div>
                       <div>
-                        <div className="font-semibold text-gray-900 dark:text-white text-lg">{demoResult.email}</div>
-                        <div className={`text-sm font-medium ${
-                          demoResult.is_valid ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'
-                        }`}>
-                          {demoResult.verdict} • Confidence: {demoResult.score}%
-                        </div>
+                        <div className="text-sm font-medium text-gray-900 dark:text-white">sarah.wilson@gmail.com</div>
+                        <div className="text-xs text-[#10B981]">Valid • 98% confidence</div>
                       </div>
                     </div>
-                    <div className="text-right">
-                      <div className="text-2xl font-bold text-gray-900 dark:text-white">{demoResult.score}%</div>
-                      <div className="text-sm text-gray-500">{demoResult.validation_time.toFixed(3)}s</div>
-                    </div>
+                    <div className="text-xs text-gray-500 dark:text-gray-400">0.2s</div>
                   </div>
                   
-                  <div className="grid grid-cols-2 lg:grid-cols-5 gap-4 mb-4">
-                    {[
-                      { label: 'Syntax', value: demoResult.breakdown.syntax.valid, score: demoResult.breakdown.syntax.score },
-                      { label: 'DNS', value: demoResult.breakdown.dns.valid, score: demoResult.breakdown.dns.score },
-                      { label: 'SMTP', value: demoResult.breakdown.smtp.valid, score: demoResult.breakdown.smtp.score },
-                      { label: 'Reputation', value: demoResult.breakdown.reputation.reputation_score > 50, score: demoResult.breakdown.reputation.reputation_score },
-                      { label: 'Role-based', value: !demoResult.breakdown.role_based.is_role_based, score: demoResult.breakdown.role_based.is_role_based ? 0 : 100 }
-                    ].map((check, index) => (
-                      <div key={index} className="text-center p-3 bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700">
-                        <div className={`text-2xl font-bold mb-1 ${check.value ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
-                          {check.value ? '✓' : '✗'}
-                        </div>
-                        <div className="text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">{check.label}</div>
-                        <div className="text-xs text-gray-500">{check.score}%</div>
+                  {/* Invalid email example */}
+                  <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                    <div className="flex items-center space-x-3">
+                      <div className="w-6 h-6 bg-[#EF4444] rounded-full flex items-center justify-center">
+                        <XCircle className="w-3 h-3 text-white" />
                       </div>
-                    ))}
-                  </div>
-
-                  {demoResult.suggestions.length > 0 && (
-                    <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-3">
-                      <div className="text-sm font-medium text-blue-800 dark:text-blue-200 mb-1">Suggestions:</div>
-                      {demoResult.suggestions.map((suggestion: string, index: number) => (
-                        <div key={index} className="text-sm text-blue-700 dark:text-blue-300">{suggestion}</div>
-                      ))}
+                      <div>
+                        <div className="text-sm font-medium text-gray-900 dark:text-white">invalid@fake-domain.xyz</div>
+                        <div className="text-xs text-[#EF4444]">Invalid • DNS not found</div>
+                      </div>
                     </div>
-                  )}
+                    <div className="text-xs text-gray-500 dark:text-gray-400">0.1s</div>
+                  </div>
+                  
+                  {/* Risky email example */}
+                  <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                    <div className="flex items-center space-x-3">
+                      <div className="w-6 h-6 bg-yellow-500 rounded-full flex items-center justify-center">
+                        <AlertTriangle className="w-3 h-3 text-white" />
+                      </div>
+                      <div>
+                        <div className="text-sm font-medium text-gray-900 dark:text-white">temp@10minutemail.com</div>
+                        <div className="text-xs text-yellow-600 dark:text-yellow-400">Risky • Disposable email</div>
+                      </div>
+                    </div>
+                    <div className="text-xs text-gray-500 dark:text-gray-400">0.3s</div>
+                  </div>
                 </div>
-              )}
-            </div>
-          </div>
+              </div>
 
-          {/* Enhanced CTA Section */}
-          <div className="flex flex-col sm:flex-row gap-6 justify-center items-center mb-20">
-            <Link
-              to="/register"
-              className="group inline-flex items-center px-10 py-5 bg-gradient-to-r from-[#2ED8A3] to-[#00C48C] text-white font-semibold rounded-2xl hover:from-[#00C48C] hover:to-[#2ED8A3] transition-all duration-300 shadow-xl hover:shadow-2xl transform hover:scale-105"
-            >
-              Start validating for free
-              <ArrowRight className="w-5 h-5 ml-3 group-hover:translate-x-1 transition-transform" />
-            </Link>
-            <Link
-              to="/api-docs"
-              className="inline-flex items-center px-10 py-5 text-gray-700 dark:text-gray-300 font-semibold rounded-2xl border-2 border-gray-200 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-800 hover:border-gray-300 dark:hover:border-gray-500 transition-all duration-300"
-            >
-              <Code className="w-5 h-5 mr-3" />
-              Explore API docs
-            </Link>
-          </div>
-
-          {/* Social proof logos */}
-          <div className="mb-20">
-            <p className="text-sm text-gray-500 dark:text-gray-400 mb-8 font-medium">
-              Trusted by leading companies worldwide
-            </p>
-            <div className="flex items-center justify-center space-x-12 opacity-60 dark:opacity-40">
-              {/* Mock company logos */}
-              <div className="w-24 h-8 bg-gradient-to-r from-gray-300 to-gray-400 dark:from-gray-600 dark:to-gray-700 rounded-md"></div>
-              <div className="w-20 h-8 bg-gradient-to-r from-gray-300 to-gray-400 dark:from-gray-600 dark:to-gray-700 rounded-md"></div>
-              <div className="w-28 h-8 bg-gradient-to-r from-gray-300 to-gray-400 dark:from-gray-600 dark:to-gray-700 rounded-md"></div>
-              <div className="w-22 h-8 bg-gradient-to-r from-gray-300 to-gray-400 dark:from-gray-600 dark:to-gray-700 rounded-md"></div>
-            </div>
-          </div>
-        </div>
-
-        {/* Enhanced Stats Grid */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-8 max-w-5xl mx-auto">
-          {stats.map((stat, index) => (
-            <div key={index} className="text-center group">
-              <div className="bg-white/60 dark:bg-gray-800/60 backdrop-blur-sm rounded-2xl p-6 border border-gray-200/50 dark:border-gray-700/50 hover:bg-white/80 dark:hover:bg-gray-800/80 transition-all duration-300 hover:shadow-lg">
-                <div className="text-3xl lg:text-4xl font-light text-gray-900 dark:text-white mb-3 group-hover:text-[#2ED8A3] transition-colors">
-                  {stat.number}
-                </div>
-                <div className="text-gray-600 dark:text-gray-400 text-sm leading-relaxed">
-                  {stat.label}
+              {/* Dashboard stats footer */}
+              <div className="bg-gray-50 dark:bg-gray-900 px-6 py-4 border-t border-gray-200 dark:border-gray-700">
+                <div className="grid grid-cols-3 gap-4 text-center">
+                  <div>
+                    <div className="text-lg font-bold text-[#10B981]">1,247</div>
+                    <div className="text-xs text-gray-500 dark:text-gray-400">Today</div>
+                  </div>
+                  <div>
+                    <div className="text-lg font-bold text-gray-900 dark:text-white">98.5%</div>
+                    <div className="text-xs text-gray-500 dark:text-gray-400">Accuracy</div>
+                  </div>
+                  <div>
+                    <div className="text-lg font-bold text-[#1E3A8A]">0.2s</div>
+                    <div className="text-xs text-gray-500 dark:text-gray-400">Avg Time</div>
+                  </div>
                 </div>
               </div>
             </div>
-          ))}
+
+            {/* Floating analytics chart */}
+            <div className="absolute -top-8 -right-8 w-20 h-20 bg-white dark:bg-gray-800 rounded-2xl shadow-xl border border-gray-200 dark:border-gray-700 p-4 animate-float-slow">
+              <div className="w-full h-full flex flex-col justify-between">
+                <div className="flex items-center justify-between">
+                  <div className="w-1 h-6 bg-[#10B981] rounded-full"></div>
+                  <div className="w-1 h-4 bg-[#1E3A8A] rounded-full"></div>
+                  <div className="w-1 h-8 bg-[#10B981] rounded-full"></div>
+                  <div className="w-1 h-3 bg-[#EF4444] rounded-full"></div>
+                </div>
+                <div className="text-xs text-gray-500 dark:text-gray-400 text-center">Analytics</div>
+              </div>
+            </div>
+
+            {/* Floating security badge */}
+            <div className="absolute -bottom-6 -left-6 w-16 h-16 bg-white dark:bg-gray-800 rounded-full shadow-xl border border-gray-200 dark:border-gray-700 flex items-center justify-center animate-float-medium">
+              <Shield className="w-6 h-6 text-[#1E3A8A]" />
+            </div>
+          </div>
         </div>
 
-        {/* Feature highlights */}
-        <div className="flex flex-wrap justify-center gap-4 mt-16">
-          {[
-            { icon: Zap, text: 'Lightning fast' },
-            { icon: Shield, text: '99.9% accurate' },
-            { icon: Globe, text: 'Global coverage' },
-            { icon: Code, text: 'Developer friendly' },
-            { icon: Users, text: '24/7 support' },
-            { icon: TrendingUp, text: 'Real-time analytics' }
-          ].map((feature, index) => (
-            <div key={index} className="inline-flex items-center px-4 py-2 bg-white/60 dark:bg-gray-800/60 backdrop-blur-sm rounded-full text-sm text-gray-700 dark:text-gray-300 border border-gray-200/50 dark:border-gray-700/50 hover:bg-white/80 dark:hover:bg-gray-800/80 transition-all duration-300">
-              <feature.icon className="w-4 h-4 mr-2 text-[#2ED8A3]" />
-              {feature.text}
-            </div>
-          ))}
+        {/* Social proof section */}
+        <div className="text-center mt-20 pt-16 border-t border-gray-200 dark:border-gray-700">
+          <p className="text-sm text-gray-500 dark:text-gray-400 mb-8 font-medium">
+            Trusted by leading companies worldwide
+          </p>
+          <div className="flex items-center justify-center space-x-12 opacity-60 dark:opacity-40">
+            {/* Mock company logos */}
+            <div className="w-24 h-8 bg-gradient-to-r from-gray-300 to-gray-400 dark:from-gray-600 dark:to-gray-700 rounded-md"></div>
+            <div className="w-20 h-8 bg-gradient-to-r from-gray-300 to-gray-400 dark:from-gray-600 dark:to-gray-700 rounded-md"></div>
+            <div className="w-28 h-8 bg-gradient-to-r from-gray-300 to-gray-400 dark:from-gray-600 dark:to-gray-700 rounded-md"></div>
+            <div className="w-22 h-8 bg-gradient-to-r from-gray-300 to-gray-400 dark:from-gray-600 dark:to-gray-700 rounded-md"></div>
+          </div>
         </div>
       </div>
     </section>

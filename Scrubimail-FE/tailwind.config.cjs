@@ -175,6 +175,25 @@ module.exports = {
                     },
                 },
             }),
+            keyframes: {
+                'float-slow': {
+                    '0%, 100%': { transform: 'translateY(0px)' },
+                    '50%': { transform: 'translateY(-10px)' },
+                },
+                'float-medium': {
+                    '0%, 100%': { transform: 'translateY(0px)' },
+                    '50%': { transform: 'translateY(-8px)' },
+                },
+                'float-fast': {
+                    '0%, 100%': { transform: 'translateY(0px)' },
+                    '50%': { transform: 'translateY(-6px)' },
+                },
+            },
+            animation: {
+                'float-slow': 'float-slow 6s ease-in-out infinite',
+                'float-medium': 'float-medium 4s ease-in-out infinite',
+                'float-fast': 'float-fast 3s ease-in-out infinite',
+            },
         },
     },
     variants: {
