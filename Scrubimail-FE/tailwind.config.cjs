@@ -194,6 +194,9 @@ module.exports = {
                 'float-medium': 'float-medium 4s ease-in-out infinite',
                 'float-fast': 'float-fast 3s ease-in-out infinite',
             },
+            backgroundImage: {
+                'gradient-radial': 'radial-gradient(var(--tw-gradient-stops))',
+            },
         },
     },
     variants: {

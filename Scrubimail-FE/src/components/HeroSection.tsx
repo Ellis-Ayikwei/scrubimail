@@ -9,12 +9,7 @@ const HeroSection: React.FC = () => {
   const [currentStat, setCurrentStat] = useState(0);
   const [typedText, setTypedText] = useState('');
 
-  const stats = [
-    { number: '50M+', label: 'emails validated monthly' },
-    { number: '<300ms', label: 'average response time' },
-    { number: '99.9%', label: 'uptime guarantee' },
-    { number: '10K+', label: 'developers trust us' }
-  ];
+  // Removed stats as requested
 
   const typewriterTexts = [
     'professional precision',
@@ -78,22 +73,22 @@ const HeroSection: React.FC = () => {
         {/* Subtle grid pattern */}
         <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.02)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.02)_1px,transparent_1px)] bg-[size:64px_64px]"></div>
         
-        {/* Dramatic light beam from bottom - GitHub style */}
-        <div className="absolute bottom-0 left-1/2 transform -translate-x-1/2 w-full max-w-6xl h-96">
-          <div className="absolute bottom-0 left-1/2 transform -translate-x-1/2 w-full h-full bg-gradient-to-t from-white/10 via-white/5 to-transparent blur-3xl"></div>
-          <div className="absolute bottom-0 left-1/2 transform -translate-x-1/2 w-3/4 h-3/4 bg-gradient-to-t from-white/15 via-white/8 to-transparent blur-2xl"></div>
-          <div className="absolute bottom-0 left-1/2 transform -translate-x-1/2 w-1/2 h-1/2 bg-gradient-to-t from-white/20 via-white/10 to-transparent blur-xl"></div>
+        {/* Focused light beam around dashboard area */}
+        <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/4 w-full max-w-5xl h-[600px]">
+          <div className="absolute inset-0 bg-gradient-radial from-white/8 via-white/4 to-transparent blur-3xl"></div>
+          <div className="absolute inset-4 bg-gradient-radial from-white/12 via-white/6 to-transparent blur-2xl"></div>
+          <div className="absolute inset-8 bg-gradient-radial from-white/16 via-white/8 to-transparent blur-xl"></div>
         </div>
         
         {/* Floating email icons around the edges */}
         <div className="absolute top-20 left-[5%] opacity-40 animate-float-slow">
-          <div className="w-10 h-10 bg-gradient-to-br from-[#10B981]/20 to-[#059669]/20 rounded-lg flex items-center justify-center border border-[#10B981]/30">
+          <div className="w-10 h-10 bg-gradient-to-br from-[#10B981]/20 to-[#059669]/20 rounded-3xl flex items-center justify-center border border-[#10B981]/30">
             <Mail className="w-5 h-5 text-[#10B981]" />
           </div>
         </div>
         
         <div className="absolute top-32 right-[8%] opacity-30 animate-float-medium">
-          <div className="w-8 h-8 bg-gradient-to-br from-[#1E3A8A]/20 to-[#1E40AF]/20 rounded-lg flex items-center justify-center border border-[#1E3A8A]/30">
+          <div className="w-8 h-8 bg-gradient-to-br from-[#1E3A8A]/20 to-[#1E40AF]/20 rounded-3xl flex items-center justify-center border border-[#1E3A8A]/30">
             <Shield className="w-4 h-4 text-[#1E3A8A]" />
           </div>
         </div>
@@ -105,13 +100,13 @@ const HeroSection: React.FC = () => {
         </div>
         
         <div className="absolute bottom-40 right-[12%] opacity-40 animate-float-slow">
-          <div className="w-12 h-12 bg-gradient-to-br from-[#1E3A8A]/20 to-[#1E40AF]/20 rounded-xl flex items-center justify-center border border-[#1E3A8A]/30">
+          <div className="w-12 h-12 bg-gradient-to-br from-[#1E3A8A]/20 to-[#1E40AF]/20 rounded-3xl flex items-center justify-center border border-[#1E3A8A]/30">
             <BarChart3 className="w-6 h-6 text-[#1E3A8A]" />
           </div>
         </div>
         
         <div className="absolute bottom-60 left-[15%] opacity-35 animate-float-medium">
-          <div className="w-5 h-5 bg-gradient-to-br from-[#EF4444]/20 to-[#DC2626]/20 rounded-lg flex items-center justify-center border border-[#EF4444]/30">
+          <div className="w-5 h-5 bg-gradient-to-br from-[#EF4444]/20 to-[#DC2626]/20 rounded-3xl flex items-center justify-center border border-[#EF4444]/30">
             <XCircle className="w-2.5 h-2.5 text-[#EF4444]" />
           </div>
         </div>
@@ -155,14 +150,14 @@ const HeroSection: React.FC = () => {
           <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
             <Link
               to="/register"
-              className="inline-flex items-center justify-center px-8 py-4 bg-[#10B981] text-white font-semibold rounded-lg hover:bg-[#059669] transition-all duration-200 shadow-lg hover:shadow-xl"
+              className="inline-flex items-center justify-center px-8 py-4 bg-[#10B981] text-white font-semibold rounded-3xl hover:bg-[#059669] transition-all duration-200 shadow-lg hover:shadow-xl"
             >
               Start validating for free
               <ArrowRight className="w-4 h-4 ml-2" />
             </Link>
             <Link
               to="/api-docs"
-              className="inline-flex items-center justify-center px-8 py-4 text-white font-semibold rounded-lg border border-[#30363d] hover:bg-[#21262d] transition-all duration-200"
+              className="inline-flex items-center justify-center px-8 py-4 text-white font-semibold rounded-3xl border border-[#30363d] hover:bg-[#21262d] transition-all duration-200"
             >
               <Code className="w-4 h-4 mr-2" />
               View documentation
@@ -173,7 +168,7 @@ const HeroSection: React.FC = () => {
           <div className="relative max-w-4xl mx-auto mt-20">
             
             {/* Main dashboard container with glow effect */}
-            <div className="relative bg-[#0d1117] rounded-2xl shadow-2xl border border-[#30363d] overflow-hidden">
+            <div className="relative bg-[#0d1117] rounded-3xl shadow-2xl border border-[#30363d] overflow-hidden">
               {/* Glow effect */}
               <div className="absolute inset-0 bg-gradient-to-t from-[#10B981]/5 via-transparent to-transparent pointer-events-none"></div>
               
@@ -181,7 +176,7 @@ const HeroSection: React.FC = () => {
               <div className="bg-[#161b22] px-8 py-6 border-b border-[#30363d]">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center space-x-4">
-                    <div className="w-10 h-10 bg-[#10B981] rounded-xl flex items-center justify-center">
+                    <div className="w-10 h-10 bg-[#10B981] rounded-3xl flex items-center justify-center">
                       <Mail className="w-5 h-5 text-white" />
                     </div>
                     <div>
@@ -206,13 +201,13 @@ const HeroSection: React.FC = () => {
                       value={demoEmail}
                       onChange={(e) => setDemoEmail(e.target.value)}
                       placeholder="john.doe@company.com"
-                      className="w-full pl-12 pr-4 py-4 text-lg bg-[#0d1117] border border-[#30363d] rounded-xl focus:ring-2 focus:ring-[#10B981] focus:border-[#10B981] text-white placeholder-[#7d8590] transition-all duration-200"
+                      className="w-full pl-12 pr-4 py-4 text-lg bg-[#0d1117] border border-[#30363d] rounded-3xl focus:ring-2 focus:ring-[#10B981] focus:border-[#10B981] text-white placeholder-[#7d8590] transition-all duration-200"
                     />
                   </div>
                   <button
                     type="submit"
                     disabled={isValidating || !demoEmail.trim()}
-                    className="w-full flex items-center justify-center space-x-2 bg-[#10B981] text-white py-4 px-6 rounded-xl text-lg font-medium hover:bg-[#059669] disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 shadow-lg"
+                    className="w-full flex items-center justify-center space-x-2 bg-[#10B981] text-white py-4 px-6 rounded-3xl text-lg font-medium hover:bg-[#059669] disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 shadow-lg"
                   >
                     {isValidating ? (
                       <>
@@ -233,7 +228,7 @@ const HeroSection: React.FC = () => {
                   <div className="text-sm font-medium text-[#7d8590] uppercase tracking-wider">Recent Validations</div>
                   
                   {/* Valid email example */}
-                  <div className="flex items-center justify-between p-4 bg-[#161b22] rounded-xl border border-[#30363d]">
+                  <div className="flex items-center justify-between p-4 bg-[#161b22] rounded-3xl border border-[#30363d]">
                     <div className="flex items-center space-x-4">
                       <div className="w-8 h-8 bg-[#10B981] rounded-full flex items-center justify-center">
                         <CheckCircle className="w-4 h-4 text-white" />
@@ -247,7 +242,7 @@ const HeroSection: React.FC = () => {
                   </div>
                   
                   {/* Invalid email example */}
-                  <div className="flex items-center justify-between p-4 bg-[#161b22] rounded-xl border border-[#30363d]">
+                  <div className="flex items-center justify-between p-4 bg-[#161b22] rounded-3xl border border-[#30363d]">
                     <div className="flex items-center space-x-4">
                       <div className="w-8 h-8 bg-[#EF4444] rounded-full flex items-center justify-center">
                         <XCircle className="w-4 h-4 text-white" />
@@ -261,7 +256,7 @@ const HeroSection: React.FC = () => {
                   </div>
                   
                   {/* Risky email example */}
-                  <div className="flex items-center justify-between p-4 bg-[#161b22] rounded-xl border border-[#30363d]">
+                  <div className="flex items-center justify-between p-4 bg-[#161b22] rounded-3xl border border-[#30363d]">
                     <div className="flex items-center space-x-4">
                       <div className="w-8 h-8 bg-yellow-500 rounded-full flex items-center justify-center">
                         <AlertTriangle className="w-4 h-4 text-white" />
@@ -296,7 +291,7 @@ const HeroSection: React.FC = () => {
             </div>
 
             {/* Floating elements around dashboard */}
-            <div className="absolute -top-6 -right-6 w-24 h-24 bg-[#0d1117] rounded-2xl shadow-xl border border-[#30363d] p-6 animate-float-slow">
+            <div className="absolute -top-6 -right-6 w-24 h-24 bg-[#0d1117] rounded-3xl shadow-xl border border-[#30363d] p-6 animate-float-slow">
               <div className="w-full h-full flex flex-col justify-between">
                 <div className="flex items-center justify-between">
                   <div className="w-1 h-6 bg-[#10B981] rounded-full"></div>
@@ -313,19 +308,7 @@ const HeroSection: React.FC = () => {
             </div>
           </div>
 
-          {/* Stats row */}
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-8 max-w-4xl mx-auto pt-16">
-            {stats.map((stat, index) => (
-              <div key={index} className="text-center">
-                <div className="text-3xl lg:text-4xl font-bold text-white mb-2">
-                  {stat.number}
-                </div>
-                <div className="text-[#7d8590] text-sm">
-                  {stat.label}
-                </div>
-              </div>
-            ))}
-          </div>
+          {/* Stats section removed as requested */}
         </div>
 
         {/* Social proof section */}
@@ -335,10 +318,10 @@ const HeroSection: React.FC = () => {
           </p>
           <div className="flex items-center justify-center space-x-12 opacity-60">
             {/* Mock company logos */}
-            <div className="w-24 h-8 bg-gradient-to-r from-[#30363d] to-[#21262d] rounded-md"></div>
-            <div className="w-20 h-8 bg-gradient-to-r from-[#30363d] to-[#21262d] rounded-md"></div>
-            <div className="w-28 h-8 bg-gradient-to-r from-[#30363d] to-[#21262d] rounded-md"></div>
-            <div className="w-22 h-8 bg-gradient-to-r from-[#30363d] to-[#21262d] rounded-md"></div>
+            <div className="w-24 h-8 bg-gradient-to-r from-[#30363d] to-[#21262d] rounded-3xl"></div>
+            <div className="w-20 h-8 bg-gradient-to-r from-[#30363d] to-[#21262d] rounded-3xl"></div>
+            <div className="w-28 h-8 bg-gradient-to-r from-[#30363d] to-[#21262d] rounded-3xl"></div>
+            <div className="w-22 h-8 bg-gradient-to-r from-[#30363d] to-[#21262d] rounded-3xl"></div>
           </div>
         </div>
       </div>
