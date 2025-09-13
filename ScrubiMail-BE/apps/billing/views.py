@@ -217,11 +217,11 @@ class UsageStatsView(APIView):
 
         # Get actual validation data from EmailValidation model
         from apps.validation.models import EmailValidation
-        
+
         validation_queryset = EmailValidation.objects.filter(
             user=request.user, created_at__gte=start_date
         )
-        
+
         total_validations = validation_queryset.count()
         valid_emails = validation_queryset.filter(
             status="completed", score__gte=80
@@ -232,11 +232,15 @@ class UsageStatsView(APIView):
         risky_emails = validation_queryset.filter(
             status="completed", score__range=[50, 79]
         ).count()
-        
+
         # Calculate success rate
         completed_validations = validation_queryset.filter(status="completed").count()
-        success_rate = (valid_emails / completed_validations * 100) if completed_validations > 0 else 0
-        
+        success_rate = (
+            (valid_emails / completed_validations * 100)
+            if completed_validations > 0
+            else 0
+        )
+
         # Get usage data from credit transactions
         usage_queryset = profile.credit_transactions.filter(
             transaction_type="usage", created_at__gte=start_date
