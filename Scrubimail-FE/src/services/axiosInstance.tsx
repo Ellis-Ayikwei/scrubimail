@@ -1,11 +1,12 @@
 import axios from 'axios';
 import { getCookie } from './authAxiosInstance';
 
-export const apiUrl = import.meta.env.VITE_API_URL;
+export const apiUrl = import.meta.env.VITE_API_URL || 'http://192.168.100.12:8000/scrubimail/api/v1/';
 //const apiUrl = 'http://172.20.10.4:5004/alumni/api/v1';
-export const imgApiUrl = import.meta.env.VITE_IMG_API_URL;
+export const imgApiUrl = import.meta.env.VITE_IMG_API_URL || 'http://192.168.100.12:8000/scrubimail/api/v1/';
 
 
+console.log('API URL:', apiUrl);
 const axiosInstance = axios.create({
     baseURL: apiUrl,
     withCredentials: true,
@@ -17,7 +18,11 @@ const axiosInstance = axios.create({
 axiosInstance.interceptors.request.use(
     (config) => {
         const token = getCookie('_auth');
-        config.headers.Authorization = token || '';
+        console.log('Token found:', !!token);
+        console.log('Token value:', token ? `${token.substring(0, 20)}...` : 'No token');
+        if (token) {
+            config.headers.Authorization = `Bearer ${token}`;
+        }
         config.headers['X-Refresh-Token'] = getCookie('_auth_refresh') ?? '';
 
         if (!config.data) {
@@ -26,6 +31,7 @@ axiosInstance.interceptors.request.use(
             };
         }
 
+        console.log('Request headers:', config.headers);
         return config;
     },
     (error) => {

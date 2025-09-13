@@ -142,6 +142,22 @@ class UserSerializer(serializers.ModelSerializer):
         return PermissionSerializer(permissions, many=True).data
 
 
+class MinimalUserSerializer(serializers.ModelSerializer):
+    """Minimal user serializer for login responses to keep cookie size small"""
+
+    class Meta:
+        model = User
+        fields = (
+            "id",
+            "email",
+            "first_name",
+            "last_name",
+            "user_type",
+            "account_status",
+        )
+        read_only_fields = fields
+
+
 class BulkUserGroupSerializer(serializers.Serializer):
     """Serializer for bulk user-group operations"""
 

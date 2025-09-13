@@ -90,7 +90,7 @@ const authStore = createStore({
 ReactDOM.createRoot(document.getElementById('root') as HTMLElement).render(
     <React.StrictMode>
         <Suspense fallback={<div className='flex justify-center items-center h-screen'><IconLoader /></div>}>
-            <ColorSchemeScript defaultColorScheme="auto" />
+            <ColorSchemeScript defaultColorScheme="dark" />
             <MantineProvider withGlobalClasses>
                 <ContextMenuProvider zIndex={5000} shadow="md" borderRadius="md">
                     <DatesProvider settings={{ locale: 'en' }}>

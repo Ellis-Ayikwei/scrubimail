@@ -52,10 +52,14 @@ class UserService {
    */
   async getProfile(): Promise<UserProfile> {
     try {
+      console.log('Fetching user profile...');
       const response = await axiosInstance.get('/user/');
+      console.log('Profile response:', response.data);
       return response.data;
     } catch (error) {
       console.error('Error fetching user profile:', error);
+      console.error('Error details:', error.response?.data);
+      console.error('Error status:', error.response?.status);
       throw new Error('Failed to load user profile');
     }
   }
@@ -102,10 +106,8 @@ class UserService {
    */
   async updateNotificationPreferences(preferences: NotificationPreferences): Promise<{ detail: string }> {
     try {
-      const response = await axiosInstance.patch('/user/', {
-        notification_preferences: preferences
-      });
-      return response.data;
+      const response = await axiosInstance.patch('/notification-preferences/', preferences);
+      return { detail: 'Notification preferences updated successfully' };
     } catch (error) {
       console.error('Error updating notification preferences:', error);
       throw new Error('Failed to update notification preferences');
@@ -117,7 +119,7 @@ class UserService {
    */
   async deleteAccount(): Promise<{ detail: string }> {
     try {
-      const response = await axiosInstance.delete('/user/');
+      const response = await axiosInstance.delete('/delete-account/');
       return response.data;
     } catch (error) {
       console.error('Error deleting account:', error);

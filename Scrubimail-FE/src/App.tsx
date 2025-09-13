@@ -38,6 +38,11 @@ function App({ children }: PropsWithChildren) {
         }
     }, [themeConfig.theme]);
 
+    // Set initial dark mode class on mount
+    useEffect(() => {
+        document.documentElement.classList.add('dark');
+    }, []);
+
     return (
         <div
             className={`${(store.getState().themeConfig.sidebar && 'toggle-sidebar') || ''} ${themeConfig.menu} ${themeConfig.layout} ${

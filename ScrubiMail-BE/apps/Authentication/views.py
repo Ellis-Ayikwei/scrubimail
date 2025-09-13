@@ -7,7 +7,7 @@ from django.urls import reverse
 from django.utils.encoding import force_bytes, force_str
 from django.utils.http import urlsafe_base64_encode, urlsafe_base64_decode
 from apps.User.models import User
-from apps.User.serializer import UserSerializer
+from apps.User.serializer import UserSerializer, MinimalUserSerializer
 from rest_framework import status, permissions
 from rest_framework.views import APIView
 from rest_framework import viewsets
@@ -63,12 +63,59 @@ class LoginView(APIView):
         return Response(serializer.validated_data, status=status.HTTP_200_OK)
 
 
-class UserProfileView(generics.RetrieveAPIView):
-    serializer_class = UserSerializer
+class UserProfileView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
-    def get_object(self):
-        return self.request.user
+    def get(self, request):
+        """Get current user's profile"""
+        serializer = UserSerializer(request.user)
+        return Response(serializer.data)
+
+    def patch(self, request):
+        """Update current user's profile"""
+        serializer = UserSerializer(request.user, data=request.data, partial=True)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+class NotificationPreferencesView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        """Get current user's notification preferences"""
+        return Response(request.user.notification_preferences)
+
+    def patch(self, request):
+        """Update current user's notification preferences"""
+        try:
+            request.user.notification_preferences = request.data
+            request.user.save(update_fields=["notification_preferences"])
+            return Response(request.user.notification_preferences)
+        except Exception as e:
+            return Response(
+                {"error": "Failed to update notification preferences"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+
+class DeleteAccountView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def delete(self, request):
+        """Delete current user's account"""
+        try:
+            user = request.user
+            user.delete()
+            return Response(
+                {"detail": "Account deleted successfully"}, status=status.HTTP_200_OK
+            )
+        except Exception as e:
+            return Response(
+                {"error": "Failed to delete account"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
 
 class RegisterAPIView(APIView):
@@ -155,8 +202,8 @@ class LoginAPIView(APIView):
             access_token = str(refresh.access_token)
             refresh_token = str(refresh)
 
-            # Create response with user data but no tokens in the body
-            response = Response({"user": UserSerializer(user).data})
+            # Create response with minimal user data to keep cookie size small
+            response = Response({"user": MinimalUserSerializer(user).data})
 
             # Add tokens to response headers
             response["Authorization"] = f"Bearer {access_token}"

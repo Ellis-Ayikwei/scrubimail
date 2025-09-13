@@ -14,7 +14,7 @@ export interface ThemeConfigState {
 }
 
 const initialState: ThemeConfigState = {
-    isDarkMode: false,
+    isDarkMode: true,
     sidebar: false,
     theme: 'dark',
     menu: 'vertical',

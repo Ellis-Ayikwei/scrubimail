@@ -66,6 +66,7 @@ const Profile: React.FC = () => {
           billingService.getBillingProfile().catch(() => null)
         ]);
         
+        console.log('Profile data fetched:', { profile, billing });
         setUserProfile(profile);
         setBillingProfile(billing);
         

@@ -68,10 +68,14 @@ class BillingService {
    */
   async getBillingProfile(): Promise<BillingProfile> {
     try {
+      console.log('Fetching billing profile...');
       const response = await axiosInstance.get('/credits/');
+      console.log('Billing profile response:', response.data);
       return response.data;
     } catch (error) {
       console.error('Error fetching billing profile:', error);
+      console.error('Error details:', error.response?.data);
+      console.error('Error status:', error.response?.status);
       throw new Error('Failed to load billing information');
     }
   }
