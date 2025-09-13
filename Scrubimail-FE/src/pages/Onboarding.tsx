@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   CheckCircle, 
   ArrowRight, 
@@ -10,11 +10,20 @@ import {
   Zap,
   Play
 } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 
 const Onboarding: React.FC = () => {
   const [currentStep, setCurrentStep] = useState(0);
   const [completedSteps, setCompletedSteps] = useState<number[]>([]);
+  const [searchParams] = useSearchParams();
+  const [userEmail, setUserEmail] = useState('');
+
+  useEffect(() => {
+    const emailParam = searchParams.get('email');
+    if (emailParam) {
+      setUserEmail(emailParam);
+    }
+  }, [searchParams]);
 
   const steps = [
     {
@@ -32,9 +41,17 @@ const Onboarding: React.FC = () => {
               Welcome to ScrubiMail! 👋
             </h2>
             <p className="text-gray-600 dark:text-gray-400 max-w-md mx-auto">
-              We'll help you get started with email validation in just a few simple steps. 
+              {userEmail ? `Great! Let's set up email validation for ${userEmail}` : 'We\'ll help you get started with email validation in just a few simple steps.'} 
               This should take less than 5 minutes.
             </p>
+            {userEmail && (
+              <div className="mt-4 p-3 bg-green-50 dark:bg-green-900/20 rounded-3xl border border-green-200 dark:border-green-800 max-w-sm mx-auto">
+                <div className="flex items-center space-x-2">
+                  <Mail className="w-4 h-4 text-green-600" />
+                  <span className="text-sm font-medium text-green-800 dark:text-green-200">{userEmail}</span>
+                </div>
+              </div>
+            )}
           </div>
           <div className="bg-blue-50 dark:bg-blue-900/20 rounded-3xl p-6 border border-blue-200 dark:border-blue-800">
             <h3 className="font-medium text-blue-800 dark:text-blue-200 mb-2">What you'll learn:</h3>
