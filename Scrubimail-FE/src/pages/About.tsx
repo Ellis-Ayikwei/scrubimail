@@ -301,14 +301,14 @@ const About: React.FC = () => {
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <Link
-              to="/register"
-              className="inline-flex items-center px-8 py-4 bg-white text-[#004E8A] font-semibold rounded-lg hover:bg-gray-100 transition-all duration-200 shadow-lg"
+              to="/onboarding"
+              className="inline-flex items-center px-8 py-4 bg-white text-[#004E8A] font-semibold rounded-3xl hover:bg-gray-100 transition-all duration-200 shadow-lg"
             >
               Start Free Trial
             </Link>
             <Link
               to="/contact"
-              className="inline-flex items-center px-8 py-4 border-2 border-white text-white font-semibold rounded-lg hover:bg-white hover:text-[#004E8A] transition-all duration-200"
+              className="inline-flex items-center px-8 py-4 border-2 border-white text-white font-semibold rounded-3xl hover:bg-white hover:text-[#004E8A] transition-all duration-200"
             >
               Contact Us
             </Link>

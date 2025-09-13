@@ -116,7 +116,7 @@ const Features: React.FC = () => {
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <Link
-              to="/register"
+              to="/onboarding"
               className="inline-flex items-center px-8 py-4 bg-[#10B981] text-white font-semibold rounded-3xl hover:bg-[#059669] transition-colors"
             >
               Start Free Trial
@@ -279,7 +279,7 @@ const Features: React.FC = () => {
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <Link
-              to="/register"
+              to="/onboarding"
               className="inline-flex items-center px-8 py-4 bg-white text-[#10B981] font-semibold rounded-3xl hover:bg-gray-100 transition-colors"
             >
               Start Free Trial
