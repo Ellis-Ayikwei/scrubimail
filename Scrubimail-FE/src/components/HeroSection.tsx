@@ -73,22 +73,7 @@ const HeroSection: React.FC = () => {
         {/* Subtle grid pattern */}
         <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.02)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.02)_1px,transparent_1px)] bg-[size:64px_64px]"></div>
         
-        {/* GitHub-style dramatic light beam from bottom */}
-        <div className="absolute bottom-0 left-1/2 transform -translate-x-1/2 w-full max-w-6xl h-[800px] pointer-events-none">
-          {/* Main beam layers */}
-          <div className="absolute bottom-0 left-1/2 transform -translate-x-1/2 w-full h-full bg-gradient-to-t from-white/12 via-white/6 to-transparent blur-3xl"></div>
-          <div className="absolute bottom-0 left-1/2 transform -translate-x-1/2 w-4/5 h-4/5 bg-gradient-to-t from-white/18 via-white/9 to-transparent blur-2xl"></div>
-          <div className="absolute bottom-0 left-1/2 transform -translate-x-1/2 w-3/5 h-3/5 bg-gradient-to-t from-white/25 via-white/12 to-transparent blur-xl"></div>
-          <div className="absolute bottom-0 left-1/2 transform -translate-x-1/2 w-2/5 h-2/5 bg-gradient-to-t from-white/30 via-white/15 to-transparent blur-lg"></div>
-          
-          {/* Intense center beam */}
-          <div className="absolute bottom-0 left-1/2 transform -translate-x-1/2 w-1/4 h-1/3 bg-gradient-to-t from-white/35 via-white/20 to-transparent blur-md"></div>
-        </div>
-        
-        {/* Additional radial glow around dashboard area */}
-        <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/4 w-full max-w-5xl h-[600px] pointer-events-none">
-          <div className="absolute inset-0 bg-gradient-radial from-white/6 via-white/3 to-transparent blur-2xl"></div>
-        </div>
+        {/* Dashboard glow effect - no beam */}
         
         {/* Floating email icons around the edges */}
         <div className="absolute top-20 left-[5%] opacity-40 animate-float-slow">
@@ -177,10 +162,16 @@ const HeroSection: React.FC = () => {
           {/* Centered Dashboard Mockup - Main Feature */}
           <div className="relative max-w-4xl mx-auto mt-20">
             
-            {/* Main dashboard container with glow effect */}
-            <div className="relative bg-[#0d1117] rounded-3xl shadow-2xl border border-[#30363d] overflow-hidden">
-              {/* Glow effect */}
-              <div className="absolute inset-0 bg-gradient-to-t from-[#10B981]/5 via-transparent to-transparent pointer-events-none"></div>
+            {/* Dashboard glow effects */}
+            <div className="absolute inset-0 bg-[#10B981]/20 rounded-3xl blur-3xl transform scale-110"></div>
+            <div className="absolute inset-0 bg-[#10B981]/15 rounded-3xl blur-2xl transform scale-105"></div>
+            <div className="absolute inset-0 bg-[#10B981]/10 rounded-3xl blur-xl"></div>
+            
+            {/* Main dashboard container */}
+            <div className="relative bg-[#0d1117] rounded-3xl shadow-2xl border border-[#30363d] overflow-hidden backdrop-blur-sm">
+              {/* Inner glow effect */}
+              <div className="absolute inset-0 bg-gradient-to-t from-[#10B981]/8 via-[#10B981]/3 to-transparent pointer-events-none"></div>
+              <div className="absolute inset-0 bg-gradient-to-br from-[#10B981]/5 via-transparent to-[#1E3A8A]/5 pointer-events-none"></div>
               
               {/* Dashboard header */}
               <div className="bg-[#161b22] px-8 py-6 border-b border-[#30363d]">
@@ -300,22 +291,36 @@ const HeroSection: React.FC = () => {
               </div>
             </div>
 
-            {/* Floating elements around dashboard */}
-            <div className="absolute -top-6 -right-6 w-24 h-24 bg-[#0d1117] rounded-3xl shadow-xl border border-[#30363d] p-6 animate-float-slow">
-              <div className="w-full h-full flex flex-col justify-between">
-                <div className="flex items-center justify-between">
-                  <div className="w-1 h-6 bg-[#10B981] rounded-full"></div>
-                  <div className="w-1 h-4 bg-[#1E3A8A] rounded-full"></div>
-                  <div className="w-1 h-8 bg-[#10B981] rounded-full"></div>
-                  <div className="w-1 h-3 bg-[#EF4444] rounded-full"></div>
+            {/* Floating elements around dashboard with glow */}
+            <div className="absolute -top-6 -right-6 w-24 h-24 animate-float-slow">
+              {/* Glow effect for analytics card */}
+              <div className="absolute inset-0 bg-[#1E3A8A]/30 rounded-3xl blur-xl"></div>
+              <div className="relative bg-[#0d1117] rounded-3xl shadow-xl border border-[#30363d] p-6">
+                <div className="w-full h-full flex flex-col justify-between">
+                  <div className="flex items-center justify-between">
+                    <div className="w-1 h-6 bg-[#10B981] rounded-full"></div>
+                    <div className="w-1 h-4 bg-[#1E3A8A] rounded-full"></div>
+                    <div className="w-1 h-8 bg-[#10B981] rounded-full"></div>
+                    <div className="w-1 h-3 bg-[#EF4444] rounded-full"></div>
+                  </div>
+                  <div className="text-xs text-[#7d8590] text-center">Analytics</div>
                 </div>
-                <div className="text-xs text-[#7d8590] text-center">Analytics</div>
               </div>
             </div>
 
-            <div className="absolute -bottom-6 -left-6 w-20 h-20 bg-[#0d1117] rounded-full shadow-xl border border-[#30363d] flex items-center justify-center animate-float-medium">
-              <Shield className="w-8 h-8 text-[#1E3A8A]" />
+            <div className="absolute -bottom-6 -left-6 w-20 h-20 animate-float-medium">
+              {/* Glow effect for shield */}
+              <div className="absolute inset-0 bg-[#1E3A8A]/30 rounded-full blur-xl"></div>
+              <div className="relative bg-[#0d1117] rounded-full shadow-xl border border-[#30363d] flex items-center justify-center w-full h-full">
+                <Shield className="w-8 h-8 text-[#1E3A8A]" />
+              </div>
             </div>
+            
+            {/* Additional glow particles */}
+            <div className="absolute -top-12 left-1/4 w-4 h-4 bg-[#10B981]/40 rounded-full blur-md animate-pulse"></div>
+            <div className="absolute -bottom-12 right-1/4 w-3 h-3 bg-[#1E3A8A]/40 rounded-full blur-md animate-pulse delay-1000"></div>
+            <div className="absolute top-1/2 -left-12 w-2 h-2 bg-[#10B981]/30 rounded-full blur-sm animate-pulse delay-2000"></div>
+            <div className="absolute top-1/3 -right-12 w-2 h-2 bg-[#1E3A8A]/30 rounded-full blur-sm animate-pulse delay-500"></div>
           </div>
 
           {/* Stats section removed as requested */}
