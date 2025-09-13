@@ -239,11 +239,7 @@ const routes = [
     },
     {
         path: '/onboarding',
-        element: (
-            <ProtectedRoute>
-                <Onboarding />
-            </ProtectedRoute>
-        ),
+        element: <Onboarding />,
         layout: 'default',
     },
 
