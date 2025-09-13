@@ -138,12 +138,12 @@ const HeroSection: React.FC = () => {
                 value={ctaEmail}
                 onChange={(e) => setCTAEmail(e.target.value)}
                 placeholder="Enter your email to get started"
-                className="w-full pl-14 pr-4 py-5 text-lg bg-transparent border-none outline-none text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-[#7d8590] font-semibold transition-colors duration-300"
+                className="w-full pl-14 pr-4 py-2 text-lg bg-transparent border-none outline-none text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-[#7d8590] font-semibold transition-colors duration-300"
               />
               </div>
               <Link
               to={`/onboarding${ctaEmail ? `?email=${encodeURIComponent(ctaEmail)}` : ''}`}
-              className="inline-flex items-center justify-center px-10 py-5 bg-gradient-to-r from-[#10B981] to-[#059669] text-white font-bold rounded-full hover:from-[#059669] hover:to-[#10B981] transition-all duration-200 shadow-xl hover:shadow-2xl transform hover:scale-105 text-lg"
+              className="inline-flex items-center justify-center px-10 py-2 bg-gradient-to-r from-[#10B981] to-[#059669] text-white font-bold rounded-full hover:from-[#059669] hover:to-[#10B981] transition-all duration-200 shadow-xl hover:shadow-2xl transform hover:scale-105 text-lg"
               >
               Start validating for free
               <ArrowRight className="w-5 h-5 ml-3" />
@@ -152,7 +152,7 @@ const HeroSection: React.FC = () => {
             
             <Link
               to="/api-docs"
-              className="inline-flex items-center justify-center px-10 py-5 ml-6 text-[#10B981] dark:text-[#10B981] font-bold rounded-3xl border-2 border-[#10B981] hover:bg-[#10B981]/10 dark:hover:bg-[#10B981]/10 transition-all duration-200 text-lg shadow-lg"
+              className="inline-flex items-center justify-center px-10 py-5 ml-6 text-[#10B981] dark:text-[#10B981] font-bold rounded-full border-2 border-[#10B981] hover:bg-[#10B981]/10 dark:hover:bg-[#10B981]/10 transition-all duration-200 text-lg shadow-lg"
             >
               <Code className="w-5 h-5 mr-3" />
               View documentation
