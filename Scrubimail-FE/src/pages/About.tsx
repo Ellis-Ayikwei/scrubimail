@@ -1,13 +1,20 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { 
-  Award, 
+  Mail,
+  Shield, 
   Globe, 
   Users, 
   Clock, 
-  Check, 
+  CheckCircle, 
   Star,
-  ArrowRight
+  ArrowRight,
+  Target,
+  TrendingUp,
+  Zap,
+  Code,
+  BarChart3,
+  Award
 } from 'lucide-react';
 import TopBar from '../components/TopBar';
 import Footer from '../components/Footer';
@@ -63,16 +70,48 @@ const About: React.FC = () => {
     <div className="min-h-screen bg-white dark:bg-gray-900">
       <TopBar />
       
-      {/* Hero Section */}
-      <section className="py-24 bg-gradient-to-br from-[#F4F5F7] to-white dark:from-gray-900 dark:to-gray-800">
-        <div className="w-full mx-auto px-4 sm:px-6 lg:px-8">
+      {/* Hero Section - GitHub inspired */}
+      <section className="py-24 bg-white dark:bg-[#0d1117] relative overflow-hidden">
+        {/* Background pattern */}
+        <div className="absolute inset-0 bg-[linear-gradient(rgba(0,0,0,0.03)_1px,transparent_1px),linear-gradient(90deg,rgba(0,0,0,0.03)_1px,transparent_1px)] dark:bg-[linear-gradient(rgba(255,255,255,0.02)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.02)_1px,transparent_1px)] bg-[size:64px_64px]"></div>
+        
+        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center">
-            <h1 className="text-5xl md:text-6xl font-bold text-[#333333] dark:text-white mb-6">
-              About Scrubimail
+            <div className="inline-flex items-center px-4 py-2 bg-[#10B981]/10 dark:bg-[#10B981]/20 rounded-full border border-[#10B981]/20 dark:border-[#10B981]/30 mb-8">
+              <Mail className="w-4 h-4 text-[#10B981] mr-2" />
+              <span className="text-sm font-medium text-[#10B981]">About ScrubiMail</span>
+            </div>
+            
+            <h1 className="text-5xl md:text-6xl font-bold text-gray-900 dark:text-white mb-6">
+              Emails flowing safely into
+              <br />
+              <span className="bg-gradient-to-r from-[#10B981] to-[#059669] bg-clip-text text-transparent">
+                every inbox
+              </span>
             </h1>
-            <p className="text-xl text-[#333333]/70 dark:text-gray-300 mb-8 max-w-3xl mx-auto">
-              We're revolutionizing email validation with cutting-edge technology and a commitment to accuracy, speed, and reliability.
+            <p className="text-xl text-gray-600 dark:text-gray-300 mb-12 max-w-4xl mx-auto leading-relaxed">
+              We're revolutionizing email validation with cutting-edge technology, ensuring your messages reach real people who want to hear from you. Built by developers, trusted by thousands.
             </p>
+            
+            {/* Trust indicators */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-8 max-w-4xl mx-auto">
+              <div className="text-center">
+                <div className="text-3xl font-bold text-gray-900 dark:text-white mb-1">99.9%</div>
+                <div className="text-sm text-gray-600 dark:text-gray-400">Accuracy Rate</div>
+              </div>
+              <div className="text-center">
+                <div className="text-3xl font-bold text-gray-900 dark:text-white mb-1">&lt;300ms</div>
+                <div className="text-sm text-gray-600 dark:text-gray-400">Response Time</div>
+              </div>
+              <div className="text-center">
+                <div className="text-3xl font-bold text-gray-900 dark:text-white mb-1">50M+</div>
+                <div className="text-sm text-gray-600 dark:text-gray-400">Emails/Month</div>
+              </div>
+              <div className="text-center">
+                <div className="text-3xl font-bold text-gray-900 dark:text-white mb-1">10K+</div>
+                <div className="text-sm text-gray-600 dark:text-gray-400">Developers</div>
+              </div>
+            </div>
           </div>
         </div>
       </section>
@@ -301,14 +340,14 @@ const About: React.FC = () => {
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <Link
-              to="/register"
-              className="inline-flex items-center px-8 py-4 bg-white text-[#004E8A] font-semibold rounded-lg hover:bg-gray-100 transition-all duration-200 shadow-lg"
+              to="/onboarding"
+              className="inline-flex items-center px-8 py-4 bg-white text-[#004E8A] font-semibold rounded-3xl hover:bg-gray-100 transition-all duration-200 shadow-lg"
             >
               Start Free Trial
             </Link>
             <Link
               to="/contact"
-              className="inline-flex items-center px-8 py-4 border-2 border-white text-white font-semibold rounded-lg hover:bg-white hover:text-[#004E8A] transition-all duration-200"
+              className="inline-flex items-center px-8 py-4 border-2 border-white text-white font-semibold rounded-3xl hover:bg-white hover:text-[#004E8A] transition-all duration-200"
             >
               Contact Us
             </Link>

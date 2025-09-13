@@ -297,8 +297,8 @@ const Pricing: React.FC = () => {
                 </div>
 
                 <Link
-                  to={tier.id === 'enterprise' ? '/contact' : '/register'}
-                  className={`w-full inline-flex items-center justify-center px-6 py-3 rounded-xl font-medium transition-all duration-200 ${
+                  to={tier.id === 'enterprise' ? '/contact' : '/onboarding'}
+                  className={`w-full inline-flex items-center justify-center px-6 py-3 rounded-3xl font-medium transition-all duration-200 ${
                     tier.buttonVariant === 'primary'
                       ? 'bg-[#2ED8A3] text-white hover:bg-[#00C48C] shadow-lg hover:shadow-xl'
                       : tier.buttonVariant === 'secondary'
@@ -420,15 +420,15 @@ const Pricing: React.FC = () => {
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <Link
-              to="/register"
-              className="inline-flex items-center px-8 py-4 bg-white text-[#2ED8A3] font-semibold rounded-xl hover:bg-gray-50 transition-colors shadow-lg"
+              to="/onboarding"
+              className="inline-flex items-center px-8 py-4 bg-white text-[#2ED8A3] font-semibold rounded-3xl hover:bg-gray-50 transition-colors shadow-lg"
             >
               Start free trial
               <ArrowRight className="w-5 h-5 ml-2" />
             </Link>
             <Link
               to="/api-docs"
-              className="inline-flex items-center px-8 py-4 border-2 border-white text-white font-semibold rounded-xl hover:bg-white/10 transition-colors"
+              className="inline-flex items-center px-8 py-4 border-2 border-white text-white font-semibold rounded-3xl hover:bg-white/10 transition-colors"
             >
               View documentation
             </Link>

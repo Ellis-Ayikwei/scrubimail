@@ -17,6 +17,13 @@ const Blog = lazy(() => import('../pages/Blog'));
 const Contact = lazy(() => import('../pages/Contact'));
 const Help = lazy(() => import('../pages/Help'));
 const Pricing = lazy(() => import('../pages/Pricing'));
+const Features = lazy(() => import('../pages/Features'));
+const Analytics = lazy(() => import('../pages/Analytics'));
+const BulkUpload = lazy(() => import('../pages/BulkUpload'));
+const Notifications = lazy(() => import('../pages/Notifications'));
+const Onboarding = lazy(() => import('../pages/Onboarding'));
+const NotFound = lazy(() => import('../pages/404'));
+const ServerError = lazy(() => import('../pages/500'));
 const Login = lazy(() => import('../pages/auth/Login'));
 const Register = lazy(() => import('../pages/auth/Register'));
 const ForgotPassword = lazy(() => import('../pages/auth/ForgotPassword'));
@@ -79,6 +86,11 @@ const routes = [
     {
         path: '/pricing',
         element: <Pricing />,
+        layout: 'default',
+    },
+    {
+        path: '/features',
+        element: <Features />,
         layout: 'default',
     },
     {
@@ -196,6 +208,38 @@ const routes = [
     {
         path: '/api-docs',
         element: <ApiDocs />,
+        layout: 'default',
+    },
+    {
+        path: '/analytics',
+        element: (
+            <ProtectedRoute>
+                <Analytics />
+            </ProtectedRoute>
+        ),
+        layout: 'default',
+    },
+    {
+        path: '/bulk-upload',
+        element: (
+            <ProtectedRoute>
+                <BulkUpload />
+            </ProtectedRoute>
+        ),
+        layout: 'default',
+    },
+    {
+        path: '/notifications',
+        element: (
+            <ProtectedRoute>
+                <Notifications />
+            </ProtectedRoute>
+        ),
+        layout: 'default',
+    },
+    {
+        path: '/onboarding',
+        element: <Onboarding />,
         layout: 'default',
     },
 
@@ -343,6 +387,18 @@ const routes = [
             </ProtectedRoute>
         ),
         layout: 'admin',
+    },
+
+    // Error pages
+    {
+        path: '/500',
+        element: <ServerError />,
+        layout: 'blank',
+    },
+    {
+        path: '*',
+        element: <NotFound />,
+        layout: 'blank',
     },
 ];
 
