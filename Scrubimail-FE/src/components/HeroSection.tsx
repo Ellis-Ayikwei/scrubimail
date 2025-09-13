@@ -152,7 +152,7 @@ const HeroSection: React.FC = () => {
             
             <Link
               to="/api-docs"
-              className="inline-flex items-center justify-center px-10 py-5 ml-6 text-[#10B981] dark:text-[#10B981] font-bold rounded-full border-2 border-[#10B981] hover:bg-[#10B981]/10 dark:hover:bg-[#10B981]/10 transition-all duration-200 text-lg shadow-lg"
+              className="inline-flex items-center justify-center px-10 py-2 ml-6 text-[#10B981] dark:text-[#10B981] font-bold rounded-full border-2 border-[#10B981] hover:bg-[#10B981]/10 dark:hover:bg-[#10B981]/10 transition-all duration-200 text-lg shadow-lg"
             >
               <Code className="w-5 h-5 mr-3" />
               View documentation
