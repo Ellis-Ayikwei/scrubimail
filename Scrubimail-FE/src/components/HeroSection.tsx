@@ -73,11 +73,21 @@ const HeroSection: React.FC = () => {
         {/* Subtle grid pattern */}
         <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.02)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.02)_1px,transparent_1px)] bg-[size:64px_64px]"></div>
         
-        {/* Focused light beam around dashboard area */}
-        <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/4 w-full max-w-5xl h-[600px]">
-          <div className="absolute inset-0 bg-gradient-radial from-white/8 via-white/4 to-transparent blur-3xl"></div>
-          <div className="absolute inset-4 bg-gradient-radial from-white/12 via-white/6 to-transparent blur-2xl"></div>
-          <div className="absolute inset-8 bg-gradient-radial from-white/16 via-white/8 to-transparent blur-xl"></div>
+        {/* GitHub-style dramatic light beam from bottom */}
+        <div className="absolute bottom-0 left-1/2 transform -translate-x-1/2 w-full max-w-6xl h-[800px] pointer-events-none">
+          {/* Main beam layers */}
+          <div className="absolute bottom-0 left-1/2 transform -translate-x-1/2 w-full h-full bg-gradient-to-t from-white/12 via-white/6 to-transparent blur-3xl"></div>
+          <div className="absolute bottom-0 left-1/2 transform -translate-x-1/2 w-4/5 h-4/5 bg-gradient-to-t from-white/18 via-white/9 to-transparent blur-2xl"></div>
+          <div className="absolute bottom-0 left-1/2 transform -translate-x-1/2 w-3/5 h-3/5 bg-gradient-to-t from-white/25 via-white/12 to-transparent blur-xl"></div>
+          <div className="absolute bottom-0 left-1/2 transform -translate-x-1/2 w-2/5 h-2/5 bg-gradient-to-t from-white/30 via-white/15 to-transparent blur-lg"></div>
+          
+          {/* Intense center beam */}
+          <div className="absolute bottom-0 left-1/2 transform -translate-x-1/2 w-1/4 h-1/3 bg-gradient-to-t from-white/35 via-white/20 to-transparent blur-md"></div>
+        </div>
+        
+        {/* Additional radial glow around dashboard area */}
+        <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/4 w-full max-w-5xl h-[600px] pointer-events-none">
+          <div className="absolute inset-0 bg-gradient-radial from-white/6 via-white/3 to-transparent blur-2xl"></div>
         </div>
         
         {/* Floating email icons around the edges */}
