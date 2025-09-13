@@ -1,0 +1,182 @@
+import React, { useState } from 'react';
+import { Link } from 'react-router-dom';
+import { 
+  Mail, 
+  ArrowLeft, 
+  Loader2, 
+  AlertCircle,
+  CheckCircle
+} from 'lucide-react';
+import authAxiosInstance from '../../services/authAxiosInstance';
+
+const ForgotPassword = () => {
+  const [email, setEmail] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    setError(null);
+
+    try {
+      const response = await authAxiosInstance.post('/forgot-password/', {
+        email
+      });
+
+      if (response.data.success) {
+        setSuccess(true);
+      } else {
+        setError(response.data.message || 'Failed to send reset email');
+      }
+    } catch (err: any) {
+      setError(err.response?.data?.message || 'Failed to send reset email. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (success) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-[#F4F5F7] dark:bg-gray-900 py-12 px-4 sm:px-6 lg:px-8">
+        <div className="max-w-md w-full space-y-8">
+          {/* Logo and Header */}
+          <div className="text-center">
+            <div className="flex justify-center">
+              <div className="w-12 h-12 bg-gradient-to-r from-[#2ED8A3] to-[#004E8A] rounded-xl flex items-center justify-center">
+                <span className="text-white font-bold text-xl">S</span>
+              </div>
+            </div>
+            <div className="mt-6 flex justify-center">
+              <div className="w-16 h-16 bg-green-100 dark:bg-green-900 rounded-full flex items-center justify-center">
+                <CheckCircle className="w-8 h-8 text-green-600 dark:text-green-400" />
+              </div>
+            </div>
+            <h2 className="mt-6 text-3xl font-bold text-[#333333] dark:text-white">
+              Check your email
+            </h2>
+            <p className="mt-2 text-sm text-[#333333]/70 dark:text-gray-400">
+              We've sent a password reset link to <strong>{email}</strong>
+            </p>
+          </div>
+
+          {/* Success Message */}
+          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl border border-gray-200 dark:border-gray-700 p-8">
+            <div className="text-center space-y-4">
+              <p className="text-[#333333] dark:text-gray-300">
+                Click the link in the email to reset your password. The link will expire in 1 hour.
+              </p>
+              <p className="text-sm text-[#333333]/70 dark:text-gray-400">
+                Didn't receive the email? Check your spam folder or try again.
+              </p>
+              <p className="text-xs text-[#333333]/50 dark:text-gray-400 mt-2">
+                The reset link will redirect you to: <code className="bg-gray-100 dark:bg-gray-600 px-1 rounded">/reset-password?token=...</code>
+              </p>
+              
+              <div className="space-y-3">
+                <button
+                  onClick={() => setSuccess(false)}
+                  className="w-full py-3 px-4 border border-transparent text-sm font-medium rounded-lg text-white bg-gradient-to-r from-[#2ED8A3] to-[#004E8A] hover:from-[#00C48C] hover:to-[#2ED8A3] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#2ED8A3] transition-all duration-200"
+                >
+                  Resend email
+                </button>
+                
+                <Link
+                  to="/login"
+                  className="w-full inline-flex justify-center py-3 px-4 border border-gray-300 dark:border-gray-600 text-sm font-medium rounded-lg text-[#333333] dark:text-white bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#2ED8A3] transition-all duration-200"
+                >
+                  Back to sign in
+                </Link>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-[#F4F5F7] dark:bg-gray-900 py-12 px-4 sm:px-6 lg:px-8">
+      <div className="max-w-md w-full space-y-8">
+        {/* Logo and Header */}
+        <div className="text-center">
+          <div className="flex justify-center">
+            <div className="w-12 h-12 bg-gradient-to-r from-[#2ED8A3] to-[#004E8A] rounded-xl flex items-center justify-center">
+              <span className="text-white font-bold text-xl">S</span>
+            </div>
+          </div>
+          <h2 className="mt-6 text-3xl font-bold text-[#333333] dark:text-white">
+            Forgot your password?
+          </h2>
+          <p className="mt-2 text-sm text-[#333333]/70 dark:text-gray-400">
+            Enter your email address and we'll send you a link to reset your password
+          </p>
+        </div>
+
+        {/* Forgot Password Form */}
+        <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl border border-gray-200 dark:border-gray-700 p-8">
+          <form className="space-y-6" onSubmit={handleSubmit}>
+            <div>
+              <label htmlFor="email" className="block text-sm font-medium text-[#333333] dark:text-gray-300 mb-2">
+                Email address
+              </label>
+              <div className="relative">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                  <Mail className="h-5 w-5 text-[#333333]/50" />
+                </div>
+                <input
+                  id="email"
+                  name="email"
+                  type="email"
+                  autoComplete="email"
+                  required
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  className="w-full pl-10 pr-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-[#2ED8A3] focus:border-transparent bg-white dark:bg-gray-700 text-[#333333] dark:text-white placeholder-[#333333]/50 dark:placeholder-gray-400 transition-colors duration-200"
+                  placeholder="Enter your email"
+                />
+              </div>
+            </div>
+
+            <div>
+              <button
+                type="submit"
+                disabled={loading}
+                className="group relative w-full flex justify-center py-3 px-4 border border-transparent text-sm font-medium rounded-lg text-white bg-gradient-to-r from-[#2ED8A3] to-[#004E8A] hover:from-[#00C48C] hover:to-[#2ED8A3] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#2ED8A3] disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
+              >
+                {loading ? (
+                  <div className="flex items-center">
+                    <Loader2 className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" />
+                    Sending reset link...
+                  </div>
+                ) : (
+                  'Send reset link'
+                )}
+              </button>
+            </div>
+
+            <div className="text-center">
+              <Link
+                to="/login"
+                className="inline-flex items-center text-sm font-medium text-[#2ED8A3] hover:text-[#004E8A] dark:text-[#2ED8A3] dark:hover:text-[#00C48C]"
+              >
+                <ArrowLeft className="w-4 h-4 mr-1" />
+                Back to sign in
+              </Link>
+            </div>
+          </form>
+        </div>
+
+        {/* Help Text */}
+        <div className="text-center">
+          <p className="text-xs text-[#333333]/50 dark:text-gray-400">
+            Need help? Contact our support team
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default ForgotPassword; 

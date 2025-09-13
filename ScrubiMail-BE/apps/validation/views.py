@@ -21,11 +21,15 @@ from .advanced_validator import AdvancedEmailValidator
 from django_celery_results.models import TaskResult
 from rest_framework.permissions import IsAuthenticated
 import json
-from backend.middle_ware import APIKeyOnlyPermission
+from backend.middle_ware import AllowJWTOrAPIKey
+from rest_framework.permissions import IsAuthenticatedOrReadOnly
+from rest_framework.permissions import BasePermission
+from apps.billing.services import BillingService
+from apps.billing.models import CreditTransaction, EmailValidationUsage
 
 
 class SingleEmailValidationView(APIView):
-    permission_classes = [APIKeyOnlyPermission]
+    permission_classes = [AllowJWTOrAPIKey]
 
     def post(self, request):
         """Single email validation with real-time option"""
@@ -34,7 +38,17 @@ class SingleEmailValidationView(APIView):
 
         email = serializer.validated_data["email"]
         real_time = serializer.validated_data.get("real_time", False)
-        user = request.user if request.user.is_authenticated else None
+        user = request.user
+
+        # Check if user has enough credits
+        billing_service = BillingService()
+        profile = billing_service.get_or_create_billing_profile(user)
+
+        if not profile.can_use_credits(1):
+            return Response(
+                {"error": "Insufficient credits. Please purchase more credits."},
+                status=status.HTTP_402_PAYMENT_REQUIRED,
+            )
 
         if real_time:
             # Perform real-time validation
@@ -63,6 +77,19 @@ class SingleEmailValidationView(APIView):
                 warnings=result.warnings,
                 metadata=result.metadata,
                 job_type="api",
+            )
+
+            # Consume credits and create billing records
+            profile.consume_credits(1, f"Email validation: {email}")
+
+            # Create usage tracking record
+            EmailValidationUsage.objects.create(
+                billing_profile=profile,
+                validation_request_id=str(validation.id),
+                credits_consumed=1,
+                cost_per_credit=0.01,
+                validation_type="single",
+                email_count=1,
             )
 
             # Check for ?details=true in query params
@@ -98,6 +125,19 @@ class SingleEmailValidationView(APIView):
 
                 # Refresh the validation object
                 validation.refresh_from_db()
+
+                # Consume credits and create billing records
+                profile.consume_credits(1, f"Email validation: {email}")
+
+                # Create usage tracking record
+                EmailValidationUsage.objects.create(
+                    billing_profile=profile,
+                    validation_request_id=str(validation.id),
+                    credits_consumed=1,
+                    cost_per_credit=0.01,
+                    validation_type="single",
+                    email_count=1,
+                )
 
                 details = request.query_params.get("details", "false").lower() == "true"
                 response_data = {
@@ -135,7 +175,7 @@ class SingleEmailValidationView(APIView):
 
 
 class BulkEmailValidationView(APIView):
-    permission_classes = [APIKeyOnlyPermission]
+    permission_classes = [AllowJWTOrAPIKey]
 
     def post(self, request):
         """Bulk email validation with job tracking"""
@@ -143,10 +183,24 @@ class BulkEmailValidationView(APIView):
         serializer.is_valid(raise_exception=True)
 
         emails = serializer.validated_data["emails"]
+        user = request.user
+
+        # Check if user has enough credits
+        billing_service = BillingService()
+        profile = billing_service.get_or_create_billing_profile(user)
+
+        required_credits = len(emails)
+        if not profile.can_use_credits(required_credits):
+            return Response(
+                {
+                    "error": f"Insufficient credits. You need {required_credits} credits but only have {profile.credits_remaining}."
+                },
+                status=status.HTTP_402_PAYMENT_REQUIRED,
+            )
 
         # Create bulk job
         bulk_job = BulkValidationJob.objects.create(
-            user=request.user, emails=emails, total_emails=len(emails), status="pending"
+            user=user, emails=emails, total_emails=len(emails), status="pending"
         )
 
         # Process bulk validation synchronously (temporary fix for Celery connection issues)
@@ -155,10 +209,25 @@ class BulkEmailValidationView(APIView):
 
             result = bulk_validate_emails_task.apply(args=[bulk_job.id])
 
+            # Consume credits and create billing records
+            profile.consume_credits(
+                required_credits, f"Bulk email validation: {len(emails)} emails"
+            )
+
+            # Create usage tracking record
+            EmailValidationUsage.objects.create(
+                billing_profile=profile,
+                validation_request_id=str(bulk_job.id),
+                credits_consumed=required_credits,
+                cost_per_credit=0.01,
+                validation_type="bulk",
+                email_count=len(emails),
+            )
+
             details = request.query_params.get("details", "false").lower() == "true"
             # Get all validations for this job
             validations = EmailValidation.objects.filter(
-                user=request.user, job_type="bulk", created_at__gte=bulk_job.created_at
+                user=user, job_type="bulk", created_at__gte=bulk_job.created_at
             )
             results = []
             for v in validations:
@@ -201,7 +270,7 @@ class BulkEmailValidationView(APIView):
 
 
 class BulkJobStatusView(APIView):
-    permission_classes = [APIKeyOnlyPermission]
+    permission_classes = [AllowJWTOrAPIKey]
 
     def get(self, request, job_id):
         """Get bulk job status and progress"""
@@ -250,7 +319,7 @@ class BulkJobStatusView(APIView):
 
 
 class ValidationStatusView(APIView):
-    permission_classes = [APIKeyOnlyPermission]
+    permission_classes = [AllowJWTOrAPIKey]
 
     def get(self, request, validation_id):
         """Get individual validation status and results"""
@@ -279,7 +348,7 @@ class ValidationStatusView(APIView):
 
 class ValidationHistoryView(generics.ListAPIView):
     serializer_class = EmailValidationSerializer
-    permission_classes = [APIKeyOnlyPermission]
+    permission_classes = [AllowJWTOrAPIKey]
 
     def get_queryset(self):
         queryset = EmailValidation.objects.filter(user=self.request.user)
@@ -386,7 +455,7 @@ class ValidationHistoryView(generics.ListAPIView):
 
 
 class ValidationAnalyticsView(APIView):
-    permission_classes = [APIKeyOnlyPermission]
+    permission_classes = [AllowJWTOrAPIKey]
 
     def get(self, request):
         """Get validation analytics and statistics"""
@@ -471,7 +540,7 @@ class ValidationAnalyticsView(APIView):
 
 
 class DomainReputationView(APIView):
-    permission_classes = [APIKeyOnlyPermission]
+    permission_classes = [AllowJWTOrAPIKey]
 
     def get(self, request, domain):
         """Get domain reputation information"""

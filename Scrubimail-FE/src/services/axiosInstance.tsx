@@ -3,6 +3,8 @@ import { getCookie } from './authAxiosInstance';
 
 export const apiUrl = import.meta.env.VITE_API_URL;
 //const apiUrl = 'http://172.20.10.4:5004/alumni/api/v1';
+export const imgApiUrl = import.meta.env.VITE_IMG_API_URL;
+
 
 const axiosInstance = axios.create({
     baseURL: apiUrl,

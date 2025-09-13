@@ -4,14 +4,11 @@ import {
   BarChart3, 
   CheckCircle, 
   History, 
-  Key, 
-  CreditCard, 
   Menu, 
   X,
   Sun,
   Moon,
-  FileText,
-  Code
+  FileText
 } from 'lucide-react';
 import useIsAuthenticated from 'react-auth-kit/hooks/useIsAuthenticated';
 import UserMenu from './UserMenu';
@@ -26,9 +23,6 @@ const TopBar: React.FC = () => {
     { to: '/dashboard', label: 'Dashboard', icon: BarChart3 },
     { to: '/validate', label: 'Validate', icon: CheckCircle },
     { to: '/history', label: 'History', icon: History },
-    { to: '/apikeys', label: 'API Keys', icon: Key },
-    { to: '/integrations', label: 'Integrations', icon: Code },
-    { to: '/billing', label: 'Billing', icon: CreditCard },
     { to: '/api-docs', label: 'API Docs', icon: FileText },
   ];
 
@@ -175,7 +169,7 @@ const TopBar: React.FC = () => {
                     key={link.to}
                     to={link.to}
                     onClick={() => setIsMobileMenuOpen(false)}
-                    className={`block px-3 py-2 rounded-md text-base font-medium transition-all duration-200 flex items-center space-x-2 ${
+                    className={`flex px-3 py-2 rounded-md text-base font-medium transition-all duration-200 items-center space-x-2 ${
                       location.pathname === link.to
                         ? 'bg-[#2ED8A3]/10 text-[#004E8A] dark:text-[#2ED8A3]'
                         : 'text-[#333333] dark:text-gray-300 hover:bg-[#F4F5F7] dark:hover:bg-gray-800 hover:text-[#004E8A] dark:hover:text-white'

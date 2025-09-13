@@ -10,9 +10,9 @@ const AuthRedirect: React.FC<AuthRedirectProps> = ({ children }) => {
   const authUser = useAuthUser();
 
   // If user is authenticated, redirect to dashboard
-  if (authUser) {
-    return <Navigate to="/dashboard" replace />;
-  }
+  // if (authUser) {
+  //   return <Navigate to="/dashboard" replace />;
+  // }
 
   // If not authenticated, show the auth page
   return <>{children}</>;

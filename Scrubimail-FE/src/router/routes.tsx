@@ -7,7 +7,7 @@ const Homepage = lazy(() => import('../pages/Homepage'));
 const Dashboard = lazy(() => import('../pages/Dashboard'));
 const Validation = lazy(() => import('../pages/Validation'));
 const History = lazy(() => import('../pages/History'));
-const ApiKeys = lazy(() => import('../pages/APIKeys'));
+const ApiKeys = lazy(() => import('../pages/ApiKeys'));
 const Billing = lazy(() => import('../pages/Billing'));
 const Profile = lazy(() => import('../pages/Profile'));
 const ApiDocs = lazy(() => import('../pages/ApiDocs'));

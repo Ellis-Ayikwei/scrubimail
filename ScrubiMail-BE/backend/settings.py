@@ -27,7 +27,7 @@ load_dotenv(BASE_DIR / ".env")
 # See https://docs.djangoproject.com/en/5.1/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = os.getenv("DJANGO_SECRETE_KEY")
+SECRET_KEY = os.getenv("DJANGO_SECRET_KEY")
 OPENWEATHERMAP_API_KEY = os.environ.get("OPENWEATHERMAP_API_KEY", "")
 GOOGLE_MAPS_API_KEY = os.getenv("GOOGLE_MAPS_API_KEY")
 
@@ -190,8 +190,8 @@ TABLE_NAME_TEMPLATE = "{table_name}"
 
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": [
-        "rest_framework_simplejwt.authentication.JWTAuthentication",
         "backend.middle_ware.APIKeyAuthentication",
+        "rest_framework_simplejwt.authentication.JWTAuthentication",
     ],
     "DEFAULT_PERMISSION_CLASSES": ("rest_framework.permissions.IsAuthenticated",),
     "DEFAULT_THROTTLE_CLASSES": [
@@ -233,10 +233,22 @@ if DEBUG:
     CORS_ALLOW_ALL_ORIGINS = True
     CORS_ALLOW_CREDENTIALS = True
 
-# # CORS Settings
-# CORS_ALLOWED_ORIGINS = [
-#     "http://localhost:3000",
-# ]
+# CORS Settings
+CORS_ALLOWED_ORIGINS = [
+    "http://localhost:3000",
+    "http://192.168.100.12:5173",
+    "http://localhost:5173",
+]
+
+# Allow all methods for development
+CORS_ALLOW_METHODS = [
+    "DELETE",
+    "GET",
+    "OPTIONS",
+    "PATCH",
+    "POST",
+    "PUT",
+]
 
 
 CORS_ALLOW_HEADERS = [
@@ -250,6 +262,7 @@ CORS_ALLOW_HEADERS = [
     "x-csrftoken",
     "x-requested-with",
     "x-refresh-token",
+    "x-api-key",
 ]
 
 # settings.py
@@ -327,50 +340,50 @@ print("=========================")
 
 APPEND_SLASH = False
 
-# --- Stripe Configuration ---
-# Stripe API Keys (get these from Stripe Dashboard)
-STRIPE_PUBLISHABLE_KEY = os.getenv(
-    "STRIPE_PUBLISHABLE_KEY",
-)  # Test publishable key for development
-STRIPE_SECRET_KEY = os.getenv(
-    "STRIPE_SECRET_KEY",
+# --- Paystack Configuration ---
+# Paystack API Keys (get these from Paystack Dashboard)
+PAYSTACK_PUBLIC_KEY = os.getenv(
+    "PAYSTACK_PUBLIC_KEY",
+)  # Test public key for development
+PAYSTACK_SECRET_KEY = os.getenv(
+    "PAYSTACK_SECRET_KEY",
 )  # Test secret key for development
 
-# Stripe Webhook Configuration
-STRIPE_WEBHOOK_SECRET = os.getenv("STRIPE_WEBHOOK_SECRET")
+# Paystack Webhook Configuration
+PAYSTACK_WEBHOOK_SECRET = os.getenv("PAYSTACK_WEBHOOK_SECRET")
 
-print("Stripe WEBHOOK Key:", STRIPE_WEBHOOK_SECRET)
-# Stripe Configuration
-STRIPE_LIVE_MODE = False  # Set to True for production
-STRIPE_CURRENCY = "gbp"  # Default currency
-STRIPE_SUPPORTED_CURRENCIES = ["usd", "eur", "gbp", "ghs"]  # Supported currencies
+print("Paystack WEBHOOK Key:", PAYSTACK_WEBHOOK_SECRET)
+# Paystack Configuration
+PAYSTACK_LIVE_MODE = False  # Set to True for production
+PAYSTACK_CURRENCY = "NGN"  # Default currency (Nigerian Naira)
+PAYSTACK_SUPPORTED_CURRENCIES = ["NGN", "USD", "GHS", "ZAR"]  # Supported currencies
 
 # Payment Configuration
 PAYMENT_SUCCESS_URL = os.getenv(
-    "PAYMENT_SUCCESS_URL", "http://localhost:3000/payment/success"
+    "PAYMENT_SUCCESS_URL", "http://localhost:3000/billing?success=1"
 )
 PAYMENT_CANCEL_URL = os.getenv(
-    "PAYMENT_CANCEL_URL", "http://localhost:3000/payment/cancel"
+    "PAYMENT_CANCEL_URL", "http://localhost:3000/billing?canceled=1"
 )
 
-# Stripe Features Configuration
-STRIPE_FEATURES = {
+# Paystack Features Configuration
+PAYSTACK_FEATURES = {
     "payment_intents": True,
     "payment_methods": True,
     "customers": True,
     "refunds": True,
     "webhooks": True,
-    "subscriptions": False,  # Enable when subscription features are needed
+    "subscriptions": True,  # Paystack supports subscriptions
 }
 
-# Logging configuration for Stripe
-LOGGING["loggers"]["stripe"] = {
+# Logging configuration for Paystack
+LOGGING["loggers"]["paystack"] = {
     "handlers": ["console"],
     "level": "INFO",
     "propagate": False,
 }
 
-LOGGING["loggers"]["apps.Payment"] = {
+LOGGING["loggers"]["apps.billing"] = {
     "handlers": ["console"],
     "level": "INFO",
     "propagate": False,

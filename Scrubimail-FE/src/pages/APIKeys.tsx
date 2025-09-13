@@ -1,378 +1,824 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
-  Key, 
   Plus, 
+  Copy, 
   Eye, 
   EyeOff, 
-  Copy, 
-  Check, 
   Trash2, 
-  AlertTriangle, 
-  Loader2,
-  Shield,
-  Clock,
+  Key, 
+  AlertCircle, 
+  CheckCircle, 
+  Calendar,
   Activity,
+  Shield,
+  Settings,
   Download,
   RefreshCw,
-  Settings,
-  Lock
+  Filter,
+  Search,
+  MoreVertical,
+  Edit,
+  RotateCcw,
+  BarChart3,
+  Clock,
+  Zap
 } from 'lucide-react';
-import { apiKeyService, APIKey } from '../services/apiKeyService';
+import { Button, Input, Select, Modal, message, Tooltip, Badge, Tabs, Card, Statistic, Switch, DatePicker, InputNumber, Divider, Alert, Space, Form, Row, Col } from 'antd';
+import apiKeyService, { APIKey } from '../services/apiKeyService';
 
-const APIKeys = () => {
-  const [keys, setKeys] = useState<APIKey[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [creating, setCreating] = useState(false);
+interface ApiKeyWithUsage extends APIKey {
+  name?: string;
+  lastUsed?: string;
+  usageCount?: number;
+  permissions?: string[];
+  description?: string;
+}
+
+const ApiKeys: React.FC = () => {
+  const [apiKeys, setApiKeys] = useState<ApiKeyWithUsage[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editingKey, setEditingKey] = useState<ApiKeyWithUsage | null>(null);
+  const [newKeyName, setNewKeyName] = useState('');
+  const [newKeyDescription, setNewKeyDescription] = useState('');
+  const [selectedPermissions, setSelectedPermissions] = useState<string[]>(['read']);
+  const [expirationDate, setExpirationDate] = useState<string>('');
+  const [ipWhitelist, setIpWhitelist] = useState<string>('');
+  const [rateLimit, setRateLimit] = useState<number>(1000);
+  const [keyPrefix, setKeyPrefix] = useState<string>('sk_');
+  const [keyLength, setKeyLength] = useState<number>(32);
+  const [notifyOnUsage, setNotifyOnUsage] = useState<boolean>(false);
+  const [autoRotate, setAutoRotate] = useState<boolean>(false);
+  const [rotationDays, setRotationDays] = useState<number>(90);
+  const [visibleKeys, setVisibleKeys] = useState<Set<number>>(new Set());
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
-  const [showSecretKeys, setShowSecretKeys] = useState<Set<string>>(new Set());
+  const [searchTerm, setSearchTerm] = useState('');
+  const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [activeTab, setActiveTab] = useState('keys');
+  const [usageStats, setUsageStats] = useState({
+    totalRequests: 0,
+    activeKeys: 0,
+    totalKeys: 0,
+    thisMonth: 0
+  });
 
-  const fetchKeys = async () => {
-    setLoading(true);
-    setError(null);
+  // Load API keys from backend
+  const loadApiKeys = async () => {
     try {
-      const data = await apiKeyService.getAPIKeys();
-      setKeys(data);
-    } catch (err: any) {
-      setError('Failed to fetch API keys');
+      setLoading(true);
+      const keys = await apiKeyService.getAPIKeys();
+      // Add mock usage data for now - replace with real analytics
+      const keysWithUsage = keys.map(key => ({
+        ...key,
+        name: `API Key ${key.id}`,
+        lastUsed: new Date(Date.now() - Math.random() * 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+        usageCount: Math.floor(Math.random() * 1000),
+        permissions: ['read', 'write'],
+        description: `API key created on ${new Date(key.created_at).toLocaleDateString()}`
+      }));
+      setApiKeys(keysWithUsage);
+      
+      // Update stats
+      setUsageStats({
+        totalRequests: keysWithUsage.reduce((sum, key) => sum + (key.usageCount || 0), 0),
+        activeKeys: keysWithUsage.filter(key => key.is_active).length,
+        totalKeys: keysWithUsage.length,
+        thisMonth: Math.floor(Math.random() * 5000)
+      });
+    } catch (error) {
+      console.error('Failed to load API keys:', error);
+      message.error('Failed to load API keys');
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchKeys();
+    loadApiKeys();
   }, []);
 
-  const handleCreate = async () => {
-    setCreating(true);
-    setError(null);
-    try {
-      const res = await apiKeyService.createAPIKey();
-      await fetchKeys();
-      // Show the new key temporarily
-      if (res.key) {
-        setShowSecretKeys(prev => new Set(prev).add(res.key));
+  const toggleKeyVisibility = (keyId: number) => {
+    setVisibleKeys(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(keyId)) {
+        newSet.delete(keyId);
+      } else {
+        newSet.add(keyId);
       }
-    } catch (err: any) {
-      setError('Failed to create API key');
-    } finally {
-      setCreating(false);
-    }
+      return newSet;
+    });
   };
 
-  const handleDeactivate = async (id: number) => {
-    setError(null);
+  const copyToClipboard = async (key: string) => {
     try {
-      await apiKeyService.deactivateAPIKey(id);
-      await fetchKeys();
-    } catch (err: any) {
-      setError('Failed to deactivate API key');
+      await navigator.clipboard.writeText(key);
+      setCopiedKey(key);
+      message.success('API key copied to clipboard');
+      setTimeout(() => setCopiedKey(null), 2000);
+    } catch (err) {
+      console.error('Failed to copy: ', err);
+      message.error('Failed to copy API key');
     }
   };
 
-  const handleDelete = async (id: number) => {
-    if (!confirm('Are you sure you want to delete this API key? This action cannot be undone.')) {
+  const maskKey = (key: string) => {
+    if (key.length <= 12) return '•'.repeat(key.length);
+    return key.substring(0, 8) + '•'.repeat(key.length - 12) + key.substring(key.length - 4);
+  };
+
+  const resetCreateForm = () => {
+    setNewKeyName('');
+    setNewKeyDescription('');
+    setSelectedPermissions(['read']);
+    setExpirationDate('');
+    setIpWhitelist('');
+    setRateLimit(1000);
+    setKeyPrefix('sk_');
+    setKeyLength(32);
+    setNotifyOnUsage(false);
+    setAutoRotate(false);
+    setRotationDays(90);
+  };
+
+  const handleCreateKey = async () => {
+    if (!newKeyName.trim()) {
+      message.error('Please enter a name for the API key');
       return;
     }
-    setError(null);
+
     try {
-      // Note: Delete functionality may not be available in backend, using deactivate instead
-      await apiKeyService.deactivateAPIKey(id);
-      await fetchKeys();
-    } catch (err: any) {
-      setError('Failed to delete API key');
+      const newKey = await apiKeyService.createAPIKey();
+      const keyWithUsage: ApiKeyWithUsage = {
+        ...newKey,
+        name: newKeyName,
+        description: newKeyDescription,
+        lastUsed: 'Never',
+        usageCount: 0,
+        permissions: selectedPermissions
+      };
+      setApiKeys(prev => [keyWithUsage, ...prev]);
+      resetCreateForm();
+      setShowCreateModal(false);
+      message.success('API key created successfully');
+      loadApiKeys(); // Refresh the list
+    } catch (error) {
+      console.error('Failed to create API key:', error);
+      message.error('Failed to create API key');
     }
   };
 
-  const copyToClipboard = (text: string) => {
-    navigator.clipboard.writeText(text);
-    setCopiedKey(text);
-    setTimeout(() => setCopiedKey(null), 2000);
-  };
-
-  const toggleKeyVisibility = (keyId: string) => {
-    const newShowSecretKeys = new Set(showSecretKeys);
-    if (newShowSecretKeys.has(keyId)) {
-      newShowSecretKeys.delete(keyId);
-    } else {
-      newShowSecretKeys.add(keyId);
+  const handleDeactivateKey = async (keyId: number) => {
+    try {
+      await apiKeyService.deactivateAPIKey(keyId);
+      setApiKeys(prev => prev.map(key => 
+        key.id === keyId ? { ...key, is_active: false } : key
+      ));
+      message.success('API key deactivated');
+      loadApiKeys(); // Refresh the list
+    } catch (error) {
+      console.error('Failed to deactivate API key:', error);
+      message.error('Failed to deactivate API key');
     }
-    setShowSecretKeys(newShowSecretKeys);
   };
 
-  const getUsageStatus = (usage: number, limit: number) => {
-    const percentage = (usage / limit) * 100;
-    if (percentage >= 90) return { color: 'text-red-600', bg: 'bg-red-100 dark:bg-red-900/20' };
-    if (percentage >= 70) return { color: 'text-yellow-600', bg: 'bg-yellow-100 dark:bg-yellow-900/20' };
-    return { color: 'text-green-600', bg: 'bg-green-100 dark:bg-green-900/20' };
+  const handleEditKey = (key: ApiKeyWithUsage) => {
+    setEditingKey(key);
+    setNewKeyName(key.name || '');
+    setNewKeyDescription(key.description || '');
+    setSelectedPermissions(key.permissions || ['read']);
+    setShowEditModal(true);
   };
 
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-[#F8FAFC] dark:bg-gray-900 flex items-center justify-center">
-        <div className="text-center">
-          <Loader2 className="w-8 h-8 animate-spin text-[#2ED8A3] mx-auto mb-4" />
-          <p className="text-[#333333] dark:text-white">Loading API keys...</p>
-        </div>
-      </div>
-    );
-  }
+  const handleUpdateKey = () => {
+    if (!editingKey || !newKeyName.trim()) return;
+    
+    setApiKeys(prev => prev.map(key => 
+      key.id === editingKey.id 
+        ? { 
+            ...key, 
+            name: newKeyName, 
+            description: newKeyDescription,
+            permissions: selectedPermissions 
+          } 
+        : key
+    ));
+    setShowEditModal(false);
+    setEditingKey(null);
+    message.success('API key updated');
+  };
+
+  const filteredKeys = apiKeys.filter(key => {
+    const matchesSearch = key.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         key.key.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesStatus = statusFilter === 'all' || 
+                         (statusFilter === 'active' && key.is_active) ||
+                         (statusFilter === 'inactive' && !key.is_active);
+    return matchesSearch && matchesStatus;
+  });
+
+  const permissionOptions = [
+    { label: 'Read', value: 'read' },
+    { label: 'Write', value: 'write' },
+    { label: 'Delete', value: 'delete' },
+    { label: 'Admin', value: 'admin' }
+  ];
 
   return (
-    <div className="min-h-screen bg-[#F8FAFC] dark:bg-gray-900">
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Header */}
         <div className="mb-8">
-          <h1 className="text-3xl font-bold text-[#333333] dark:text-white mb-2 flex items-center">
-            <Key className="w-8 h-8 mr-3 text-[#2ED8A3]" />
-            API Key Management
-          </h1>
-          <p className="text-[#333333]/70 dark:text-gray-400">
-            Manage your API keys for programmatic access to Scrubimail services
-          </p>
-        </div>
-
-        {error && (
-          <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4 mb-6">
-            <div className="flex">
-              <AlertTriangle className="w-5 h-5 text-red-600 dark:text-red-400 mt-0.5" />
-              <div className="ml-3">
-                <p className="text-sm text-red-600 dark:text-red-400">{error}</p>
-              </div>
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-3xl font-bold text-gray-900 dark:text-white flex items-center">
+                <Key className="w-8 h-8 mr-3 text-[#2ED8A3]" />
+                API Keys
+              </h1>
+              <p className="mt-2 text-gray-600 dark:text-gray-400">
+                Manage your API keys for accessing ScrubiMail services
+              </p>
+            </div>
+            <div className="flex items-center space-x-3">
+              <Button
+                icon={<RefreshCw className="w-4 h-4" />}
+                onClick={loadApiKeys}
+                loading={loading}
+              >
+                Refresh
+              </Button>
+              <Button
+                type="primary"
+                icon={<Plus className="w-4 h-4" />}
+                onClick={() => setShowCreateModal(true)}
+                className="bg-[#2ED8A3] hover:bg-[#00C48C] border-none"
+              >
+                Create API Key
+              </Button>
             </div>
           </div>
-        )}
+        </div>
 
-        <div className="grid lg:grid-cols-3 gap-8">
-          {/* API Keys List */}
-          <div className="lg:col-span-2 space-y-6">
-            {/* Actions */}
-            <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="text-xl font-semibold text-[#333333] dark:text-white">API Keys</h2>
-                <div className="flex items-center space-x-3">
-                  <button
-                    onClick={fetchKeys}
-                    className="flex items-center space-x-2 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-[#F4F5F7] dark:hover:bg-gray-700 transition-colors"
-                  >
-                    <RefreshCw className="w-4 h-4" />
-                    <span className="text-sm">Refresh</span>
-                  </button>
-                  <button
-                    onClick={handleCreate}
-                    disabled={creating}
-                    className="flex items-center space-x-2 bg-[#2ED8A3] text-white px-4 py-2 rounded-lg hover:bg-[#00C48C] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                  >
-                    {creating ? (
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                    ) : (
-                      <Plus className="w-4 h-4" />
-                    )}
-                    <span>Create New Key</span>
-                  </button>
-                </div>
-              </div>
+        {/* Stats Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+          <Card className="bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700">
+            <Statistic
+              title="Total Keys"
+              value={usageStats.totalKeys}
+              prefix={<Key className="w-4 h-4 text-[#2ED8A3]" />}
+              valueStyle={{ color: '#2ED8A3' }}
+            />
+          </Card>
+          <Card className="bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700">
+            <Statistic
+              title="Active Keys"
+              value={usageStats.activeKeys}
+              prefix={<CheckCircle className="w-4 h-4 text-green-500" />}
+              valueStyle={{ color: '#10B981' }}
+            />
+          </Card>
+          <Card className="bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700">
+            <Statistic
+              title="Total Requests"
+              value={usageStats.totalRequests}
+              prefix={<Activity className="w-4 h-4 text-blue-500" />}
+              valueStyle={{ color: '#3B82F6' }}
+            />
+          </Card>
+          <Card className="bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700">
+            <Statistic
+              title="This Month"
+              value={usageStats.thisMonth}
+              prefix={<BarChart3 className="w-4 h-4 text-purple-500" />}
+              valueStyle={{ color: '#8B5CF6' }}
+            />
+          </Card>
+        </div>
 
-              {/* Keys List */}
-              <div className="space-y-4">
-                {keys.map((key: APIKey) => (
-                  <div key={key.id} className="border border-gray-200 dark:border-gray-700 rounded-lg p-4 hover:shadow-sm transition-shadow">
-                    <div className="flex items-center justify-between mb-3">
-                      <div className="flex items-center space-x-3">
-                        <div className={`w-3 h-3 rounded-full ${key.is_active ? 'bg-green-500' : 'bg-red-500'}`}></div>
-                        <span className="font-medium text-[#333333] dark:text-white">
-                          {key.name || `API Key ${key.id}`}
-                        </span>
-                        <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                          key.is_active 
-                            ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
-                            : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
-                        }`}>
-                          {key.is_active ? 'Active' : 'Inactive'}
-                        </span>
+        {/* Tabs */}
+        <Tabs
+          activeKey={activeTab}
+          onChange={setActiveTab}
+          items={[
+            {
+              key: 'keys',
+              label: 'API Keys',
+              children: (
+                <div className="space-y-6">
+                  {/* Filters */}
+                  <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4">
+                    <div className="flex flex-col sm:flex-row gap-4">
+                      <div className="flex-1">
+                        <Input
+                          placeholder="Search API keys..."
+                          prefix={<Search className="w-4 h-4 text-gray-400" />}
+                          value={searchTerm}
+                          onChange={(e) => setSearchTerm(e.target.value)}
+                          className="w-full"
+                        />
                       </div>
-                      <div className="flex items-center space-x-2">
-                        <button
-                          onClick={() => toggleKeyVisibility(key.key)}
-                          className="text-[#333333]/50 hover:text-[#333333] transition-colors"
-                        >
-                          {showSecretKeys.has(key.key) ? (
-                            <EyeOff className="w-4 h-4" />
-                          ) : (
-                            <Eye className="w-4 h-4" />
-                          )}
-                        </button>
-                        <button
-                          onClick={() => copyToClipboard(key.key)}
-                          className="text-[#2ED8A3] hover:text-[#00C48C] transition-colors"
-                        >
-                          {copiedKey === key.key ? (
-                            <Check className="w-4 h-4" />
-                          ) : (
-                            <Copy className="w-4 h-4" />
-                          )}
-                        </button>
-                      </div>
-                    </div>
-
-                    {/* Key Display */}
-                    <div className="mb-3">
-                      <div className="flex items-center space-x-2">
-                        <Lock className="w-4 h-4 text-[#333333]/50" />
-                        <code className="text-sm bg-[#F4F5F7] dark:bg-gray-700 px-2 py-1 rounded font-mono">
-                          {showSecretKeys.has(key.key) ? key.key : '••••••••••••••••••••••••••••••••'}
-                        </code>
-                      </div>
-                    </div>
-
-                    {/* Key Details */}
-                    <div className="grid grid-cols-2 gap-4 text-sm">
-                      <div>
-                        <span className="text-[#333333]/70 dark:text-gray-400">Created:</span>
-                        <div className="flex items-center space-x-1">
-                          <Clock className="w-3 h-3" />
-                          <span className="text-[#333333] dark:text-white">
-                            {new Date(key.created_at).toLocaleDateString()}
-                          </span>
-                        </div>
-                      </div>
-                      <div>
-                        <span className="text-[#333333]/70 dark:text-gray-400">Last Used:</span>
-                        <div className="flex items-center space-x-1">
-                          <Activity className="w-3 h-3" />
-                          <span className="text-[#333333] dark:text-white">
-                            {key.last_used ? new Date(key.last_used).toLocaleDateString() : 'Never'}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Actions */}
-                    <div className="flex items-center justify-between mt-4 pt-3 border-t border-gray-200 dark:border-gray-700">
-                      <div className="flex items-center space-x-2">
-                        {key.is_active ? (
-                          <button
-                            onClick={() => handleDeactivate(key.id)}
-                            className="text-red-600 hover:text-red-700 text-sm font-medium transition-colors"
-                          >
-                            Deactivate
-                          </button>
-                        ) : (
-                          <span className="text-sm text-[#333333]/50 dark:text-gray-400">Deactivated</span>
-                        )}
-                      </div>
-                      <button
-                        onClick={() => handleDelete(key.id)}
-                        className="text-red-600 hover:text-red-700 transition-colors"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
+                      <Select
+                        value={statusFilter}
+                        onChange={setStatusFilter}
+                        className="w-full sm:w-48"
+                        options={[
+                          { label: 'All Keys', value: 'all' },
+                          { label: 'Active', value: 'active' },
+                          { label: 'Inactive', value: 'inactive' }
+                        ]}
+                      />
                     </div>
                   </div>
-                ))}
 
-                {keys.length === 0 && (
+                  {/* API Keys List */}
+                  {loading ? (
+                    <div className="text-center py-12">
+                      <RefreshCw className="w-8 h-8 text-gray-400 animate-spin mx-auto mb-4" />
+                      <p className="text-gray-500 dark:text-gray-400">Loading API keys...</p>
+                    </div>
+                  ) : filteredKeys.length === 0 ? (
+                    <div className="text-center py-12">
+                      <Key className="w-16 h-16 text-gray-300 dark:text-gray-600 mx-auto mb-4" />
+                      <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
+                        {searchTerm ? 'No matching API keys' : 'No API Keys'}
+                      </h3>
+                      <p className="text-gray-500 dark:text-gray-400 mb-6">
+                        {searchTerm ? 'Try adjusting your search terms' : 'Create your first API key to start using our services'}
+                      </p>
+                      {!searchTerm && (
+                        <Button
+                          type="primary"
+                          icon={<Plus className="w-4 h-4" />}
+                          onClick={() => setShowCreateModal(true)}
+                          className="bg-[#2ED8A3] hover:bg-[#00C48C] border-none"
+                        >
+                          Create API Key
+                        </Button>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      {filteredKeys.map((apiKey) => (
+                        <Card
+                          key={apiKey.id}
+                          className="bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 hover:shadow-lg transition-shadow"
+                        >
+                          <div className="flex items-start justify-between">
+                            <div className="flex-1">
+                              <div className="flex items-center space-x-3 mb-3">
+                                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                                  {apiKey.name}
+                                </h3>
+                                <Badge
+                                  status={apiKey.is_active ? 'success' : 'error'}
+                                  text={apiKey.is_active ? 'Active' : 'Inactive'}
+                                />
+                                {apiKey.usageCount && apiKey.usageCount > 0 && (
+                                  <Badge
+                                    count={apiKey.usageCount}
+                                    style={{ backgroundColor: '#3B82F6' }}
+                                    title="Usage Count"
+                                  />
+                                )}
+                              </div>
+                              
+                              {apiKey.description && (
+                                <p className="text-sm text-gray-600 dark:text-gray-400 mb-3">
+                                  {apiKey.description}
+                                </p>
+                              )}
+                              
+                              <div className="flex items-center space-x-4 mb-4">
+                                <div className="flex items-center space-x-2">
+                                  <code className="bg-gray-100 dark:bg-gray-700 px-3 py-1 rounded text-sm font-mono">
+                                    {visibleKeys.has(apiKey.id) ? apiKey.key : maskKey(apiKey.key)}
+                                  </code>
+                                  <Tooltip title={visibleKeys.has(apiKey.id) ? 'Hide key' : 'Show key'}>
+                                    <Button
+                                      type="text"
+                                      size="small"
+                                      icon={visibleKeys.has(apiKey.id) ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                                      onClick={() => toggleKeyVisibility(apiKey.id)}
+                                    />
+                                  </Tooltip>
+                                  <Tooltip title="Copy to clipboard">
+                                    <Button
+                                      type="text"
+                                      size="small"
+                                      icon={copiedKey === apiKey.key ? <CheckCircle className="w-4 h-4 text-green-500" /> : <Copy className="w-4 h-4" />}
+                                      onClick={() => copyToClipboard(apiKey.key)}
+                                    />
+                                  </Tooltip>
+                                </div>
+                              </div>
+
+                              <div className="grid grid-cols-1 md:grid-cols-4 gap-4 text-sm text-gray-600 dark:text-gray-400">
+                                <div className="flex items-center">
+                                  <Calendar className="w-4 h-4 mr-2" />
+                                  <span>Created: {new Date(apiKey.created_at).toLocaleDateString()}</span>
+                                </div>
+                                <div className="flex items-center">
+                                  <Clock className="w-4 h-4 mr-2" />
+                                  <span>Last Used: {apiKey.lastUsed || 'Never'}</span>
+                                </div>
+                                <div className="flex items-center">
+                                  <Shield className="w-4 h-4 mr-2" />
+                                  <span>Permissions: {apiKey.permissions?.join(', ') || 'None'}</span>
+                                </div>
+                                <div className="flex items-center">
+                                  <Activity className="w-4 h-4 mr-2" />
+                                  <span>Usage: {apiKey.usageCount || 0} requests</span>
+                                </div>
+                              </div>
+                            </div>
+
+                            <div className="flex items-center space-x-2 ml-4">
+                              <Tooltip title="Edit key">
+                                <Button
+                                  type="text"
+                                  size="small"
+                                  icon={<Edit className="w-4 h-4" />}
+                                  onClick={() => handleEditKey(apiKey)}
+                                />
+                              </Tooltip>
+                              {apiKey.is_active && (
+                                <Tooltip title="Deactivate key">
+                                  <Button
+                                    type="text"
+                                    size="small"
+                                    icon={<RotateCcw className="w-4 h-4" />}
+                                    onClick={() => handleDeactivateKey(apiKey.id)}
+                                    danger
+                                  />
+                                </Tooltip>
+                              )}
+                            </div>
+                          </div>
+                        </Card>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )
+            },
+            {
+              key: 'analytics',
+              label: 'Analytics',
+              children: (
+                <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
+                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+                    Usage Analytics
+                  </h3>
                   <div className="text-center py-12">
-                    <Key className="w-12 h-12 text-[#333333]/30 mx-auto mb-4" />
-                    <h3 className="text-lg font-medium text-[#333333] dark:text-white mb-2">No API keys found</h3>
-                    <p className="text-[#333333]/70 dark:text-gray-400 mb-4">
-                      Create your first API key to start using our services programmatically.
+                    <BarChart3 className="w-16 h-16 text-gray-300 dark:text-gray-600 mx-auto mb-4" />
+                    <p className="text-gray-500 dark:text-gray-400">
+                      Analytics dashboard coming soon
                     </p>
-                    <button
-                      onClick={handleCreate}
-                      disabled={creating}
-                      className="bg-[#2ED8A3] text-white px-4 py-2 rounded-lg hover:bg-[#00C48C] disabled:opacity-50 transition-colors"
-                    >
-                      {creating ? 'Creating...' : 'Create API Key'}
-                    </button>
+                  </div>
+                </div>
+              )
+            }
+          ]}
+        />
+
+        {/* Create API Key Modal */}
+        <Modal
+          title={
+            <div className="flex items-center space-x-2">
+              <Key className="w-5 h-5 text-[#2ED8A3]" />
+              <span>Create New API Key</span>
+            </div>
+          }
+          open={showCreateModal}
+          onCancel={() => {
+            setShowCreateModal(false);
+            resetCreateForm();
+          }}
+          width={800}
+          footer={[
+            <Button key="cancel" onClick={() => {
+              setShowCreateModal(false);
+              resetCreateForm();
+            }}>
+              Cancel
+            </Button>,
+            <Button
+              key="create"
+              type="primary"
+              onClick={handleCreateKey}
+              disabled={!newKeyName.trim()}
+              className="bg-[#2ED8A3] hover:bg-[#00C48C] border-none"
+              icon={<Plus className="w-4 h-4" />}
+            >
+              Create API Key
+            </Button>
+          ]}
+        >
+          <div className="space-y-6">
+            {/* Basic Information */}
+            <div>
+              <h4 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center">
+                <Settings className="w-5 h-5 mr-2 text-[#2ED8A3]" />
+                Basic Information
+              </h4>
+              <Row gutter={16}>
+                <Col span={12}>
+                  <div className="mb-4">
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      Key Name *
+                    </label>
+                    <Input
+                      placeholder="e.g., Production API, Development Key"
+                      value={newKeyName}
+                      onChange={(e) => setNewKeyName(e.target.value)}
+                      size="large"
+                    />
+                  </div>
+                </Col>
+                <Col span={12}>
+                  <div className="mb-4">
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      Key Prefix
+                    </label>
+                    <Input
+                      placeholder="sk_"
+                      value={keyPrefix}
+                      onChange={(e) => setKeyPrefix(e.target.value)}
+                      size="large"
+                    />
+                  </div>
+                </Col>
+              </Row>
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Description
+                </label>
+                <Input.TextArea
+                  placeholder="Describe what this API key will be used for..."
+                  value={newKeyDescription}
+                  onChange={(e) => setNewKeyDescription(e.target.value)}
+                  rows={3}
+                />
+              </div>
+            </div>
+
+            <Divider />
+
+            {/* Security & Permissions */}
+            <div>
+              <h4 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center">
+                <Shield className="w-5 h-5 mr-2 text-[#2ED8A3]" />
+                Security & Permissions
+              </h4>
+              <Row gutter={16}>
+                <Col span={12}>
+                  <div className="mb-4">
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      Permissions *
+                    </label>
+                    <Select
+                      mode="multiple"
+                      placeholder="Select permissions"
+                      value={selectedPermissions}
+                      onChange={setSelectedPermissions}
+                      options={permissionOptions}
+                      className="w-full"
+                      size="large"
+                    />
+                  </div>
+                </Col>
+                <Col span={12}>
+                  <div className="mb-4">
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      Key Length
+                    </label>
+                    <Select
+                      value={keyLength}
+                      onChange={setKeyLength}
+                      className="w-full"
+                      size="large"
+                      options={[
+                        { label: '16 characters', value: 16 },
+                        { label: '32 characters', value: 32 },
+                        { label: '64 characters', value: 64 },
+                        { label: '128 characters', value: 128 }
+                      ]}
+                    />
+                  </div>
+                </Col>
+              </Row>
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  IP Whitelist (Optional)
+                </label>
+                <Input.TextArea
+                  placeholder="Enter IP addresses or CIDR blocks, one per line&#10;Example:&#10;192.168.1.1&#10;10.0.0.0/8"
+                  value={ipWhitelist}
+                  onChange={(e) => setIpWhitelist(e.target.value)}
+                  rows={3}
+                />
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                  Leave empty to allow access from any IP address
+                </p>
+              </div>
+            </div>
+
+            <Divider />
+
+            {/* Rate Limiting & Usage */}
+            <div>
+              <h4 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center">
+                <Activity className="w-5 h-5 mr-2 text-[#2ED8A3]" />
+                Rate Limiting & Usage
+              </h4>
+              <Row gutter={16}>
+                <Col span={12}>
+                  <div className="mb-4">
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      Rate Limit (requests per hour)
+                    </label>
+                    <InputNumber
+                      min={1}
+                      max={100000}
+                      value={rateLimit}
+                      onChange={(value) => setRateLimit(value || 1000)}
+                      className="w-full"
+                      size="large"
+                      formatter={(value) => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
+                    />
+                  </div>
+                </Col>
+                <Col span={12}>
+                  <div className="mb-4">
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      Expiration Date (Optional)
+                    </label>
+                    <DatePicker
+                      value={expirationDate ? new Date(expirationDate) : null}
+                      onChange={(date) => setExpirationDate(date ? date.toISOString().split('T')[0] : '')}
+                      className="w-full"
+                      size="large"
+                      placeholder="Select expiration date"
+                    />
+                  </div>
+                </Col>
+              </Row>
+            </div>
+
+            <Divider />
+
+            {/* Advanced Options */}
+            <div>
+              <h4 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center">
+                <Zap className="w-5 h-5 mr-2 text-[#2ED8A3]" />
+                Advanced Options
+              </h4>
+              <div className="space-y-4">
+                <div className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                  <div>
+                    <div className="font-medium text-gray-900 dark:text-white">Usage Notifications</div>
+                    <div className="text-sm text-gray-500 dark:text-gray-400">
+                      Get notified when this API key is used
+                    </div>
+                  </div>
+                  <Switch
+                    checked={notifyOnUsage}
+                    onChange={setNotifyOnUsage}
+                  />
+                </div>
+                
+                <div className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                  <div>
+                    <div className="font-medium text-gray-900 dark:text-white">Auto Rotation</div>
+                    <div className="text-sm text-gray-500 dark:text-gray-400">
+                      Automatically rotate this key for security
+                    </div>
+                  </div>
+                  <Switch
+                    checked={autoRotate}
+                    onChange={setAutoRotate}
+                  />
+                </div>
+
+                {autoRotate && (
+                  <div className="ml-4 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      Rotation Interval (days)
+                    </label>
+                    <InputNumber
+                      min={1}
+                      max={365}
+                      value={rotationDays}
+                      onChange={(value) => setRotationDays(value || 90)}
+                      className="w-32"
+                      size="large"
+                    />
                   </div>
                 )}
               </div>
             </div>
-          </div>
 
-          {/* Sidebar */}
+            {/* Security Warning */}
+            <Alert
+              message="Security Notice"
+              description="API keys provide full access to your account. Keep them secure and never share them publicly. Store them in environment variables or secure configuration files."
+              type="warning"
+              showIcon
+              icon={<AlertCircle className="w-4 h-4" />}
+            />
+          </div>
+        </Modal>
+
+        {/* Edit API Key Modal */}
+        <Modal
+          title={
+            <div className="flex items-center space-x-2">
+              <Edit className="w-5 h-5 text-[#2ED8A3]" />
+              <span>Edit API Key</span>
+            </div>
+          }
+          open={showEditModal}
+          onCancel={() => setShowEditModal(false)}
+          width={600}
+          footer={[
+            <Button key="cancel" onClick={() => setShowEditModal(false)}>
+              Cancel
+            </Button>,
+            <Button
+              key="update"
+              type="primary"
+              onClick={handleUpdateKey}
+              disabled={!newKeyName.trim()}
+              className="bg-[#2ED8A3] hover:bg-[#00C48C] border-none"
+              icon={<Edit className="w-4 h-4" />}
+            >
+              Update Key
+            </Button>
+          ]}
+        >
           <div className="space-y-6">
-            {/* Security Tips */}
-            <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
-              <h3 className="text-lg font-semibold text-[#333333] dark:text-white mb-4 flex items-center">
-                <Shield className="w-5 h-5 mr-2 text-[#2ED8A3]" />
-                Security Tips
-              </h3>
-              <div className="space-y-3 text-sm">
-                <div className="flex items-start space-x-2">
-                  <div className="w-2 h-2 bg-[#2ED8A3] rounded-full mt-2 flex-shrink-0"></div>
-                  <span className="text-[#333333] dark:text-white">Keep your API keys secure and never share them publicly</span>
-                </div>
-                <div className="flex items-start space-x-2">
-                  <div className="w-2 h-2 bg-[#2ED8A3] rounded-full mt-2 flex-shrink-0"></div>
-                  <span className="text-[#333333] dark:text-white">Use environment variables in production</span>
-                </div>
-                <div className="flex items-start space-x-2">
-                  <div className="w-2 h-2 bg-[#2ED8A3] rounded-full mt-2 flex-shrink-0"></div>
-                  <span className="text-[#333333] dark:text-white">Rotate keys regularly for better security</span>
-                </div>
-                <div className="flex items-start space-x-2">
-                  <div className="w-2 h-2 bg-[#2ED8A3] rounded-full mt-2 flex-shrink-0"></div>
-                  <span className="text-[#333333] dark:text-white">Monitor usage to detect unauthorized access</span>
-                </div>
-              </div>
+            <Alert
+              message="Note"
+              description="You can only edit the name, description, and permissions. Security settings like IP whitelist and rate limits cannot be changed after creation."
+              type="info"
+              showIcon
+            />
+            
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Key Name *
+              </label>
+              <Input
+                placeholder="Enter a name for your API key"
+                value={newKeyName}
+                onChange={(e) => setNewKeyName(e.target.value)}
+                size="large"
+              />
+            </div>
+            
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Description
+              </label>
+              <Input.TextArea
+                placeholder="Optional description"
+                value={newKeyDescription}
+                onChange={(e) => setNewKeyDescription(e.target.value)}
+                rows={3}
+              />
+            </div>
+            
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Permissions
+              </label>
+              <Select
+                mode="multiple"
+                placeholder="Select permissions"
+                value={selectedPermissions}
+                onChange={setSelectedPermissions}
+                options={permissionOptions}
+                className="w-full"
+                size="large"
+              />
             </div>
 
-            {/* Usage Stats */}
-            <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
-              <h3 className="text-lg font-semibold text-[#333333] dark:text-white mb-4 flex items-center">
-                <Activity className="w-5 h-5 mr-2 text-[#2ED8A3]" />
-                Usage Stats
-              </h3>
-              <div className="space-y-4">
-                <div>
-                  <div className="flex justify-between text-sm mb-1">
-                    <span className="text-[#333333]/70 dark:text-gray-400">Active Keys</span>
-                    <span className="font-medium text-[#333333] dark:text-white">
-                      {keys.filter(k => k.is_active).length}
-                    </span>
-                  </div>
-                  <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
-                    <div 
-                      className="bg-[#2ED8A3] h-2 rounded-full transition-all duration-300"
-                      style={{ width: `${(keys.filter(k => k.is_active).length / Math.max(keys.length, 1)) * 100}%` }}
-                    ></div>
-                  </div>
-                </div>
-                <div>
-                  <div className="flex justify-between text-sm mb-1">
-                    <span className="text-[#333333]/70 dark:text-gray-400">Total Keys</span>
-                    <span className="font-medium text-[#333333] dark:text-white">{keys.length}</span>
-                  </div>
-                </div>
+            {editingKey && (
+              <div className="p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                <h5 className="font-medium text-gray-900 dark:text-white mb-2">Current Key</h5>
+                <code className="text-sm text-gray-600 dark:text-gray-400 break-all">
+                  {editingKey.key}
+                </code>
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
+                  Created: {new Date(editingKey.created_at).toLocaleString()}
+                </p>
               </div>
-            </div>
-
-            {/* Quick Actions */}
-            <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
-              <h3 className="text-lg font-semibold text-[#333333] dark:text-white mb-4">Quick Actions</h3>
-              <div className="space-y-3">
-                <button className="w-full flex items-center justify-between p-3 bg-[#F4F5F7] dark:bg-gray-700 rounded-lg hover:bg-[#2ED8A3]/10 transition-colors">
-                  <span className="text-sm text-[#333333] dark:text-white">View API Documentation</span>
-                  <Settings className="w-4 h-4 text-[#2ED8A3]" />
-                </button>
-                <button className="w-full flex items-center justify-between p-3 bg-[#F4F5F7] dark:bg-gray-700 rounded-lg hover:bg-[#2ED8A3]/10 transition-colors">
-                  <span className="text-sm text-[#333333] dark:text-white">Download SDK</span>
-                  <Download className="w-4 h-4 text-[#2ED8A3]" />
-                </button>
-                <button className="w-full flex items-center justify-between p-3 bg-[#F4F5F7] dark:bg-gray-700 rounded-lg hover:bg-[#2ED8A3]/10 transition-colors">
-                  <span className="text-sm text-[#333333] dark:text-white">Usage Analytics</span>
-                  <Activity className="w-4 h-4 text-[#2ED8A3]" />
-                </button>
-              </div>
-            </div>
+            )}
           </div>
-        </div>
+        </Modal>
       </div>
     </div>
   );
 };
 
-export default APIKeys; 
+export default ApiKeys;

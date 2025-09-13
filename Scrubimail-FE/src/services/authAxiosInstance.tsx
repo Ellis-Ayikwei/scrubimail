@@ -1,22 +1,23 @@
 import axios from 'axios';
+import { apiUrl } from './axiosInstance';
 
-// const authApiUrl = 'https://127.0.0.1/sc/api/v1';
 export const authApiUrl = import.meta.env.VITE_API_URL + 'auth';
-
-//export const authApiUrl = 'http://127.0.0.1:5004/alumni/api/v1/auth';
-//const authApiUrl = 'http://172.20.10.4:5004/alumni/api/v1/auth';
 
 export const getCookie = (name: string): string | undefined => {
     try {
         const value = `; ${document.cookie}`;
+        // console.log("Checking all cookies:", document.cookie); // Debug all cookies
+        
         const parts = value.split(`; ${name}=`);
         if (parts.length === 2) {
             const cookieValue = parts.pop()?.split(';').shift();
+            // console.log(`Found cookie ${name}:`, cookieValue);
             return cookieValue ? decodeURIComponent(cookieValue) : undefined;
         }
+        // console.log(`Cookie ${name} not found`);
         return undefined;
     } catch (error) {
-        console.error(`Error getting cookie ${name}:`, error);
+        console.error("Error getting cookie:", error);
         return undefined;
     }
 };
@@ -58,31 +59,28 @@ const authAxiosInstance = axios.create({
 // Enhanced interceptor with better error handling
 authAxiosInstance.interceptors.request.use(
     (config) => {
-        try {
-            const token = getCookie('_auth');
-            const refreshToken = getCookie('_auth_refresh');
-            
-            if (token) {
-                config.headers.Authorization = token;
-            }
-            
-            if (refreshToken) {
-                config.headers['X-Refresh-Token'] = refreshToken;
-            }
-
-            // Add user ID to request data if it exists
-            const userId = localStorage.getItem('userId');
-            if (userId && !config.data) {
-                config.data = { user_id: userId };
-            } else if (userId) {
-                config.data = { ...config.data, user_id: userId };
-            }
-            
-            return config;
-        } catch (error) {
-            console.error('Request interceptor error:', error);
-            return Promise.reject(error);
+        console.log("intercepting request");
+        const token = getCookie('_auth');
+        if (token) {
+            console.log("adding refresh token");
+            config.headers.Authorization = token;
         }
+        const refreshToken = getCookie('_auth_refresh');
+        if (refreshToken) {
+            config.headers['X-Refresh-Token'] = refreshToken;
+        }
+
+        // Add user ID to request data if it exists
+        if (!config.data) {
+            config.data = {};
+        }
+        
+        const userId = localStorage.getItem('userId');
+        if (userId) {
+            config.data.user_id = userId;
+        }
+        
+        return config;
     },
     (error) => {
         console.error('Request interceptor error:', error);
@@ -93,23 +91,29 @@ authAxiosInstance.interceptors.request.use(
 // Add response interceptor to log cookies
 authAxiosInstance.interceptors.response.use(
     (response) => {
-        try {
-            // Check for Set-Cookie header
-            const setCookieHeader = response.headers['set-cookie'];
-            if (setCookieHeader) {
-                console.log('Set-Cookie header found:', setCookieHeader);
-            }
-            
-            return response;
-        } catch (error) {
-            console.error('Response interceptor error:', error);
-            return Promise.reject(error);
+        console.log('Response received:', response.status);
+        
+        // Log all headers (helps with debugging)
+        console.log('Response headers:', response.headers);
+        
+        // Check for Set-Cookie header
+        const setCookieHeader = response.headers['set-cookie'];
+        if (setCookieHeader) {
+            console.log('Set-Cookie header found:', setCookieHeader);
         }
+        
+        // Log all cookies after response
+        console.log('Cookies after response:', document.cookie);
+        
+        return response;
     },
     (error) => {
         console.error('Response interceptor error:', error);
         return Promise.reject(error);
     }
 );
+
+// Named export for compatibility with imports
+export { authAxiosInstance };
 
 export default authAxiosInstance;

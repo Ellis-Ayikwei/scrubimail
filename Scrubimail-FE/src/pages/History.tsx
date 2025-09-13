@@ -1,6 +1,5 @@
 import React, { useEffect, useState } from 'react';
 import { 
-  History, 
   Search, 
   Filter, 
   Download, 
@@ -46,11 +45,20 @@ const History = () => {
     setError(null);
     try {
       const res = await axiosInstance.get('/history/');
+      console.log('History data fetched:', res.data);
       setHistory(res.data.results || res.data);
       if (res.data.summary) {
-        setSummary(res.data.summary);
+        console.log('History summary:', res.data.summary);
+        setSummary({
+          total: res.data.summary.total_validations || 0,
+          valid: res.data.summary.valid_emails || 0,
+          invalid: res.data.summary.invalid_emails || 0,
+          risky: res.data.summary.risky_emails || 0,
+          avgScore: res.data.summary.avg_score || 0
+        });
       }
     } catch (err: any) {
+      console.error('History fetch error:', err);
       setError('Failed to fetch validation history');
     } finally {
       setLoading(false);
@@ -144,7 +152,7 @@ const History = () => {
               <BarChart3 className="w-5 h-5 text-[#2ED8A3]" />
             </div>
             <div className="text-2xl font-bold text-[#333333] dark:text-white">
-              {summary.total.toLocaleString()}
+              {summary?.total?.toLocaleString() || '0'}
             </div>
           </div>
           
@@ -154,7 +162,7 @@ const History = () => {
               <CheckCircle className="w-5 h-5 text-green-600" />
             </div>
             <div className="text-2xl font-bold text-green-600">
-              {summary.valid.toLocaleString()}
+              {summary?.valid?.toLocaleString() || '0'}
             </div>
           </div>
           
@@ -164,7 +172,7 @@ const History = () => {
               <XCircle className="w-5 h-5 text-red-600" />
             </div>
             <div className="text-2xl font-bold text-red-600">
-              {summary.invalid.toLocaleString()}
+              {summary?.invalid?.toLocaleString() || '0'}
             </div>
           </div>
           
@@ -174,7 +182,7 @@ const History = () => {
               <AlertTriangle className="w-5 h-5 text-yellow-600" />
             </div>
             <div className="text-2xl font-bold text-yellow-600">
-              {summary.risky.toLocaleString()}
+              {summary?.risky?.toLocaleString() || '0'}
             </div>
           </div>
           
@@ -184,7 +192,7 @@ const History = () => {
               <BarChart3 className="w-5 h-5 text-[#2ED8A3]" />
             </div>
             <div className="text-2xl font-bold text-[#333333] dark:text-white">
-              {summary.avgScore.toFixed(1)}
+              {summary?.avgScore?.toFixed(1) || '0.0'}
             </div>
           </div>
         </div>

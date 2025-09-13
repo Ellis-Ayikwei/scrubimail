@@ -1,0 +1,30 @@
+import { FC } from 'react';
+
+interface IconLinkProps {
+    className?: string;
+    fill?: boolean;
+    duotone?: boolean;
+}
+
+const IconLink: FC<IconLinkProps> = ({ className, fill = false, duotone = true }) => {
+    return (
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className={className}>
+            <path
+                d="M10 13C10.4295 13.5741 10.9774 14.0492 11.6066 14.3929C12.2357 14.7367 12.9315 14.9411 13.6467 14.9923C14.3618 15.0435 15.0796 14.9404 15.7513 14.6898C16.4231 14.4392 17.0331 14.0471 17.54 13.54L20.54 10.54C21.4508 9.59699 21.9548 8.33398 21.9434 7.02299C21.932 5.71201 21.4061 4.45794 20.4791 3.53088C19.5521 2.60383 18.298 2.07802 16.987 2.0666C15.676 2.05518 14.413 2.55919 13.47 3.47L11.75 5.18"
+                stroke="currentColor"
+                strokeWidth="1.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+            />
+            <path
+                d="M14 11C13.5705 10.4259 13.0226 9.95083 12.3934 9.60707C11.7643 9.26331 11.0685 9.05889 10.3533 9.00768C9.63816 8.95646 8.92037 9.05964 8.24861 9.31023C7.57685 9.56082 6.96684 9.95294 6.46 10.46L3.46 13.46C2.54918 14.403 2.04519 15.666 2.05661 16.977C2.06803 18.288 2.59384 19.5421 3.52089 20.4691C4.44794 21.3961 5.70201 21.9219 7.01299 21.9334C8.32398 21.9448 9.58699 21.4408 10.53 20.53L12.24 18.82"
+                stroke="currentColor"
+                strokeWidth="1.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+            />
+        </svg>
+    );
+};
+
+export default IconLink;

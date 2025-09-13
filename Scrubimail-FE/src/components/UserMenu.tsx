@@ -3,7 +3,7 @@ import { useDispatch, useSelector } from 'react-redux';
 import useAuthUser from 'react-auth-kit/hooks/useAuthUser';
 import useSignOut from 'react-auth-kit/hooks/useSignOut';
 import { Link, useNavigate } from 'react-router-dom';
-import { User, Settings, LogOut, ChevronDown } from 'lucide-react';
+import { User, Settings, LogOut, ChevronDown, Key, Code, CreditCard } from 'lucide-react';
 import { LogoutUser } from '../store/authSlice';
 import { RootState } from '../store';
 
@@ -100,11 +100,29 @@ const UserMenu = () => {
             </Link>
             
             <Link
+              to="/apikeys"
+              onClick={() => setIsOpen(false)}
+              className="flex items-center px-4 py-2 text-sm text-[#333333] dark:text-gray-300 hover:bg-[#F4F5F7] dark:hover:bg-gray-700 hover:text-[#2ED8A3] transition-colors"
+            >
+              <Key className="w-4 h-4 mr-3" />
+              API Keys
+            </Link>
+            
+            <Link
+              to="/integrations"
+              onClick={() => setIsOpen(false)}
+              className="flex items-center px-4 py-2 text-sm text-[#333333] dark:text-gray-300 hover:bg-[#F4F5F7] dark:hover:bg-gray-700 hover:text-[#2ED8A3] transition-colors"
+            >
+              <Code className="w-4 h-4 mr-3" />
+              Integrations
+            </Link>
+            
+            <Link
               to="/billing"
               onClick={() => setIsOpen(false)}
               className="flex items-center px-4 py-2 text-sm text-[#333333] dark:text-gray-300 hover:bg-[#F4F5F7] dark:hover:bg-gray-700 hover:text-[#2ED8A3] transition-colors"
             >
-              <Settings className="w-4 h-4 mr-3" />
+              <CreditCard className="w-4 h-4 mr-3" />
               Billing
             </Link>
           </div>

@@ -1,4 +1,5 @@
-import api from './api';
+import axiosInstance from "./axiosInstance";
+
 
 export interface EmailValidationRequest {
   email: string;
@@ -103,25 +104,25 @@ export interface DomainReputation {
 class ValidationService {
   // Single email validation
   async validateEmail(request: EmailValidationRequest): Promise<ValidationResult> {
-    const response = await api.post('/validate/', request);
+    const response = await axiosInstance.post('/validate/', request);
     return response.data;
   }
 
   // Bulk email validation
   async validateBulk(request: BulkValidationRequest): Promise<BulkJobResponse> {
-    const response = await api.post('/validate-bulk/', request);
+    const response = await axiosInstance.post('/validate-bulk/', request);
     return response.data;
   }
 
   // Get bulk job status
   async getBulkJobStatus(jobId: number): Promise<BulkJobStatus> {
-    const response = await api.get(`/bulk-status/${jobId}/`);
+    const response = await axiosInstance.get(`/bulk-status/${jobId}/`);
     return response.data;
   }
 
   // Get validation status
   async getValidationStatus(validationId: number): Promise<ValidationResult> {
-    const response = await api.get(`/status/${validationId}/`);
+    const response = await axiosInstance.get(`/status/${validationId}/`);
     return response.data;
   }
 
@@ -133,7 +134,7 @@ class ValidationService {
     end_date?: string;
     status?: string;
   }): Promise<ValidationHistory> {
-    const response = await api.get('/history/', { params });
+    const response = await axiosInstance.get('/history/', { params });
     return response.data;
   }
 
@@ -142,13 +143,13 @@ class ValidationService {
     start_date?: string;
     end_date?: string;
   }): Promise<ValidationAnalytics> {
-    const response = await api.get('/analytics/', { params });
+    const response = await axiosInstance.get('/analytics/', { params });
     return response.data;
   }
 
   // Get domain reputation
   async getDomainReputation(domain: string): Promise<DomainReputation> {
-    const response = await api.get(`/domain-reputation/${domain}/`);
+    const response = await axiosInstance.get(`/domain-reputation/${domain}/`);
     return response.data;
   }
 }

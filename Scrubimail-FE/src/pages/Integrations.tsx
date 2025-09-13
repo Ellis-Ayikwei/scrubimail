@@ -20,10 +20,11 @@ import {
 } from 'lucide-react';
 import TopBar from '../components/TopBar';
 import Footer from '../components/Footer';
+import useIsAuthenticated from 'react-auth-kit/hooks/useIsAuthenticated';
 
 const Integrations: React.FC = () => {
   const [copiedCode, setCopiedCode] = React.useState<string | null>(null);
-
+  const isAuthenticated = useIsAuthenticated();
   const languages = [
     {
       name: 'JavaScript',
@@ -233,13 +234,13 @@ var result = await response.Content.ReadAsStringAsync();`,
                 <BookOpen className="w-5 h-5 mr-2" />
                 View Full Documentation
               </Link>
-              <Link
+              {!isAuthenticated && <Link
                 to="/register"
                 className="inline-flex items-center px-8 py-4 border-2 border-[#004E8A] text-[#004E8A] dark:text-[#2ED8A3] font-semibold rounded-lg hover:bg-[#004E8A] hover:text-white dark:hover:bg-[#2ED8A3] transition-all duration-200"
               >
                 Get API Key
                 <ArrowRight className="w-5 h-5 ml-2" />
-              </Link>
+              </Link>}
             </div>
           </div>
         </div>
