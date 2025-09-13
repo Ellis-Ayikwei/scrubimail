@@ -5,6 +5,7 @@ from rest_framework.decorators import action
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from django.db.models import Q, Avg, Count
+from django.db import models
 from .models import (
     EmailValidation,
     BulkValidationJob,
