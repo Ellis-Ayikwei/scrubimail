@@ -129,8 +129,8 @@ const HeroSection: React.FC = () => {
           </div>
 
           {/* CTA with email input */}
-          <div className="max-w-2xl mx-auto space-y-4">
-            <div className="flex flex-col sm:flex-row gap-3 p-3 bg-white dark:bg-[#161b22] rounded-3xl border border-gray-200 dark:border-[#30363d] shadow-lg transition-colors duration-300">
+          <div className="max-w-2xl mx-auto space-y-4 flex flex-row">
+            <div className="flex flex-col sm:flex-row gap-3 p-1 bg-white dark:bg-[#161b22] rounded-full border border-gray-200 dark:border-[#30363d] shadow-lg transition-colors duration-300">
               <div className="relative flex-1">
                 <Mail className="absolute left-4 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400 dark:text-[#7d8590]" />
                 <input
@@ -143,7 +143,7 @@ const HeroSection: React.FC = () => {
               </div>
               <Link
                 to={`/onboarding${ctaEmail ? `?email=${encodeURIComponent(ctaEmail)}` : ''}`}
-                className="inline-flex items-center justify-center px-8 py-4 bg-[#10B981] text-white font-semibold rounded-3xl hover:bg-[#059669] transition-all duration-200 shadow-lg hover:shadow-xl transform hover:scale-105"
+                className="inline-flex items-center justify-center px-8 py-4 bg-[#10B981] text-white font-semibold rounded-full hover:bg-[#059669] transition-all duration-200 shadow-lg hover:shadow-xl transform hover:scale-105"
               >
                 Start validating for free
                 <ArrowRight className="w-4 h-4 ml-2" />
