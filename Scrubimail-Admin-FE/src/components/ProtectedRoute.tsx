@@ -1,11 +1,13 @@
 import React from 'react';
-import { Navigate } from 'react-router-dom';
+import { Navigate, useLocation } from 'react-router-dom';
 import useIsAuthenticated from 'react-auth-kit/hooks/useIsAuthenticated';
 
 const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const isAuthenticated = useIsAuthenticated()
+  const isAuthenticated = useIsAuthenticated();
+  const location = useLocation();
   if (!isAuthenticated) {
-    return <Navigate to="/" replace />;
+    const from = encodeURIComponent(location.pathname + location.search);
+    return <Navigate to={`/login?from=${from}`} replace />;
   }
   return <>{children}</>;
 };

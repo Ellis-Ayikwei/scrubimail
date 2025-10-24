@@ -69,6 +69,7 @@ INSTALLED_APPS = [
     "apps.billing",
     "apps.apikey",
     "apps.plan",
+    "apps.admin",
     "django_celery_results",
 ]
 

@@ -129,40 +129,6 @@ const Login = () => {
 
         {/* Login Form */}
         <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl border border-gray-200 dark:border-gray-700 p-8">
-          {/* SSO Providers */}
-          <div className="mb-6">
-            <div className="flex justify-center space-x-3">
-              {ssoProviders.map((provider) => {
-                const IconComponent = provider.icon;
-                return (
-                  <button
-                    key={provider.id}
-                    onClick={() => handleSSO(provider.id)}
-                    disabled={loading}
-                    className={`flex-1 p-3 rounded-lg border-2 transition-all duration-200 ${provider.color} ${provider.textColor} hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed`}
-                  >
-                    <div className="flex items-center justify-center space-x-2">
-                      <IconComponent className="w-4 h-4" />
-                      <span className="text-sm font-medium">{provider.name}</span>
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* Divider */}
-          <div className="relative mb-6">
-            <div className="absolute inset-0 flex items-center">
-              <div className="w-full border-t border-gray-300 dark:border-gray-600" />
-            </div>
-            <div className="relative flex justify-center text-sm">
-              <span className="px-2 bg-white dark:bg-gray-800 text-[#333333]/70 dark:text-gray-400">
-                Or continue with email
-              </span>
-            </div>
-          </div>
-
           <form className="space-y-6" onSubmit={handleSubmit}>
             {error && (
               <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4">

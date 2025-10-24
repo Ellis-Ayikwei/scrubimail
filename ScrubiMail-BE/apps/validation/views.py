@@ -496,19 +496,42 @@ class ValidationAnalyticsView(APIView):
             )
             current_date += timezone.timedelta(days=1)
 
-        # Top domains
-        top_domains = (
-            validations.filter(status="completed")
-            .values("email")
-            .annotate(
-                domain=models.functions.Substr(
-                    "email", models.functions.Position("@", "email") + 1
-                )
-            )
-            .values("domain")
-            .annotate(count=Count("id"), avg_score=Avg("score"))
-            .order_by("-count")[:10]
+        # Top domains - extract domain from email using Python processing
+        # Get all completed validations and process domains in Python
+        completed_validations = validations.filter(status="completed").values(
+            "email", "score"
         )
+
+        # Group by domain and calculate stats
+        domain_stats = {}
+        for validation in completed_validations:
+            email = validation["email"]
+            score = validation["score"]
+
+            if "@" in email:
+                domain = email.split("@")[1]
+                if domain not in domain_stats:
+                    domain_stats[domain] = {"count": 0, "total_score": 0, "scores": []}
+                domain_stats[domain]["count"] += 1
+                domain_stats[domain]["total_score"] += score
+                domain_stats[domain]["scores"].append(score)
+
+        # Convert to list and sort by count
+        top_domains = []
+        for domain, stats in domain_stats.items():
+            avg_score = (
+                stats["total_score"] / stats["count"] if stats["count"] > 0 else 0
+            )
+            top_domains.append(
+                {
+                    "domain": domain,
+                    "count": stats["count"],
+                    "avg_score": round(avg_score, 2),
+                }
+            )
+
+        # Sort by count and take top 10
+        top_domains = sorted(top_domains, key=lambda x: x["count"], reverse=True)[:10]
 
         # Validation success rate
         total_completed = validations.filter(status="completed").count()
@@ -535,7 +558,7 @@ class ValidationAnalyticsView(APIView):
                     or 0,
                 },
                 "daily_stats": daily_stats,
-                "top_domains": list(top_domains),
+                "top_domains": top_domains,
             }
         )
 

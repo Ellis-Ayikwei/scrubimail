@@ -31,6 +31,8 @@ numpy>=1.24.0
 PyJWT>=2.8.0
 cryptography>=41.0.0
 authlib>=1.2.0
+pyotp>=2.9.0
+qrcode>=7.4.0
 
 # Rate limiting and utilities
 django-ratelimit>=4.1.0
@@ -64,4 +66,4 @@ flake8>=6.0.0
 # Production
 gunicorn>=21.2.0
 whitenoise>=6.5.0
-dj-database-url
+dj-database-url>=2.0.0

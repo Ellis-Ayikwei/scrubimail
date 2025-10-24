@@ -1,190 +1,172 @@
 import React, { useEffect, useState } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Loader2, CheckCircle, AlertCircle } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { useDispatch } from 'react-redux';
+import { Loader2, CheckCircle, AlertCircle } from 'lucide-react';
 import { LoginUser } from '../../store/authSlice';
+import { showMessage } from '../../utils/notifications';
+import { getDeviceInfo } from '../../utils/DeviceFingerPrint';
+import ssoService from '../../services/ssoService';
 
-const OAuthCallback = () => {
-  const [searchParams] = useSearchParams();
+const OAuthCallback: React.FC = () => {
   const navigate = useNavigate();
   const dispatch = useDispatch();
   const [status, setStatus] = useState<'loading' | 'success' | 'error'>('loading');
-  const [error, setError] = useState<string | null>(null);
+  const [message, setMessage] = useState('Processing OAuth callback...');
+  const [deviceInfo, setDeviceInfo] = useState<any>(null);
 
   useEffect(() => {
-    const handleOAuthCallback = async () => {
+    const handleCallback = async () => {
       try {
-        // Get tokens from URL parameters
-        const accessToken = searchParams.get('access_token');
-        const refreshToken = searchParams.get('refresh_token');
-        const provider = searchParams.get('provider');
-        const errorParam = searchParams.get('error');
+        // Get device info for fingerprinting
+        const device = getDeviceInfo();
+        setDeviceInfo(device);
 
-        // Check for OAuth errors
-        if (errorParam) {
-          setError(`OAuth authentication failed: ${errorParam}`);
+        // Check for OAuth callback data in URL
+        const callbackData = ssoService.handleCallbackFromUrl();
+        
+        if (callbackData) {
+          // Handle successful OAuth login
+          dispatch(LoginUser({
+            email: '', // OAuth users don't need email/password
+            password: '',
+            trust_device: false,
+            device_id: device?.device_id,
+            device_name: device?.device_name,
+            fingerprint: device?.fingerprint,
+            user_id: '', // Will be set by backend
+            session_id: '',
+            device_info: device?.device_info,
+            extra: {
+              access_token: callbackData.access_token,
+              refresh_token: callbackData.refresh_token,
+              provider: callbackData.provider
+            }
+          }));
+          
+          setStatus('success');
+          setMessage(`Successfully logged in with ${callbackData.provider}!`);
+          
+          // Clear URL parameters
+          ssoService.clearCallbackFromUrl();
+          
+          // Redirect to dashboard after a short delay
+          setTimeout(() => {
+            navigate('/dashboard', { replace: true });
+          }, 2000);
+        } else {
+          // No callback data found
           setStatus('error');
-          return;
+          setMessage('No OAuth callback data found. Please try logging in again.');
+          
+          // Redirect to login after a delay
+          setTimeout(() => {
+            navigate('/login', { replace: true });
+          }, 3000);
         }
-
-        // Check if we have the required tokens
-        if (!accessToken || !refreshToken) {
-          setError('Authentication tokens not found');
-          setStatus('error');
-          return;
-        }
-
-        // Use the auth slice to handle the login
-        await dispatch(LoginUser({ 
-          password: '', // Not needed for OAuth
-          extra: {}
-        }) as any);
-
-        setStatus('success');
-
-        // Redirect to dashboard after a short delay
-        setTimeout(() => {
-          navigate('/dashboard');
-        }, 2000);
-
-      } catch (err: any) {
-        console.error('OAuth callback error:', err);
-        setError(err.message || 'Authentication failed');
+      } catch (error: any) {
+        console.error('OAuth callback error:', error);
         setStatus('error');
+        setMessage('OAuth callback failed. Please try logging in again.');
+        
+        // Redirect to login after a delay
+        setTimeout(() => {
+          navigate('/login', { replace: true });
+        }, 3000);
       }
     };
 
-    handleOAuthCallback();
-  }, [searchParams, navigate, dispatch]);
+    handleCallback();
+  }, [dispatch, navigate]);
 
-  if (status === 'loading') {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-[#F4F5F7] dark:bg-gray-900">
-        <div className="max-w-md w-full space-y-8">
-          <div className="text-center">
-            <div className="flex justify-center">
-              <div className="w-12 h-12 bg-gradient-to-r from-[#2ED8A3] to-[#004E8A] rounded-xl flex items-center justify-center">
-                <span className="text-white font-bold text-xl">S</span>
-              </div>
-            </div>
-            <h2 className="mt-6 text-3xl font-bold text-[#333333] dark:text-white">
-              Completing Authentication
-            </h2>
-            <p className="mt-2 text-sm text-[#333333]/70 dark:text-gray-400">
-              Please wait while we complete your sign-in...
-            </p>
-          </div>
+  const getStatusIcon = () => {
+    switch (status) {
+      case 'loading':
+        return <Loader2 className="w-8 h-8 animate-spin text-[#2ED8A3]" />;
+      case 'success':
+        return <CheckCircle className="w-8 h-8 text-green-600" />;
+      case 'error':
+        return <AlertCircle className="w-8 h-8 text-red-600" />;
+      default:
+        return <Loader2 className="w-8 h-8 animate-spin text-[#2ED8A3]" />;
+    }
+  };
 
-          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl border border-gray-200 dark:border-gray-700 p-8">
-            <div className="flex items-center justify-center space-x-3">
-              <Loader2 className="animate-spin h-6 w-6 text-[#2ED8A3]" />
-              <span className="text-[#333333] dark:text-gray-300">Processing authentication...</span>
+  const getStatusColor = () => {
+    switch (status) {
+      case 'loading':
+        return 'text-[#2ED8A3]';
+      case 'success':
+        return 'text-green-600';
+      case 'error':
+        return 'text-red-600';
+      default:
+        return 'text-[#2ED8A3]';
+    }
+  };
+
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-[#F4F5F7] dark:bg-gray-900 py-12 px-4 sm:px-6 lg:px-8">
+      <div className="max-w-md w-full space-y-8">
+        {/* Header */}
+        <div className="text-center">
+          <div className="flex justify-center">
+            <div className="w-12 h-12 bg-gradient-to-r from-[#2ED8A3] to-[#004E8A] rounded-xl flex items-center justify-center">
+              <span className="text-white font-bold text-xl">S</span>
             </div>
           </div>
+          <h2 className="mt-6 text-3xl font-bold text-[#333333] dark:text-white">
+            OAuth Callback
+          </h2>
         </div>
-      </div>
-    );
-  }
 
-  if (status === 'success') {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-[#F4F5F7] dark:bg-gray-900">
-        <div className="max-w-md w-full space-y-8">
-          <div className="text-center">
+        {/* Status Card */}
+        <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl border border-gray-200 dark:border-gray-700 p-8">
+          <div className="text-center space-y-4">
             <div className="flex justify-center">
-              <div className="w-12 h-12 bg-gradient-to-r from-[#2ED8A3] to-[#004E8A] rounded-xl flex items-center justify-center">
-                <span className="text-white font-bold text-xl">S</span>
-              </div>
+              {getStatusIcon()}
             </div>
-            <div className="mt-6 flex justify-center">
-              <div className="w-16 h-16 bg-green-100 dark:bg-green-900 rounded-full flex items-center justify-center">
-                <CheckCircle className="w-8 h-8 text-green-600 dark:text-green-400" />
-              </div>
-            </div>
-            <h2 className="mt-6 text-3xl font-bold text-[#333333] dark:text-white">
-              Authentication Successful!
-            </h2>
-            <p className="mt-2 text-sm text-[#333333]/70 dark:text-gray-400">
-              Welcome to Scrubimail! Redirecting to your dashboard...
+            
+            <h3 className={`text-lg font-semibold ${getStatusColor()}`}>
+              {status === 'loading' && 'Processing...'}
+              {status === 'success' && 'Success!'}
+              {status === 'error' && 'Error'}
+            </h3>
+            
+            <p className="text-[#333333]/70 dark:text-gray-400">
+              {message}
             </p>
-          </div>
-
-          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl border border-gray-200 dark:border-gray-700 p-8">
-            <div className="text-center space-y-4">
-              <p className="text-[#333333] dark:text-gray-300">
-                You have successfully signed in with your OAuth provider.
-              </p>
-              
-              <button
-                onClick={() => navigate('/dashboard')}
-                className="w-full py-3 px-4 border border-transparent text-sm font-medium rounded-lg text-white bg-gradient-to-r from-[#2ED8A3] to-[#004E8A] hover:from-[#00C48C] hover:to-[#2ED8A3] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#2ED8A3] transition-all duration-200"
-              >
-                Go to Dashboard
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  if (status === 'error') {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-[#F4F5F7] dark:bg-gray-900">
-        <div className="max-w-md w-full space-y-8">
-          <div className="text-center">
-            <div className="flex justify-center">
-              <div className="w-12 h-12 bg-gradient-to-r from-[#2ED8A3] to-[#004E8A] rounded-xl flex items-center justify-center">
-                <span className="text-white font-bold text-xl">S</span>
-              </div>
-            </div>
-            <div className="mt-6 flex justify-center">
-              <div className="w-16 h-16 bg-red-100 dark:bg-red-900 rounded-full flex items-center justify-center">
-                <AlertCircle className="w-8 h-8 text-red-600 dark:text-red-400" />
-              </div>
-            </div>
-            <h2 className="mt-6 text-3xl font-bold text-[#333333] dark:text-white">
-              Authentication Failed
-            </h2>
-            <p className="mt-2 text-sm text-[#333333]/70 dark:text-gray-400">
-              We couldn't complete your sign-in
-            </p>
-          </div>
-
-          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl border border-gray-200 dark:border-gray-700 p-8">
-            <div className="text-center space-y-4">
-              <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4">
-                <div className="flex">
-                  <AlertCircle className="w-5 h-5 text-red-600 dark:text-red-400 mt-0.5" />
-                  <div className="ml-3">
-                    <p className="text-sm text-red-600 dark:text-red-400">{error}</p>
-                  </div>
+            
+            {status === 'loading' && (
+              <div className="mt-4">
+                <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+                  <div className="bg-[#2ED8A3] h-2 rounded-full animate-pulse" style={{ width: '60%' }}></div>
                 </div>
               </div>
-              
-              <div className="space-y-3">
+            )}
+            
+            {status === 'success' && (
+              <div className="mt-4">
+                <p className="text-sm text-green-600 dark:text-green-400">
+                  Redirecting to dashboard...
+                </p>
+              </div>
+            )}
+            
+            {status === 'error' && (
+              <div className="mt-4">
                 <button
                   onClick={() => navigate('/login')}
-                  className="w-full py-3 px-4 border border-transparent text-sm font-medium rounded-lg text-white bg-gradient-to-r from-[#2ED8A3] to-[#004E8A] hover:from-[#00C48C] hover:to-[#2ED8A3] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#2ED8A3] transition-all duration-200"
+                  className="px-6 py-3 bg-[#2ED8A3] text-white rounded-lg hover:bg-[#00C48C] transition-colors"
                 >
-                  Try Again
-                </button>
-                
-                <button
-                  onClick={() => navigate('/register')}
-                  className="w-full py-3 px-4 border border-gray-300 dark:border-gray-600 text-sm font-medium rounded-lg text-[#333333] dark:text-white bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#2ED8A3] transition-all duration-200"
-                >
-                  Create Account
+                  Back to Login
                 </button>
               </div>
-            </div>
+            )}
           </div>
         </div>
       </div>
-    );
-  }
-
-  return null;
+    </div>
+  );
 };
 
-export default OAuthCallback; 
+export default OAuthCallback;

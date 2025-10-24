@@ -24,7 +24,10 @@ urlpatterns = [
         "scrubimail/api/v1/",
         include(
             [
-                path("admin/", admin.site.urls),
+                # Admin API endpoints
+                path("admin/", include("apps.admin.urls")),
+                # Django admin interface (separate from API)
+                path("django-admin/", admin.site.urls),
                 # Media files under API prefix
                 *static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT),
                 path("", include("apps.validation.urls")),

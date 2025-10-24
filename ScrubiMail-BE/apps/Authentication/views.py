@@ -24,6 +24,7 @@ from rest_framework_simplejwt.exceptions import (
 )
 from django.core.cache import cache
 from django.utils import timezone
+from django.contrib.auth import authenticate
 import logging
 
 from .serializer import (
@@ -32,7 +33,14 @@ from .serializer import (
     PasswordRecoverySerializer,
     PasswordResetConfirmSerializer,
     RegisterSerializer,
+    TOTPSetupSerializer,
+    TOTPVerifySerializer,
+    TOTPEnableSerializer,
+    TOTPDisableSerializer,
+    BackupCodeSerializer,
+    LoginWithTOTPSerializer,
 )
+from .models import TOTPDevice
 
 logger = logging.getLogger(__name__)
 
@@ -78,6 +86,86 @@ class UserProfileView(APIView):
             serializer.save()
             return Response(serializer.data)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+class MyProfileView(APIView):
+    """Comprehensive profile view with additional user data"""
+
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        """Get comprehensive current user's profile with additional data"""
+        try:
+            from apps.billing.models import BillingProfile
+            from apps.billing.services import BillingService
+
+            # Get basic user data
+            user_serializer = UserSerializer(request.user)
+            user_data = user_serializer.data
+
+            # Get billing profile data
+            billing_service = BillingService()
+            billing_profile = billing_service.get_or_create_billing_profile(
+                request.user
+            )
+
+            # Get usage statistics
+            from apps.billing.views import UsageStatsView
+
+            usage_view = UsageStatsView()
+            usage_view.request = request
+            usage_response = usage_view.get(request)
+            usage_data = usage_response.data
+
+            # Combine all data
+            profile_data = {
+                "user": user_data,
+                "billing": {
+                    "credits_remaining": billing_profile.credits_remaining,
+                    "credits_used_this_month": billing_profile.credits_used_this_month,
+                    "current_plan": {
+                        "name": (
+                            billing_profile.current_plan.name
+                            if billing_profile.current_plan
+                            else "Free Plan"
+                        ),
+                        "price": (
+                            billing_profile.current_plan.price
+                            if billing_profile.current_plan
+                            else 0
+                        ),
+                        "credits": (
+                            billing_profile.current_plan.credits
+                            if billing_profile.current_plan
+                            else 100
+                        ),
+                    },
+                },
+                "usage": usage_data,
+                "stats": {
+                    "total_validations": usage_data.get("total_validations", 0),
+                    "valid_emails": usage_data.get("valid_emails", 0),
+                    "invalid_emails": usage_data.get("invalid_emails", 0),
+                    "risky_emails": usage_data.get("risky_emails", 0),
+                    "success_rate": usage_data.get("success_rate", 0),
+                },
+            }
+
+            return Response(profile_data)
+
+        except Exception as e:
+            logger.error(f"Error fetching comprehensive profile: {str(e)}")
+            # Fallback to basic user data
+            serializer = UserSerializer(request.user)
+            return Response(
+                {
+                    "user": serializer.data,
+                    "billing": None,
+                    "usage": None,
+                    "stats": None,
+                    "error": "Some profile data could not be loaded",
+                }
+            )
 
 
 class NotificationPreferencesView(APIView):
@@ -579,5 +667,523 @@ class TokenVerifyView(APIView):
             logger.exception(f"Token verification error: {str(e)}")
             return Response(
                 {"detail": "An error occurred during token verification."},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+
+# TOTP 2FA Views
+class TOTPSetupView(APIView):
+    """
+    Setup TOTP 2FA for the authenticated user.
+    Returns QR code and backup codes for setup.
+    """
+
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        """Get TOTP setup data (QR code, secret, backup codes)"""
+        try:
+            logger.info(f"TOTP Setup - User: {request.user.id}")
+
+            # Get or create TOTP device for user
+            totp_device, created = TOTPDevice.objects.get_or_create(
+                user=request.user, defaults={"secret_key": ""}
+            )
+            logger.info(
+                f"TOTP Device {'created' if created else 'found'}: {totp_device.id}"
+            )
+
+            # Generate secret if not exists
+            if not totp_device.secret_key:
+                totp_device.generate_secret()
+
+            # Generate QR code
+            qr_code = totp_device.generate_qr_code()
+
+            # Generate backup codes
+            backup_codes = totp_device.generate_backup_codes()
+
+            return Response(
+                {
+                    "secret_key": totp_device.secret_key,
+                    "qr_code": qr_code,
+                    "backup_codes": backup_codes,
+                    "is_enabled": totp_device.is_enabled,
+                }
+            )
+
+        except Exception as e:
+            logger.exception(f"TOTP setup error: {str(e)}")
+            return Response(
+                {"detail": "Failed to setup TOTP. Please try again."},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+
+class TOTPEnableView(APIView):
+    """
+    Enable TOTP 2FA after verifying the setup token.
+    """
+
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request):
+        serializer = TOTPEnableSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        try:
+            # Debug: Check if TOTP device exists
+            logger.info(f"TOTP Enable - User: {request.user.id}, Data: {request.data}")
+
+            # Get user's TOTP device
+            totp_device = TOTPDevice.objects.get(user=request.user)
+            logger.info(
+                f"TOTP Device found: {totp_device.id}, Secret exists: {bool(totp_device.secret_key)}"
+            )
+
+            # Verify the token and enable 2FA
+            verification_token = serializer.validated_data["verification_token"]
+            logger.info(f"Attempting to verify token: {verification_token}")
+
+            if totp_device.enable_2fa(verification_token):
+                logger.info("TOTP 2FA enabled successfully")
+                return Response(
+                    {"detail": "TOTP 2FA enabled successfully", "is_enabled": True}
+                )
+            else:
+                logger.warning(
+                    f"Token verification failed for token: {verification_token}"
+                )
+                return Response(
+                    {"detail": "Invalid verification token"},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+        except TOTPDevice.DoesNotExist:
+            return Response(
+                {"detail": "TOTP device not found. Please setup TOTP first."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+        except Exception as e:
+            logger.exception(f"TOTP enable error: {str(e)}")
+            return Response(
+                {"detail": "Failed to enable TOTP. Please try again."},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+
+class TOTPDisableView(APIView):
+    """
+    Disable TOTP 2FA for the authenticated user.
+    Requires password verification.
+    """
+
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request):
+        serializer = TOTPDisableSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        try:
+            # Verify password
+            if not request.user.check_password(serializer.validated_data["password"]):
+                return Response(
+                    {"detail": "Invalid password"}, status=status.HTTP_400_BAD_REQUEST
+                )
+
+            # Get and disable TOTP device
+            try:
+                totp_device = TOTPDevice.objects.get(user=request.user)
+                totp_device.disable_2fa()
+                return Response({"detail": "TOTP 2FA disabled successfully"})
+            except TOTPDevice.DoesNotExist:
+                return Response(
+                    {"detail": "TOTP 2FA is not enabled"},
+                    status=status.HTTP_404_NOT_FOUND,
+                )
+
+        except Exception as e:
+            logger.exception(f"TOTP disable error: {str(e)}")
+            return Response(
+                {"detail": "Failed to disable TOTP. Please try again."},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+
+class TOTPStatusView(APIView):
+    """
+    Get TOTP 2FA status for the authenticated user.
+    """
+
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        try:
+            totp_device = TOTPDevice.objects.get(user=request.user)
+            return Response(
+                {
+                    "is_enabled": totp_device.is_enabled,
+                    "has_backup_codes": len(totp_device.backup_codes) > 0,
+                    "created_at": totp_device.created_at,
+                    "last_used": totp_device.last_used,
+                }
+            )
+        except TOTPDevice.DoesNotExist:
+            return Response(
+                {
+                    "is_enabled": False,
+                    "has_backup_codes": False,
+                    "created_at": None,
+                    "last_used": None,
+                }
+            )
+
+
+class TOTPVerifyView(APIView):
+    """
+    Verify TOTP token for the authenticated user.
+    Used for testing or additional verification.
+    """
+
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request):
+        serializer = TOTPVerifySerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        try:
+            totp_device = TOTPDevice.objects.get(user=request.user)
+
+            if not totp_device.is_enabled:
+                return Response(
+                    {"detail": "TOTP 2FA is not enabled"},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            if totp_device.verify_token(serializer.validated_data["token"]):
+                return Response({"detail": "Token verified successfully"})
+            else:
+                return Response(
+                    {"detail": "Invalid token"}, status=status.HTTP_400_BAD_REQUEST
+                )
+
+        except TOTPDevice.DoesNotExist:
+            return Response(
+                {"detail": "TOTP device not found"}, status=status.HTTP_404_NOT_FOUND
+            )
+        except Exception as e:
+            logger.exception(f"TOTP verify error: {str(e)}")
+            return Response(
+                {"detail": "Failed to verify token. Please try again."},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+
+class BackupCodeView(APIView):
+    """
+    Regenerate backup codes for the authenticated user.
+    """
+
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request):
+        try:
+            totp_device = TOTPDevice.objects.get(user=request.user)
+
+            if not totp_device.is_enabled:
+                return Response(
+                    {"detail": "TOTP 2FA is not enabled"},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            # Generate new backup codes
+            backup_codes = totp_device.generate_backup_codes()
+
+            return Response(
+                {
+                    "detail": "Backup codes regenerated successfully",
+                    "backup_codes": backup_codes,
+                }
+            )
+
+        except TOTPDevice.DoesNotExist:
+            return Response(
+                {"detail": "TOTP device not found"}, status=status.HTTP_404_NOT_FOUND
+            )
+        except Exception as e:
+            logger.exception(f"Backup code generation error: {str(e)}")
+            return Response(
+                {"detail": "Failed to generate backup codes. Please try again."},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+
+class LoginWithTOTPView(APIView):
+    """
+    Login with TOTP 2FA verification and device fingerprinting.
+    This view handles the complete login flow including 2FA and trusted devices.
+    """
+
+    permission_classes = [permissions.AllowAny]
+    authentication_classes = []
+    throttle_classes = [AnonRateThrottle]
+
+    def post(self, request):
+        # First, authenticate the user with email and password
+        from django.contrib.auth import authenticate
+
+        print("request data", request.data)
+
+        email = request.data.get("email")
+        password = request.data.get("password")
+
+        if not email or not password:
+            return Response(
+                {"detail": "Email and password are required"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # Authenticate user
+        user = authenticate(email=email, password=password)
+
+        if not user:
+            ip = get_client_ip(request)
+            logger.warning(f"Failed login attempt for {email} from IP {ip}")
+            increment_failed_logins(email, ip)
+            return Response(
+                {"detail": "Invalid credentials"},
+                status=status.HTTP_401_UNAUTHORIZED,
+            )
+
+        # Check if user has 2FA enabled
+        try:
+            totp_device = TOTPDevice.objects.get(user=user)
+            has_2fa = totp_device.is_enabled
+        except TOTPDevice.DoesNotExist:
+            has_2fa = False
+
+        # If 2FA is not enabled, proceed with normal login
+        if not has_2fa:
+            # Use the same logic as LoginAPIView for users without 2FA
+            # Check if account is locked
+            if is_account_locked(user.email):
+                return Response(
+                    {
+                        "detail": "Account temporarily locked. Try again later or reset your password."
+                    },
+                    status=status.HTTP_403_FORBIDDEN,
+                )
+
+            # Record successful login
+            ip = get_client_ip(request)
+            logger.info(f"Successful login for user {user.id} from IP {ip}")
+            reset_failed_logins(user.email)
+
+            # Update last login timestamp
+            user.last_login = timezone.now()
+            user.save(update_fields=["last_login"])
+
+            # Add tokens to response headers
+            refresh = RefreshToken.for_user(user)
+            access_token = str(refresh.access_token)
+            refresh_token = str(refresh)
+
+            # Create response with minimal user data to keep cookie size small
+            response = Response(
+                {"user": MinimalUserSerializer(user).data, "requires_2fa": False}
+            )
+
+            # Add tokens to response headers
+            response["Authorization"] = f"Bearer {access_token}"
+            response["X-Refresh-Token"] = refresh_token
+
+            # Set Access-Control-Expose-Headers to make headers available to JavaScript
+            response["Access-Control-Expose-Headers"] = "Authorization, X-Refresh-Token"
+
+            return response
+
+        # If 2FA is enabled, validate TOTP token or backup code
+        # Check if TOTP token or backup code is provided
+        totp_token = request.data.get("totp_token")
+        backup_code = request.data.get("backup_code")
+
+        if not totp_token and not backup_code:
+            return Response(
+                {
+                    "detail": "TOTP token or backup code is required for 2FA",
+                    "requires_2fa": True,
+                },
+                status=status.HTTP_200_OK,
+            )
+
+        # Validate TOTP token or backup code
+        try:
+            totp_device = TOTPDevice.objects.get(user=user)
+
+            if totp_token:
+                # Verify TOTP token
+                if not totp_device.verify_token(totp_token):
+                    return Response(
+                        {"detail": "Invalid TOTP token"},
+                        status=status.HTTP_400_BAD_REQUEST,
+                    )
+            elif backup_code:
+                # Verify backup code
+                if not totp_device.verify_backup_code(backup_code):
+                    return Response(
+                        {"detail": "Invalid backup code"},
+                        status=status.HTTP_400_BAD_REQUEST,
+                    )
+
+            # 2FA verification successful
+
+            # Record successful login
+            ip = get_client_ip(request)
+            logger.info(f"Successful 2FA login for user {user.id} from IP {ip}")
+            reset_failed_logins(user.email)
+
+            # Update last login timestamp
+            user.last_login = timezone.now()
+            user.save(update_fields=["last_login"])
+
+            refresh = RefreshToken.for_user(user)
+            access_token = str(refresh.access_token)
+            refresh_token = str(refresh)
+
+            # Create response with minimal user data to keep cookie size small
+            response = Response(
+                {"user": MinimalUserSerializer(user).data, "requires_2fa": False}
+            )
+
+            # Add tokens to response headers
+            response["Authorization"] = f"Bearer {access_token}"
+            response["X-Refresh-Token"] = refresh_token
+
+            # Set Access-Control-Expose-Headers to make headers available to JavaScript
+            response["Access-Control-Expose-Headers"] = "Authorization, X-Refresh-Token"
+
+            return response
+
+        except TOTPDevice.DoesNotExist:
+            return Response(
+                {"detail": "2FA not configured for this user"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        except Exception as e:
+            logger.error(f"2FA verification error: {str(e)}")
+            return Response(
+                {"detail": "2FA verification failed"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+
+class TrustedDevicesView(APIView):
+    """
+    List trusted devices for the authenticated user.
+    """
+
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        try:
+            from .models import TrustedDevice
+
+            devices = TrustedDevice.objects.filter(
+                user=request.user, is_active=True
+            ).order_by("-created_at")
+
+            device_data = []
+            for device in devices:
+                device_data.append(
+                    {
+                        "id": device.id,
+                        "device_name": device.device_name,
+                        "device_id": device.device_id,
+                        "created_at": device.created_at,
+                        "last_used": device.last_used,
+                        "expires_at": device.expires_at,
+                    }
+                )
+
+            return Response(
+                {
+                    "devices": device_data,
+                    "count": len(device_data),
+                }
+            )
+
+        except Exception as e:
+            logger.exception(f"Error fetching trusted devices: {str(e)}")
+            return Response(
+                {"detail": "Failed to fetch trusted devices."},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+
+class RevokeTrustedDeviceView(APIView):
+    """
+    Revoke a specific trusted device.
+    """
+
+    permission_classes = [permissions.IsAuthenticated]
+
+    def delete(self, request, device_id):
+        try:
+            from .models import TrustedDevice
+
+            device = TrustedDevice.objects.filter(
+                id=device_id, user=request.user
+            ).first()
+
+            if not device:
+                return Response(
+                    {"detail": "Trusted device not found."},
+                    status=status.HTTP_404_NOT_FOUND,
+                )
+
+            device.deactivate()
+
+            return Response(
+                {
+                    "detail": "Trusted device revoked successfully.",
+                    "device_name": device.device_name,
+                }
+            )
+
+        except Exception as e:
+            logger.exception(f"Error revoking trusted device: {str(e)}")
+            return Response(
+                {"detail": "Failed to revoke trusted device."},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+
+class RevokeAllTrustedDevicesView(APIView):
+    """
+    Revoke all trusted devices for the authenticated user.
+    """
+
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request):
+        try:
+            from .models import TrustedDevice
+
+            devices = TrustedDevice.objects.filter(user=request.user, is_active=True)
+            count = devices.count()
+
+            devices.update(is_active=False, refresh_token_hash="")
+
+            return Response(
+                {
+                    "detail": f"Successfully revoked {count} trusted devices.",
+                    "revoked_count": count,
+                }
+            )
+
+        except Exception as e:
+            logger.exception(f"Error revoking all trusted devices: {str(e)}")
+            return Response(
+                {"detail": "Failed to revoke trusted devices."},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )

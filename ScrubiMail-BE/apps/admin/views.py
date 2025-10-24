@@ -1,0 +1,168 @@
+from rest_framework import generics, status, permissions
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework.response import Response
+from django.contrib.auth import get_user_model
+from django.db.models import Count, Q, Sum
+from django.utils import timezone
+from datetime import timedelta
+from apps.User.serializer import UserSerializer
+from apps.billing.models import BillingProfile, CreditTransaction, Subscription
+from apps.validation.models import EmailValidation, BulkValidationJob
+from apps.plan.models import Plan
+from apps.billing.serializers import (
+    BillingProfileSerializer,
+    CreditTransactionSerializer,
+)
+from apps.validation.serializers import EmailValidationSerializer
+from apps.plan.serializers import PlanSerializer
+
+User = get_user_model()
+
+
+class AdminUserListView(generics.ListAPIView):
+    """List all users for admin"""
+
+    serializer_class = UserSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        return User.objects.all().order_by("-date_joined")
+
+
+class AdminUserDetailView(generics.RetrieveUpdateDestroyAPIView):
+    """Get, update, or delete a specific user"""
+
+    serializer_class = UserSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        return User.objects.all()
+
+
+class AdminUserCreateView(generics.CreateAPIView):
+    """Create a new user"""
+
+    serializer_class = UserSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+
+@api_view(["GET"])
+@permission_classes([permissions.IsAuthenticated])
+def admin_user_stats(request):
+    """Get user statistics for admin dashboard"""
+    total_users = User.objects.count()
+    active_users = User.objects.filter(is_active=True).count()
+
+    # Users joined in last 30 days
+    thirty_days_ago = timezone.now() - timedelta(days=30)
+    new_users = User.objects.filter(date_joined__gte=thirty_days_ago).count()
+
+    # Suspended users (assuming is_active=False means suspended)
+    suspended_users = User.objects.filter(is_active=False).count()
+
+    # Recent users (last 10)
+    recent_users = User.objects.all().order_by("-date_joined")[:10]
+    recent_users_data = UserSerializer(recent_users, many=True).data
+
+    return Response(
+        {
+            "total": total_users,
+            "active": active_users,
+            "new": new_users,
+            "suspended": suspended_users,
+            "recent_users": recent_users_data,
+        }
+    )
+
+
+@api_view(["GET"])
+@permission_classes([permissions.IsAuthenticated])
+def admin_billing_stats(request):
+    """Get billing statistics for admin dashboard"""
+    # Calculate total revenue from credit transactions
+    total_revenue = (
+        CreditTransaction.objects.filter(transaction_type="purchase").aggregate(
+            total=Sum("amount")
+        )["total"]
+        or 0
+    )
+
+    # Recent credit transactions
+    recent_transactions = CreditTransaction.objects.all().order_by("-created_at")[:10]
+    recent_transactions_data = CreditTransactionSerializer(
+        recent_transactions, many=True
+    ).data
+
+    return Response(
+        {"total_revenue": total_revenue, "recent_billing": recent_transactions_data}
+    )
+
+
+@api_view(["GET"])
+@permission_classes([permissions.IsAuthenticated])
+def admin_validations_stats(request):
+    """Get validation statistics for admin dashboard"""
+    total_validations = EmailValidation.objects.count()
+
+    # Recent validations
+    recent_validations = EmailValidation.objects.all().order_by("-created_at")[:10]
+    recent_validations_data = EmailValidationSerializer(
+        recent_validations, many=True
+    ).data
+
+    return Response(
+        {
+            "total_validations": total_validations,
+            "recent_validations": recent_validations_data,
+        }
+    )
+
+
+class AdminBillingListView(generics.ListAPIView):
+    """List all billing records for admin"""
+
+    serializer_class = CreditTransactionSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        return CreditTransaction.objects.all().order_by("-created_at")
+
+
+class AdminPlansListView(generics.ListCreateAPIView):
+    """List and create plans for admin"""
+
+    serializer_class = PlanSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        return Plan.objects.all().order_by("-created_at")
+
+
+class AdminPlanDetailView(generics.RetrieveUpdateDestroyAPIView):
+    """Get, update, or delete a specific plan"""
+
+    serializer_class = PlanSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        return Plan.objects.all()
+
+
+@api_view(["GET"])
+@permission_classes([permissions.IsAuthenticated])
+def admin_plans_stats(request):
+    """Get plans statistics for admin"""
+    total_plans = Plan.objects.count()
+    active_plans = Plan.objects.filter(is_active=True).count()
+
+    return Response({"total_plans": total_plans, "active_plans": active_plans})
+
+
+class AdminValidationsListView(generics.ListAPIView):
+    """List all validation records for admin"""
+
+    serializer_class = EmailValidationSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        return EmailValidation.objects.all().order_by("-created_at")

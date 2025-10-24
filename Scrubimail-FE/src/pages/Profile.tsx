@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import { 
   User, 
   Mail, 
@@ -15,9 +16,11 @@ import {
   LogOut,
   RefreshCw,
   AlertCircle,
-  CheckCircle
+  CheckCircle,
+  Key,
+  Lock
 } from 'lucide-react';
-import { userService, UserProfile, PasswordChangeRequest, NotificationPreferences } from '../services/userService';
+import { userService, UserProfile, PasswordChangeRequest, NotificationPreferences, ComprehensiveProfile } from '../services/userService';
 import { billingService, BillingProfile } from '../services/billingService';
 
 const Profile: React.FC = () => {
@@ -32,6 +35,7 @@ const Profile: React.FC = () => {
 
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [billingProfile, setBillingProfile] = useState<BillingProfile | null>(null);
+  const [comprehensiveProfile, setComprehensiveProfile] = useState<ComprehensiveProfile | null>(null);
   const [profileData, setProfileData] = useState({
     firstName: '',
     lastName: '',
@@ -61,29 +65,71 @@ const Profile: React.FC = () => {
     const fetchUserData = async () => {
       try {
         setLoading(true);
-        const [profile, billing] = await Promise.all([
-          userService.getProfile(),
-          billingService.getBillingProfile().catch(() => null)
-        ]);
         
-        console.log('Profile data fetched:', { profile, billing });
-        setUserProfile(profile);
-        setBillingProfile(billing);
-        
-        // Update profile data with real user data
-        setProfileData({
-          firstName: profile.first_name || '',
-          lastName: profile.last_name || '',
-          email: profile.email || '',
-          phone: profile.phone_number || '',
-          company: '', // Not available in user model
-          location: '', // Not available in user model
-          bio: '' // Not available in user model
-        });
+        // Try to get comprehensive profile first
+        try {
+          const comprehensive = await userService.getComprehensiveProfile();
+          console.log('Comprehensive profile fetched:', comprehensive);
+          setComprehensiveProfile(comprehensive);
+          
+          // Extract user data from comprehensive profile
+          const profile = comprehensive.user;
+          setUserProfile(profile);
+          
+          // Extract billing data from comprehensive profile
+          if (comprehensive.billing) {
+            setBillingProfile({
+              id: 1, // Default ID since we don't have it in the response
+              credits_remaining: comprehensive.billing.credits_remaining,
+              credits_used_this_month: comprehensive.billing.credits_used_this_month,
+              current_plan: comprehensive.billing.current_plan
+            });
+          }
+          
+          // Update profile data with real user data
+          setProfileData({
+            firstName: profile.first_name || '',
+            lastName: profile.last_name || '',
+            email: profile.email || '',
+            phone: profile.phone_number || '',
+            company: '', // Not available in user model
+            location: '', // Not available in user model
+            bio: '' // Not available in user model
+          });
 
-        // Update notification preferences if available
-        if (profile.notification_preferences) {
-          setNotificationPreferences(profile.notification_preferences);
+          // Update notification preferences if available
+          if (profile.notification_preferences) {
+            setNotificationPreferences(profile.notification_preferences);
+          }
+          
+        } catch (comprehensiveError) {
+          console.log('Comprehensive profile failed, falling back to individual calls:', comprehensiveError);
+          
+          // Fallback to individual API calls
+          const [profile, billing] = await Promise.all([
+            userService.getProfile(),
+            billingService.getBillingProfile().catch(() => null)
+          ]);
+          
+          console.log('Fallback profile data fetched:', { profile, billing });
+          setUserProfile(profile);
+          setBillingProfile(billing);
+          
+          // Update profile data with real user data
+          setProfileData({
+            firstName: profile.first_name || '',
+            lastName: profile.last_name || '',
+            email: profile.email || '',
+            phone: profile.phone_number || '',
+            company: '', // Not available in user model
+            location: '', // Not available in user model
+            bio: '' // Not available in user model
+          });
+
+          // Update notification preferences if available
+          if (profile.notification_preferences) {
+            setNotificationPreferences(profile.notification_preferences);
+          }
         }
       } catch (error) {
         console.error('Error fetching user data:', error);
@@ -414,7 +460,30 @@ const Profile: React.FC = () => {
           {/* Security Tab */}
           {activeTab === 'security' && (
             <div className="space-y-6">
-              <h2 className="text-xl font-semibold text-[#333333] dark:text-white">Change Password</h2>
+              <div className="flex items-center justify-between">
+                <h2 className="text-xl font-semibold text-[#333333] dark:text-white">Security Settings</h2>
+                <Link 
+                  to="/security" 
+                  className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                >
+                  <Key className="w-4 h-4 mr-2" />
+                  Two-Factor Authentication
+                </Link>
+              </div>
+              
+              <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4">
+                <div className="flex items-center">
+                  <Lock className="w-5 h-5 text-yellow-600 dark:text-yellow-400 mr-3" />
+                  <div>
+                    <h3 className="font-medium text-yellow-800 dark:text-yellow-200">Enhanced Security Available</h3>
+                    <p className="text-sm text-yellow-700 dark:text-yellow-300 mt-1">
+                      Enable two-factor authentication to add an extra layer of security to your account.
+                    </p>
+                  </div>
+                </div>
+              </div>
+              
+              <h3 className="text-lg font-semibold text-[#333333] dark:text-white">Change Password</h3>
               
               <div className="space-y-4">
                 <div>
@@ -632,13 +701,13 @@ const Profile: React.FC = () => {
                   <div>
                     <p className="text-sm text-[#333333]/70 dark:text-gray-400">Credits Used</p>
                     <p className="text-lg font-semibold text-[#333333] dark:text-white">
-                      {billingProfile ? `${billingProfile.credits_used_this_month.toLocaleString()} / ${(billingProfile.credits_remaining + billingProfile.credits_used_this_month).toLocaleString()}` : '0 / 0'}
+                      {billingProfile ? `${billingProfile.credits_used_this_month?.toLocaleString() || '0'} / ${((billingProfile.credits_remaining || 0) + (billingProfile.credits_used_this_month || 0)).toLocaleString()}` : '0 / 0'}
                     </p>
                   </div>
                   <div>
                     <p className="text-sm text-[#333333]/70 dark:text-gray-400">Credits Remaining</p>
                     <p className="text-lg font-semibold text-[#333333] dark:text-white">
-                      {billingProfile?.credits_remaining.toLocaleString() || '0'}
+                      {billingProfile?.credits_remaining?.toLocaleString() || '0'}
                     </p>
                   </div>
                 </div>

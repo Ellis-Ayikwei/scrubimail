@@ -68,7 +68,6 @@ const About: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-white dark:bg-gray-900">
-      <TopBar />
       
       {/* Hero Section - GitHub inspired */}
       <section className="py-24 bg-white dark:bg-[#0d1117] relative overflow-hidden">

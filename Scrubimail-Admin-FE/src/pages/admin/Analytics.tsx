@@ -14,16 +14,39 @@ import {
     Legend,
     Filler
 } from 'chart.js';
-import IconTrendingUp from '../../components/Icon/IconTrendingUp';
-import IconTrendingDown from '../../components/Icon/IconTrendingDown';
-import IconEye from '../../components/Icon/IconEye';
-import IconClock from '../../components/Icon/IconClock';
-import IconGlobe from '../../components/Icon/IconGlobe';
-import IconDeviceDesktop from '../../components/Icon/IconDeviceDesktop';
-import IconDeviceMobile from '../../components/Icon/IconDeviceMobile';
-import IconDeviceTablet from '../../components/Icon/IconDeviceTablet';
-import IconUsersGroup from '../../components/Icon/IconUsersGroup';
-import IconLink from '../../components/Icon/IconLink';
+import { 
+    Card, 
+    Row, 
+    Col, 
+    Statistic, 
+    Select, 
+    DatePicker, 
+    Space, 
+    Typography, 
+    Progress, 
+    Table, 
+    Tag,
+    Button,
+    Tooltip as AntTooltip,
+    Badge
+} from 'antd';
+import {
+    BarChartOutlined,
+    LineChartOutlined,
+    PieChartOutlined,
+    DownloadOutlined,
+    ReloadOutlined,
+    RiseOutlined,
+    TrendingDownOutlined,
+    UserOutlined,
+    EyeOutlined,
+    ClockCircleOutlined,
+    GlobalOutlined,
+    DesktopOutlined,
+    MobileOutlined,
+    TabletOutlined,
+    LinkOutlined
+} from '@ant-design/icons';
 
 // Register ChartJS components
 ChartJS.register(
@@ -133,42 +156,37 @@ const AdminAnalytics: React.FC = () => {
         },
     };
 
+    const { Title, Text } = Typography;
+
     const metrics = [
         {
             title: 'Total Page Views',
-            value: '108,900',
-            change: '+12.5%',
+            value: 108900,
+            change: 12.5,
             changeType: 'positive',
-            icon: <IconEye className="w-6 h-6" />,
-            bgColor: 'bg-blue-500',
-            description: 'vs last period',
+            icon: <EyeOutlined style={{ color: '#1890ff' }} />,
         },
         {
             title: 'Unique Visitors',
-            value: '68,540',
-            change: '+8.2%',
+            value: 68540,
+            change: 8.2,
             changeType: 'positive',
-            icon: <IconUsersGroup className="w-6 h-6" />,
-            bgColor: 'bg-green-500',
-            description: 'vs last period',
+            icon: <UserOutlined style={{ color: '#52c41a' }} />,
         },
         {
             title: 'Bounce Rate',
-            value: '35.2%',
-            change: '-5.4%',
+            value: 35.2,
+            suffix: '%',
+            change: -5.4,
             changeType: 'positive',
-            icon: <IconTrendingDown className="w-6 h-6" />,
-            bgColor: 'bg-orange-500',
-            description: 'vs last period',
+            icon: <TrendingDownOutlined style={{ color: '#fa8c16' }} />,
         },
         {
             title: 'Avg. Session Duration',
             value: '3m 24s',
-            change: '+18.3%',
+            change: 18.3,
             changeType: 'positive',
-            icon: <IconClock className="w-6 h-6" />,
-            bgColor: 'bg-purple-500',
-            description: 'vs last period',
+            icon: <ClockCircleOutlined style={{ color: '#722ed1' }} />,
         },
     ];
 
@@ -189,223 +207,217 @@ const AdminAnalytics: React.FC = () => {
     ];
 
     return (
-        <div className="space-y-6">
+        <div>
             {/* Page Header */}
-            <div className="flex justify-between items-center">
+            <div style={{ marginBottom: '24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <div>
-                    <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Analytics Overview</h1>
-                    <p className="text-gray-500 dark:text-gray-400 mt-1">Track and analyze your website performance</p>
+                    <Title level={2} style={{ margin: 0 }}>Analytics Overview</Title>
+                    <Text type="secondary">Track and analyze your website performance</Text>
                 </div>
-                <div className="flex space-x-3">
-                    <select
+                <Space>
+                    <Select
                         value={timeRange}
-                        onChange={(e) => setTimeRange(e.target.value)}
-                        className="px-4 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg text-sm font-medium text-gray-700 dark:text-gray-300"
+                        onChange={setTimeRange}
+                        style={{ width: 150 }}
                     >
-                        <option value="24h">Last 24 hours</option>
-                        <option value="7d">Last 7 days</option>
-                        <option value="30d">Last 30 days</option>
-                        <option value="90d">Last 90 days</option>
-                    </select>
-                    <button className="px-4 py-2 bg-primary text-white rounded-lg text-sm font-medium hover:bg-primary-dark">
+                        <Select.Option value="24h">Last 24 hours</Select.Option>
+                        <Select.Option value="7d">Last 7 days</Select.Option>
+                        <Select.Option value="30d">Last 30 days</Select.Option>
+                        <Select.Option value="90d">Last 90 days</Select.Option>
+                    </Select>
+                    <Button type="primary" icon={<DownloadOutlined />}>
                         Export Report
-                    </button>
-                </div>
+                    </Button>
+                </Space>
             </div>
 
             {/* Metrics Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            <Row gutter={[16, 16]} style={{ marginBottom: '24px' }}>
                 {metrics.map((metric, index) => (
-                    <div key={index} className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
-                        <div className="flex items-center justify-between">
-                            <div>
-                                <p className="text-sm font-medium text-gray-600 dark:text-gray-400">{metric.title}</p>
-                                <p className="text-2xl font-bold text-gray-900 dark:text-white mt-2">{metric.value}</p>
-                                <div className="flex items-center mt-2">
-                                    <span className={`text-sm font-medium ${
-                                        metric.changeType === 'positive' ? 'text-green-600' : 'text-red-600'
-                                    }`}>
-                                        {metric.change}
-                                    </span>
-                                    <span className="text-sm text-gray-500 dark:text-gray-400 ml-2">{metric.description}</span>
-                                </div>
+                    <Col xs={24} sm={12} lg={6} key={index}>
+                        <Card>
+                            <Statistic
+                                title={metric.title}
+                                value={metric.value}
+                                suffix={metric.suffix}
+                                prefix={metric.icon}
+                                valueStyle={{ 
+                                    color: metric.changeType === 'positive' ? '#3f8600' : '#cf1322' 
+                                }}
+                            />
+                            <div style={{ marginTop: '8px' }}>
+                                <Text type={metric.changeType === 'positive' ? 'success' : 'danger'}>
+                                    {metric.change > 0 ? '+' : ''}{metric.change}%
+                                </Text>
+                                <Text type="secondary" style={{ marginLeft: '8px' }}>vs last period</Text>
                             </div>
-                            <div className={`${metric.bgColor} bg-opacity-10 p-3 rounded-lg`}>
-                                <div className={`${metric.bgColor} text-white p-2 rounded`}>
-                                    {metric.icon}
-                                </div>
-                            </div>
-                        </div>
-                    </div>
+                        </Card>
+                    </Col>
                 ))}
-            </div>
+            </Row>
 
             {/* Main Charts */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <Row gutter={[16, 16]} style={{ marginBottom: '24px' }}>
                 {/* Traffic Overview */}
-                <div className="lg:col-span-2 bg-white dark:bg-gray-800 rounded-lg shadow p-6">
-                    <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Traffic Overview</h2>
-                    <div className="h-80">
-                        <Line data={pageViewsData} options={chartOptions} />
-                    </div>
-                </div>
+                <Col xs={24} lg={16}>
+                    <Card title="Traffic Overview" style={{ height: '400px' }}>
+                        <div style={{ height: '300px' }}>
+                            <Line data={pageViewsData} options={chartOptions} />
+                        </div>
+                    </Card>
+                </Col>
 
                 {/* Device Breakdown */}
-                <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
-                    <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Device Breakdown</h2>
-                    <div className="h-80 flex items-center justify-center">
-                        <Doughnut data={deviceData} options={{ ...chartOptions, maintainAspectRatio: true }} />
-                    </div>
-                    <div className="mt-4 space-y-2">
-                        <div className="flex items-center justify-between">
-                            <div className="flex items-center">
-                                <IconDeviceDesktop className="w-5 h-5 text-blue-500 mr-2" />
-                                <span className="text-sm text-gray-600 dark:text-gray-400">Desktop</span>
-                            </div>
-                            <span className="text-sm font-medium text-gray-900 dark:text-white">58%</span>
+                <Col xs={24} lg={8}>
+                    <Card title="Device Breakdown" style={{ height: '400px' }}>
+                        <div style={{ height: '200px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                            <Doughnut data={deviceData} options={{ ...chartOptions, maintainAspectRatio: true }} />
                         </div>
-                        <div className="flex items-center justify-between">
-                            <div className="flex items-center">
-                                <IconDeviceMobile className="w-5 h-5 text-green-500 mr-2" />
-                                <span className="text-sm text-gray-600 dark:text-gray-400">Mobile</span>
+                        <div style={{ marginTop: '16px' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+                                <Space>
+                                    <DesktopOutlined style={{ color: '#1890ff' }} />
+                                    <Text>Desktop</Text>
+                                </Space>
+                                <Text strong>58%</Text>
                             </div>
-                            <span className="text-sm font-medium text-gray-900 dark:text-white">35%</span>
-                        </div>
-                        <div className="flex items-center justify-between">
-                            <div className="flex items-center">
-                                <IconDeviceTablet className="w-5 h-5 text-orange-500 mr-2" />
-                                <span className="text-sm text-gray-600 dark:text-gray-400">Tablet</span>
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+                                <Space>
+                                    <MobileOutlined style={{ color: '#52c41a' }} />
+                                    <Text>Mobile</Text>
+                                </Space>
+                                <Text strong>35%</Text>
                             </div>
-                            <span className="text-sm font-medium text-gray-900 dark:text-white">7%</span>
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                                <Space>
+                                    <TabletOutlined style={{ color: '#fa8c16' }} />
+                                    <Text>Tablet</Text>
+                                </Space>
+                                <Text strong>7%</Text>
+                            </div>
                         </div>
-                    </div>
-                </div>
-            </div>
+                    </Card>
+                </Col>
+            </Row>
 
             {/* Secondary Charts */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <Row gutter={[16, 16]} style={{ marginBottom: '24px' }}>
                 {/* Top Pages */}
-                <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
-                    <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Top Pages</h2>
-                    <div className="h-64">
-                        <Bar data={topPagesData} options={{ ...chartOptions, indexAxis: 'y' }} />
-                    </div>
-                </div>
+                <Col xs={24} lg={12}>
+                    <Card title="Top Pages" style={{ height: '350px' }}>
+                        <div style={{ height: '250px' }}>
+                            <Bar data={topPagesData} options={{ ...chartOptions, indexAxis: 'y' }} />
+                        </div>
+                    </Card>
+                </Col>
 
                 {/* User Behavior */}
-                <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
-                    <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">User Behavior</h2>
-                    <div className="h-64">
-                        <Radar data={userBehaviorData} options={chartOptions} />
-                    </div>
-                </div>
-            </div>
+                <Col xs={24} lg={12}>
+                    <Card title="User Behavior" style={{ height: '350px' }}>
+                        <div style={{ height: '250px' }}>
+                            <Radar data={userBehaviorData} options={chartOptions} />
+                        </div>
+                    </Card>
+                </Col>
+            </Row>
 
             {/* Tables Row */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <Row gutter={[16, 16]} style={{ marginBottom: '24px' }}>
                 {/* Top Countries */}
-                <div className="bg-white dark:bg-gray-800 rounded-lg shadow">
-                    <div className="p-6 border-b dark:border-gray-700">
-                        <div className="flex justify-between items-center">
-                            <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Top Countries</h2>
-                            <IconGlobe className="w-5 h-5 text-gray-400" />
-                        </div>
-                    </div>
-                    <div className="p-6">
-                        <div className="space-y-4">
+                <Col xs={24} lg={12}>
+                    <Card 
+                        title="Top Countries" 
+                        extra={<GlobalOutlined />}
+                    >
+                        <div style={{ maxHeight: '300px', overflowY: 'auto' }}>
                             {topCountries.map((country, index) => (
-                                <div key={index} className="flex items-center justify-between">
-                                    <div className="flex items-center space-x-3">
-                                        <span className="text-sm font-medium text-gray-900 dark:text-white">
-                                            {index + 1}. {country.country}
-                                        </span>
+                                <div key={index} style={{ marginBottom: '16px' }}>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                                        <Text strong>{index + 1}. {country.country}</Text>
+                                        <Text type="secondary">{country.visitors} visitors</Text>
                                     </div>
-                                    <div className="flex items-center space-x-4">
-                                        <span className="text-sm text-gray-500 dark:text-gray-400">
-                                            {country.visitors} visitors
-                                        </span>
-                                        <div className="w-24 bg-gray-200 dark:bg-gray-700 rounded-full h-2">
-                                            <div
-                                                className="bg-blue-500 h-2 rounded-full"
-                                                style={{ width: `${country.percentage}%` }}
-                                            />
-                                        </div>
-                                        <span className="text-sm font-medium text-gray-900 dark:text-white w-12 text-right">
-                                            {country.percentage}%
-                                        </span>
+                                    <Progress 
+                                        percent={country.percentage} 
+                                        showInfo={false}
+                                        strokeColor="#1890ff"
+                                    />
+                                    <div style={{ textAlign: 'right', marginTop: '4px' }}>
+                                        <Text strong>{country.percentage}%</Text>
                                     </div>
                                 </div>
                             ))}
                         </div>
-                    </div>
-                </div>
+                    </Card>
+                </Col>
 
                 {/* Top Referrers */}
-                <div className="bg-white dark:bg-gray-800 rounded-lg shadow">
-                    <div className="p-6 border-b dark:border-gray-700">
-                        <div className="flex justify-between items-center">
-                            <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Top Referrers</h2>
-                            <IconLink className="w-5 h-5 text-gray-400" />
-                        </div>
-                    </div>
-                    <div className="p-6">
-                        <div className="space-y-4">
+                <Col xs={24} lg={12}>
+                    <Card 
+                        title="Top Referrers" 
+                        extra={<LinkOutlined />}
+                    >
+                        <div style={{ maxHeight: '300px', overflowY: 'auto' }}>
                             {topReferrers.map((referrer, index) => (
-                                <div key={index} className="flex items-center justify-between">
-                                    <div className="flex items-center space-x-3">
-                                        <span className="text-sm font-medium text-gray-900 dark:text-white">
-                                            {index + 1}. {referrer.source}
-                                        </span>
+                                <div key={index} style={{ marginBottom: '16px' }}>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                                        <Text strong>{index + 1}. {referrer.source}</Text>
+                                        <Text type="secondary">{referrer.visitors} visitors</Text>
                                     </div>
-                                    <div className="flex items-center space-x-4">
-                                        <span className="text-sm text-gray-500 dark:text-gray-400">
-                                            {referrer.visitors} visitors
-                                        </span>
-                                        <div className="w-24 bg-gray-200 dark:bg-gray-700 rounded-full h-2">
-                                            <div
-                                                className="bg-green-500 h-2 rounded-full"
-                                                style={{ width: `${referrer.percentage}%` }}
-                                            />
-                                        </div>
-                                        <span className="text-sm font-medium text-gray-900 dark:text-white w-12 text-right">
-                                            {referrer.percentage}%
-                                        </span>
+                                    <Progress 
+                                        percent={referrer.percentage} 
+                                        showInfo={false}
+                                        strokeColor="#52c41a"
+                                    />
+                                    <div style={{ textAlign: 'right', marginTop: '4px' }}>
+                                        <Text strong>{referrer.percentage}%</Text>
                                     </div>
                                 </div>
                             ))}
                         </div>
-                    </div>
-                </div>
-            </div>
+                    </Card>
+                </Col>
+            </Row>
 
             {/* Real-time Stats */}
-            <div className="bg-gradient-to-r from-blue-500 to-purple-600 rounded-lg shadow p-6 text-white">
-                <div className="flex items-center justify-between mb-4">
-                    <h2 className="text-lg font-semibold">Real-time Analytics</h2>
-                    <div className="flex items-center space-x-2">
-                        <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
-                        <span className="text-sm">Live</span>
-                    </div>
+            <Card 
+                style={{ 
+                    background: 'linear-gradient(135deg, #1890ff 0%, #722ed1 100%)',
+                    color: 'white'
+                }}
+            >
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+                    <Title level={3} style={{ color: 'white', margin: 0 }}>Real-time Analytics</Title>
+                    <Space>
+                        <Badge status="processing" text="Live" />
+                    </Space>
                 </div>
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-                    <div>
-                        <p className="text-sm opacity-80">Active Users</p>
-                        <p className="text-3xl font-bold mt-1">284</p>
-                    </div>
-                    <div>
-                        <p className="text-sm opacity-80">Page Views/min</p>
-                        <p className="text-3xl font-bold mt-1">42</p>
-                    </div>
-                    <div>
-                        <p className="text-sm opacity-80">Avg. Time on Page</p>
-                        <p className="text-3xl font-bold mt-1">2:34</p>
-                    </div>
-                    <div>
-                        <p className="text-sm opacity-80">Conversion Rate</p>
-                        <p className="text-3xl font-bold mt-1">3.8%</p>
-                    </div>
-                </div>
-            </div>
+                <Row gutter={[16, 16]}>
+                    <Col xs={24} sm={12} lg={6}>
+                        <div style={{ textAlign: 'center' }}>
+                            <Text style={{ color: 'rgba(255,255,255,0.8)', fontSize: '14px' }}>Active Users</Text>
+                            <div style={{ fontSize: '32px', fontWeight: 'bold', marginTop: '8px' }}>284</div>
+                        </div>
+                    </Col>
+                    <Col xs={24} sm={12} lg={6}>
+                        <div style={{ textAlign: 'center' }}>
+                            <Text style={{ color: 'rgba(255,255,255,0.8)', fontSize: '14px' }}>Page Views/min</Text>
+                            <div style={{ fontSize: '32px', fontWeight: 'bold', marginTop: '8px' }}>42</div>
+                        </div>
+                    </Col>
+                    <Col xs={24} sm={12} lg={6}>
+                        <div style={{ textAlign: 'center' }}>
+                            <Text style={{ color: 'rgba(255,255,255,0.8)', fontSize: '14px' }}>Avg. Time on Page</Text>
+                            <div style={{ fontSize: '32px', fontWeight: 'bold', marginTop: '8px' }}>2:34</div>
+                        </div>
+                    </Col>
+                    <Col xs={24} sm={12} lg={6}>
+                        <div style={{ textAlign: 'center' }}>
+                            <Text style={{ color: 'rgba(255,255,255,0.8)', fontSize: '14px' }}>Conversion Rate</Text>
+                            <div style={{ fontSize: '32px', fontWeight: 'bold', marginTop: '8px' }}>3.8%</div>
+                        </div>
+                    </Col>
+                </Row>
+            </Card>
         </div>
     );
 };

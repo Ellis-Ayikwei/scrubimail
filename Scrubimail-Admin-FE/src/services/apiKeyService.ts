@@ -19,22 +19,22 @@ export interface CreateAPIKeyResponse {
 class APIKeyService {
   // Get all API keys for current user
   async getAPIKeys(): Promise<APIKey[]> {
-    const response = await axiosInstance.get('/axiosInstance-keys/');
+    const response = await axiosInstance.get('/api-keys/');
     return response.data;
   }
 
   // Create new API key
   async createAPIKey(): Promise<CreateAPIKeyResponse> {
-    const response = await axiosInstance.post('/axiosInstance-keys/');
+    const response = await axiosInstance.post('/api-keys/');
     return response.data;
   }
 
   // Deactivate API key
   async deactivateAPIKey(keyId: number): Promise<{ message: string }> {
-    const response = await axiosInstance.patch(`/axiosInstance-keys/${keyId}/deactivate/`);
+    const response = await axiosInstance.patch(`/api-keys/${keyId}/deactivate/`);
     return response.data;
   }
 }
 
-export const axiosInstanceKeyService = new APIKeyService();
-export default axiosInstanceKeyService;
+export const apiKeyService = new APIKeyService();
+export default apiKeyService;

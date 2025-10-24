@@ -1,8 +1,12 @@
 import axios from 'axios';
 import { getCookie } from './authAxiosInstance';
 
-export const apiUrl = import.meta.env.VITE_API_URL;
-//const apiUrl = 'http://172.20.10.4:5004/alumni/api/v1';
+// Base API URL with safe fallback and normalized trailing slash
+const defaultApiUrl = 'http://192.168.100.12:8000/scrubimail/api/v1/';
+const rawBaseUrl: string = (import.meta as any)?.env?.VITE_API_URL || defaultApiUrl;
+const normalizedBaseUrl = rawBaseUrl.endsWith('/') ? rawBaseUrl : `${rawBaseUrl}/`;
+
+export const apiUrl = normalizedBaseUrl;
 
 const axiosInstance = axios.create({
     baseURL: apiUrl,
@@ -15,7 +19,10 @@ const axiosInstance = axios.create({
 axiosInstance.interceptors.request.use(
     (config) => {
         const token = getCookie('_auth');
-        config.headers.Authorization = token || '';
+        if (token) {
+            const hasBearerPrefix = /^Bearer\s+/i.test(token);
+            config.headers.Authorization = hasBearerPrefix ? token : `Bearer ${token}`;
+        }
         config.headers['X-Refresh-Token'] = getCookie('_auth_refresh') ?? '';
 
         if (!config.data) {

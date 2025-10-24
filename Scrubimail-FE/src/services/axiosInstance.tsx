@@ -21,7 +21,7 @@ axiosInstance.interceptors.request.use(
         console.log('Token found:', !!token);
         console.log('Token value:', token ? `${token.substring(0, 20)}...` : 'No token');
         if (token) {
-            config.headers.Authorization = `Bearer ${token}`;
+            config.headers.Authorization = `${token}`;
         }
         config.headers['X-Refresh-Token'] = getCookie('_auth_refresh') ?? '';
 

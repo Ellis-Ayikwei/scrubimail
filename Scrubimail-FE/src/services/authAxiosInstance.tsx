@@ -63,7 +63,7 @@ authAxiosInstance.interceptors.request.use(
         const token = getCookie('_auth');
         if (token) {
             console.log("adding auth token");
-            config.headers.Authorization = `Bearer ${token}`;
+            config.headers.Authorization = `${token}`;
         }
         const refreshToken = getCookie('_auth_refresh');
         if (refreshToken) {

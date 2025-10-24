@@ -1,30 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
-import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { IRootState } from '../store';
 import { toggleSidebar } from '../store/themeConfigSlice';
 import useAuthUser from 'react-auth-kit/hooks/useAuthUser';
 import useSignOut from 'react-auth-kit/hooks/useSignOut';
-import IconMenu from './Icon/IconMenu';
-import IconX from './Icon/IconX';
-import IconHome from './Icon/IconHome';
-import IconUsersGroup from './Icon/IconUsersGroup';
-import IconBox from './Icon/IconBox';
-import IconDollarSign from './Icon/IconDollarSign';
-import IconTrendingUp from './Icon/IconTrendingUp';
-import IconSettings from './Icon/IconSettings';
-import IconFile from './Icon/IconFile';
-import IconBell from './Icon/IconBell';
-import IconUser from './Icon/IconUser';
-import IconLogout from './Icon/IconLogout';
-import IconChartSquare from './Icon/IconChartSquare';
-import IconMail from './Icon/IconMail';
-import IconCalendar from './Icon/IconCalendar';
-import IconShoppingBag from './Icon/IconShoppingBag';
-import IconCreditCard from './Icon/IconCreditCard';
-import IconTag from './Icon/IconTag';
-import IconHelpCircle from './Icon/IconHelpCircle';
-import IconMessageSquare from './Icon/IconMessageSquare';
+import AdminSidebar from './admin/AdminSidebar';
+import AdminHeader from './admin/AdminHeader';
+import { Suspense } from 'react';
 
 interface AdminLayoutProps {
     children: React.ReactNode;
@@ -41,193 +24,110 @@ interface AuthUser {
 
 const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
     const dispatch = useDispatch();
-    const location = useLocation();
     const navigate = useNavigate();
     const signOut = useSignOut();
     const authUser = useAuthUser();
     const user = authUser as AuthUser | null;
-    
     const themeConfig = useSelector((state: IRootState) => state.themeConfig);
+    
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-
-    // Close mobile menu on route change
-    useEffect(() => {
-        setIsMobileMenuOpen(false);
-    }, [location.pathname]);
+    const [showLoader, setShowLoader] = useState(true);
+    const [showTopButton, setShowTopButton] = useState(false);
 
     const handleSignOut = () => {
         signOut();
         navigate('/login');
     };
 
-    const menuItems = [
-        {
-            title: 'Dashboard',
-            items: [
-                { icon: <IconHome />, label: 'Overview', path: '/admin/dashboard' },
-                { icon: <IconChartSquare />, label: 'Analytics', path: '/admin/analytics' },
-                { icon: <IconTrendingUp />, label: 'Reports', path: '/admin/reports' },
-            ]
-        },
-        {
-            title: 'Management',
-            items: [
-                { icon: <IconUsersGroup />, label: 'Users', path: '/admin/users' },
-                { icon: <IconBox />, label: 'Products', path: '/admin/products' },
-                { icon: <IconShoppingBag />, label: 'Orders', path: '/admin/orders' },
-                { icon: <IconTag />, label: 'Categories', path: '/admin/categories' },
-            ]
-        },
-        {
-            title: 'Financial',
-            items: [
-                { icon: <IconDollarSign />, label: 'Revenue', path: '/admin/revenue' },
-                { icon: <IconCreditCard />, label: 'Transactions', path: '/admin/transactions' },
-                { icon: <IconFile />, label: 'Invoices', path: '/admin/invoices' },
-            ]
-        },
-        {
-            title: 'Communication',
-            items: [
-                { icon: <IconMail />, label: 'Messages', path: '/admin/messages' },
-                { icon: <IconBell />, label: 'Notifications', path: '/admin/notifications' },
-                { icon: <IconMessageSquare />, label: 'Support Tickets', path: '/admin/support' },
-            ]
-        },
-        {
-            title: 'System',
-            items: [
-                { icon: <IconSettings />, label: 'Settings', path: '/admin/settings' },
-                { icon: <IconCalendar />, label: 'Activity Log', path: '/admin/activity' },
-                { icon: <IconHelpCircle />, label: 'Help Center', path: '/admin/help' },
-            ]
-        },
-    ];
+    const handleToggleMobileMenu = () => {
+        setIsMobileMenuOpen(!isMobileMenuOpen);
+    };
 
-    const isActive = (path: string) => location.pathname === path;
+    const handleCloseMobileMenu = () => {
+        setIsMobileMenuOpen(false);
+    };
+
+    const goToTop = () => {
+        document.body.scrollTop = 0;
+        document.documentElement.scrollTop = 0;
+    };
+
+    const onScrollHandler = () => {
+        if (document.body.scrollTop > 50 || document.documentElement.scrollTop > 50) {
+            setShowTopButton(true);
+        } else {
+            setShowTopButton(false);
+        }
+    };
+
+    useEffect(() => {
+        window.addEventListener('scroll', onScrollHandler);
+
+        const screenLoader = document.getElementsByClassName('screen_loader');
+        if (screenLoader?.length) {
+            screenLoader[0].classList.add('animate__fadeOut');
+            setTimeout(() => {
+                setShowLoader(false);
+            }, 200);
+        }
+
+        return () => {
+            window.removeEventListener('scroll', onScrollHandler);
+        };
+    }, []);
 
     return (
-        <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
-            {/* Sidebar */}
-            <aside className={`fixed inset-y-0 left-0 z-50 w-64 bg-white dark:bg-gray-800 transform transition-transform duration-300 ease-in-out ${
-                isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'
-            } lg:translate-x-0 lg:static lg:inset-0`}>
-                <div className="flex items-center justify-between h-16 px-6 border-b dark:border-gray-700">
-                    <Link to="/admin/dashboard" className="flex items-center space-x-2">
-                        <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
-                            <span className="text-white font-bold text-lg">A</span>
-                        </div>
-                        <span className="text-xl font-bold text-gray-800 dark:text-white">Admin Panel</span>
-                    </Link>
-                    <button
-                        onClick={() => setIsMobileMenuOpen(false)}
-                        className="lg:hidden text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
-                    >
-                        <IconX />
+        <div className="relative">
+            {/* sidebar menu overlay */}
+            <div className={`${(!themeConfig.sidebar && 'hidden') || ''} fixed inset-0 bg-[black]/60 z-50 lg:hidden`} onClick={() => dispatch(toggleSidebar())}></div>
+            
+            {/* screen loader */}
+            {showLoader && (
+                <div className="screen_loader fixed inset-0 bg-[#fafafa] dark:bg-[#060818] z-[60] grid place-content-center animate__animated">
+                    <svg width="64" height="64" viewBox="0 0 135 135" xmlns="http://www.w3.org/2000/svg" fill="#4361ee">
+                        <path d="M67.447 58c5.523 0 10-4.477 10-10s-4.477-10-10-10-10 4.477-10 10 4.477 10 10 10zm9.448 9.447c0 5.523 4.477 10 10 10 5.522 0 10-4.477 10-10s-4.478-10-10-10c-5.523 0-10 4.477-10 10zm-9.448 9.448c-5.523 0-10 4.477-10 10 0 5.522 4.477 10 10 10s10-4.478 10-10c0-5.523-4.477-10-10-10zM58 67.447c0-5.523-4.477-10-10-10s-10 4.477-10 10 4.477 10 10 10 10-4.477 10-10z">
+                            <animateTransform attributeName="transform" type="rotate" from="0 67 67" to="-360 67 67" dur="2.5s" repeatCount="indefinite" />
+                        </path>
+                        <path d="M28.19 40.31c6.627 0 12-5.374 12-12 0-6.628-5.373-12-12-12-6.628 0-12 5.372-12 12 0 6.626 5.372 12 12 12zm30.72-19.825c4.686 4.687 12.284 4.687 16.97 0 4.686-4.686 4.686-12.284 0-16.97-4.686-4.687-12.284-4.687-16.97 0-4.687 4.686-4.687 12.284 0 16.97zm35.74 7.705c0 6.627 5.37 12 12 12 6.626 0 12-5.373 12-12 0-6.628-5.374-12-12-12-6.63 0-12 5.372-12 12zm19.822 30.72c-4.686 4.686-4.686 12.284 0 16.97 4.687 4.686 12.285 4.686 16.97 0 4.687-4.686 4.687-12.284 0-16.97-4.685-4.687-12.283-4.687-16.97 0zm-7.704 35.74c-6.627 0-12 5.37-12 12 0 6.626 5.373 12 12 12s12-5.374 12-12c0-6.63-5.373-12-12-12zm-30.72 19.822c-4.686-4.686-12.284-4.686-16.97 0-4.686 4.687-4.686 12.285 0 16.97 4.686 4.687 12.284 4.687 16.97 0 4.687-4.685 4.687-12.283 0-16.97zm-35.74-7.704c0-6.627-5.372-12-12-12-6.626 0-12 5.373-12 12s5.374 12 12 12c6.628 0 12-5.373 12-12zm-19.823-30.72c4.687-4.686 4.687-12.284 0-16.97-4.686-4.686-12.284-4.686-16.97 0-4.687 4.686-4.687 12.284 0 16.97 4.686 4.687 12.284 4.687 16.97 0z">
+                            <animateTransform attributeName="transform" type="rotate" from="0 67 67" to="360 67 67" dur="8s" repeatCount="indefinite" />
+                        </path>
+                    </svg>
+                </div>
+            )}
+            
+            {/* Scroll to top button */}
+            <div className="fixed bottom-6 ltr:right-6 rtl:left-6 z-50">
+                {showTopButton && (
+                    <button type="button" className="btn btn-outline-primary rounded-full p-2 animate-pulse bg-[#fafafa] dark:bg-[#060818] dark:hover:bg-primary" onClick={goToTop}>
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M8 7l4-4m0 0l4 4m-4-4v18" />
+                        </svg>
                     </button>
-                </div>
-
-                <nav className="flex-1 px-4 py-4 space-y-1 overflow-y-auto">
-                    {menuItems.map((section, index) => (
-                        <div key={index} className="mb-6">
-                            <h3 className="px-3 mb-2 text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                                {section.title}
-                            </h3>
-                            <div className="space-y-1">
-                                {section.items.map((item, itemIndex) => (
-                                    <Link
-                                        key={itemIndex}
-                                        to={item.path}
-                                        className={`flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-colors ${
-                                            isActive(item.path)
-                                                ? 'bg-primary text-white'
-                                                : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
-                                        }`}
-                                    >
-                                        <span className="w-5 h-5 mr-3">{item.icon}</span>
-                                        {item.label}
-                                    </Link>
-                                ))}
-                            </div>
-                        </div>
-                    ))}
-                </nav>
-
-                <div className="p-4 border-t dark:border-gray-700">
-                    <div className="flex items-center space-x-3">
-                        <div className="w-10 h-10 bg-gray-300 dark:bg-gray-600 rounded-full flex items-center justify-center">
-                            {user?.user?.avatar ? (
-                                <img src={user.user.avatar} alt="Avatar" className="w-full h-full rounded-full" />
-                            ) : (
-                                <IconUser className="w-6 h-6 text-gray-600 dark:text-gray-400" />
-                            )}
-                        </div>
-                        <div className="flex-1">
-                            <p className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                                {user?.user?.name || 'Admin User'}
-                            </p>
-                            <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
-                                {user?.user?.email || 'admin@example.com'}
-                            </p>
-                        </div>
-                        <button
-                            onClick={handleSignOut}
-                            className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
-                            title="Sign out"
-                        >
-                            <IconLogout className="w-5 h-5" />
-                        </button>
-                    </div>
-                </div>
-            </aside>
-
-            {/* Main Content */}
-            <div className="lg:ml-64">
-                {/* Header */}
-                <header className="bg-white dark:bg-gray-800 shadow-sm">
-                    <div className="flex items-center justify-between h-16 px-4 sm:px-6 lg:px-8">
-                        <button
-                            onClick={() => setIsMobileMenuOpen(true)}
-                            className="lg:hidden text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
-                        >
-                            <IconMenu />
-                        </button>
-
-                        <div className="flex items-center space-x-4 ml-auto">
-                            {/* Notifications */}
-                            <button className="relative p-2 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200">
-                                <IconBell className="w-6 h-6" />
-                                <span className="absolute top-0 right-0 w-2 h-2 bg-red-500 rounded-full"></span>
-                            </button>
-
-                            {/* Theme Toggle */}
-                            <button
-                                onClick={() => {
-                                    const newTheme = themeConfig.theme === 'dark' ? 'light' : 'dark';
-                                    dispatch(toggleTheme(newTheme));
-                                    localStorage.setItem('theme', newTheme);
-                                }}
-                                className="p-2 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
-                            >
-                                {themeConfig.theme === 'dark' ? '🌞' : '🌙'}
-                            </button>
-                        </div>
-                    </div>
-                </header>
-
-                {/* Page Content */}
-                <main className="p-4 sm:p-6 lg:p-8">
-                    {children}
-                </main>
+                )}
             </div>
 
-            {/* Mobile menu overlay */}
-            {isMobileMenuOpen && (
-                <div
-                    className="fixed inset-0 bg-black bg-opacity-50 z-40 lg:hidden"
-                    onClick={() => setIsMobileMenuOpen(false)}
+            <div className={`${themeConfig.navbar} main-container text-black dark:text-white-dark min-h-screen`}>
+                {/* BEGIN SIDEBAR */}
+                <AdminSidebar
+                    isMobileMenuOpen={isMobileMenuOpen}
+                    onCloseMobileMenu={handleCloseMobileMenu}
+                    onSignOut={handleSignOut}
+                    user={user?.user || null}
                 />
-            )}
+                {/* END SIDEBAR */}
+
+                <div className="main-content flex flex-col min-h-screen lg:ml-64">
+                    {/* BEGIN TOP NAVBAR */}
+                    <AdminHeader onToggleMobileMenu={handleToggleMobileMenu} />
+                    {/* END TOP NAVBAR */}
+
+                    {/* BEGIN CONTENT AREA */}
+                    <Suspense>
+                        <div className={`${themeConfig.animation} p-1 animate__animated bg-white dark:bg-black`}>{children}</div>
+                    </Suspense>
+                    {/* END CONTENT AREA */}
+                </div>
+            </div>
         </div>
     );
 };

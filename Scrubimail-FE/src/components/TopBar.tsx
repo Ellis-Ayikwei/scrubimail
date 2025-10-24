@@ -45,7 +45,7 @@ const TopBar: React.FC = () => {
             </div>
 
             {/* Navigation Links for unauthenticated users */}
-            <nav className="hidden md:flex items-center space-x-8">
+            <nav className="hidden lg:flex items-center space-x-8">
               <Link
                 to="/api-docs"
                 className="text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white text-sm font-medium transition-colors"
@@ -72,7 +72,7 @@ const TopBar: React.FC = () => {
               <DarkModeToggle />
 
               {/* Auth buttons */}
-              <div className="flex items-center space-x-3">
+              <div className="hidden sm:flex items-center space-x-3">
                 <Link
                   to="/login"
                   className="text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white text-sm font-medium transition-colors"
@@ -86,8 +86,68 @@ const TopBar: React.FC = () => {
                   Get started
                 </Link>
               </div>
+
+              {/* Mobile menu button for unauthenticated users */}
+              <button
+                onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+                className="lg:hidden p-2 rounded-md text-[#333333] dark:text-gray-300 hover:bg-[#F4F5F7] dark:hover:bg-gray-800"
+              >
+                {isMobileMenuOpen ? (
+                  <X className="w-6 h-6" />
+                ) : (
+                  <Menu className="w-6 h-6" />
+                )}
+              </button>
             </div>
           </div>
+
+          {/* Mobile Navigation for unauthenticated users */}
+          {isMobileMenuOpen && (
+            <div className="lg:hidden border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900">
+              <div className="px-4 py-3 space-y-1">
+                <Link
+                  to="/api-docs"
+                  onClick={() => setIsMobileMenuOpen(false)}
+                  className="flex px-3 py-3 rounded-lg text-base font-medium transition-all duration-200 items-center space-x-3 text-gray-600 dark:text-gray-300 hover:bg-[#F4F5F7] dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-white"
+                >
+                  <FileText className="w-5 h-5" />
+                  <span>API Docs</span>
+                </Link>
+                <Link
+                  to="/pricing"
+                  onClick={() => setIsMobileMenuOpen(false)}
+                  className="flex px-3 py-3 rounded-lg text-base font-medium transition-all duration-200 items-center space-x-3 text-gray-600 dark:text-gray-300 hover:bg-[#F4F5F7] dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-white"
+                >
+                  <span>Pricing</span>
+                </Link>
+                <Link
+                  to="/about"
+                  onClick={() => setIsMobileMenuOpen(false)}
+                  className="flex px-3 py-3 rounded-lg text-base font-medium transition-all duration-200 items-center space-x-3 text-gray-600 dark:text-gray-300 hover:bg-[#F4F5F7] dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-white"
+                >
+                  <span>About</span>
+                </Link>
+                
+                {/* Mobile auth buttons */}
+                <div className="pt-3 border-t border-gray-200 dark:border-gray-700 space-y-2">
+                  <Link
+                    to="/login"
+                    onClick={() => setIsMobileMenuOpen(false)}
+                    className="flex px-3 py-3 rounded-lg text-base font-medium transition-all duration-200 items-center justify-center text-gray-700 dark:text-gray-300 hover:bg-[#F4F5F7] dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-white"
+                  >
+                    Sign in
+                  </Link>
+                  <Link
+                    to="/register"
+                    onClick={() => setIsMobileMenuOpen(false)}
+                    className="flex px-3 py-3 rounded-lg text-base font-medium transition-all duration-200 items-center justify-center bg-[#2ED8A3] text-white hover:bg-[#00C48C]"
+                  >
+                    Get started
+                  </Link>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </header>
     );
@@ -97,8 +157,21 @@ const TopBar: React.FC = () => {
     <header className="sticky top-0 z-50 bg-white/80 dark:bg-gray-900/80 backdrop-blur-md border-b border-gray-200 dark:border-gray-700">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-16">
-          {/* Logo and Brand */}
-          <div className="flex items-center">
+          {/* Left side - Mobile menu button + Logo */}
+          <div className="flex items-center space-x-3">
+            {/* Mobile menu button - only show on small screens when authenticated */}
+            <button
+              onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+              className="lg:hidden p-2 rounded-md text-[#333333] dark:text-gray-300 hover:bg-[#F4F5F7] dark:hover:bg-gray-800"
+            >
+              {isMobileMenuOpen ? (
+                <X className="w-6 h-6" />
+              ) : (
+                <Menu className="w-6 h-6" />
+              )}
+            </button>
+
+            {/* Logo and Brand */}
             <Link to="/dashboard" className="flex items-center space-x-2">
               <img src='assets/images/scrubiLogo.png' alt="Logo" />
               <span className="text-xl font-bold bg-gradient-to-r from-[#2ED8A3] to-[#004E8A] bg-clip-text text-transparent">
@@ -108,7 +181,7 @@ const TopBar: React.FC = () => {
           </div>
 
           {/* Desktop Navigation */}
-          <nav className="hidden md:flex items-center space-x-1">
+          <nav className="hidden lg:flex items-center space-x-1">
             {navLinks.map((link) => {
               const IconComponent = link.icon;
               return (
@@ -143,25 +216,13 @@ const TopBar: React.FC = () => {
 
             {/* User menu */}
             <UserMenu />
-
-            {/* Mobile menu button */}
-            <button
-              onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-              className="md:hidden p-2 rounded-md text-[#333333] dark:text-gray-300 hover:bg-[#F4F5F7] dark:hover:bg-gray-800"
-            >
-              {isMobileMenuOpen ? (
-                <X className="w-6 h-6" />
-              ) : (
-                <Menu className="w-6 h-6" />
-              )}
-            </button>
           </div>
         </div>
 
         {/* Mobile Navigation */}
         {isMobileMenuOpen && (
-          <div className="md:hidden border-t border-gray-200 dark:border-gray-700">
-            <div className="px-2 pt-2 pb-3 space-y-1">
+          <div className="lg:hidden border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900">
+            <div className="px-4 py-3 space-y-1">
               {navLinks.map((link) => {
                 const IconComponent = link.icon;
                 return (
@@ -169,19 +230,19 @@ const TopBar: React.FC = () => {
                     key={link.to}
                     to={link.to}
                     onClick={() => setIsMobileMenuOpen(false)}
-                    className={`flex px-3 py-2 rounded-md text-base font-medium transition-all duration-200 items-center space-x-2 ${
+                    className={`flex px-3 py-3 rounded-lg text-base font-medium transition-all duration-200 items-center space-x-3 ${
                       location.pathname === link.to
                         ? 'bg-[#2ED8A3]/10 text-[#004E8A] dark:text-[#2ED8A3]'
                         : 'text-[#333333] dark:text-gray-300 hover:bg-[#F4F5F7] dark:hover:bg-gray-800 hover:text-[#004E8A] dark:hover:text-white'
                     }`}
                   >
-                    <IconComponent className="w-4 h-4" />
+                    <IconComponent className="w-5 h-5" />
                     <span>{link.label}</span>
                   </Link>
                 );
               })}
               {/* Mobile credits display */}
-              <div className="px-3 py-2 flex items-center space-x-2">
+              <div className="px-3 py-3 flex items-center space-x-3 bg-[#00C48C]/5 rounded-lg">
                 <div className="w-2 h-2 bg-[#00C48C] rounded-full"></div>
                 <span className="text-sm font-medium text-[#00C48C]">
                   1,250 credits

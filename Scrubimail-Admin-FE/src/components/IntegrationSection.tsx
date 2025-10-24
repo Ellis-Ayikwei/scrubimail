@@ -47,8 +47,8 @@ const IntegrationSection: React.FC = () => {
           </div>
         </div>
       </section>
-        );
     </div>
+  );
 };
 
 export default IntegrationSection; 

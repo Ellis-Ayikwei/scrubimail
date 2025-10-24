@@ -13,28 +13,76 @@ import {
 } from 'lucide-react';
 import { validationService, ValidationHistory, ValidationAnalytics } from '../services/validationService';
 import { billingService, BillingProfile, UsageStats } from '../services/billingService';
+import { userService, ComprehensiveProfile } from '../services/userService';
+import dayjs from 'dayjs';
 
 const Dashboard: React.FC = () => {
   const [analytics, setAnalytics] = useState<ValidationAnalytics | null>(null);
   const [history, setHistory] = useState<ValidationHistory | null>(null);
   const [billingProfile, setBillingProfile] = useState<BillingProfile | null>(null);
   const [usageStats, setUsageStats] = useState<UsageStats | null>(null);
+  const [comprehensiveProfile, setComprehensiveProfile] = useState<ComprehensiveProfile | null>(null);
   const [loading, setLoading] = useState(true);
 
   const fetchDashboardData = async () => {
     try {
       setLoading(true);
-      const [analyticsData, historyData, billingData, usageData] = await Promise.all([
-        validationService.getValidationAnalytics(),
-        validationService.getValidationHistory({ page_size: 4 }),
-        billingService.getBillingProfile(),
-        billingService.getUsageStats()
-      ]);
-      console.log('Dashboard data fetched:', { analyticsData, historyData, billingData, usageData });
-      setAnalytics(analyticsData);
-      setHistory(historyData);
-      setBillingProfile(billingData);
-      setUsageStats(usageData);
+      
+      // Try to get comprehensive profile first
+      try {
+        const comprehensive = await userService.getComprehensiveProfile();
+        console.log('Comprehensive profile fetched for dashboard:', comprehensive);
+        setComprehensiveProfile(comprehensive);
+        
+        // Extract data from comprehensive profile
+        if (comprehensive.billing) {
+          setBillingProfile({
+            id: 1, // Default ID
+            current_plan: comprehensive.billing.current_plan,
+            credits_remaining: comprehensive.billing.credits_remaining,
+            credits_used_this_month: comprehensive.billing.credits_used_this_month,
+            billing_status: 'active',
+            total_credits_purchased: comprehensive.billing.credits_remaining + comprehensive.billing.credits_used_this_month,
+            total_amount_spent: 0,
+            last_credit_purchase: null,
+            plan_start_date: new Date().toISOString(),
+            plan_end_date: null,
+            auto_renew: false,
+            usage_percentage: 0,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          });
+        }
+        
+        if (comprehensive.usage) {
+          setUsageStats(comprehensive.usage);
+        }
+        
+        // Still fetch analytics and history separately for detailed data
+        const [analyticsData, historyData] = await Promise.all([
+          validationService.getValidationAnalytics().catch(() => null),
+          validationService.getValidationHistory({ page_size: 4 }).catch(() => null)
+        ]);
+        
+        if (analyticsData) setAnalytics(analyticsData);
+        if (historyData) setHistory(historyData);
+        
+      } catch (comprehensiveError) {
+        console.log('Comprehensive profile failed, falling back to individual calls:', comprehensiveError);
+        
+        // Fallback to individual API calls
+        const [analyticsData, historyData, billingData, usageData] = await Promise.all([
+          validationService.getValidationAnalytics(),
+          validationService.getValidationHistory({ page_size: 4 }),
+          billingService.getBillingProfile(),
+          billingService.getUsageStats()
+        ]);
+        console.log('Fallback dashboard data fetched:', { analyticsData, historyData, billingData, usageData });
+        setAnalytics(analyticsData);
+        setHistory(historyData);
+        setBillingProfile(billingData);
+        setUsageStats(usageData);
+      }
     } catch (error) {
       console.error('Error fetching dashboard data:', error);
       // Set fallback data for demo purposes
@@ -72,21 +120,21 @@ const Dashboard: React.FC = () => {
   const stats = [
     { 
       label: 'Total Validations', 
-      value: usageStats?.total_validations.toLocaleString() || '0', 
+      value: usageStats?.total_validations?.toLocaleString() || '0', 
       change: '+12%', 
       changeType: 'positive' as const, 
       icon: Activity 
     },
     { 
       label: 'Valid Emails', 
-      value: usageStats?.valid_emails.toLocaleString() || '0', 
+      value: usageStats?.valid_emails?.toLocaleString() || '0', 
       change: '+8%', 
       changeType: 'positive' as const, 
       icon: CheckCircle 
     },
     { 
       label: 'Invalid Emails', 
-      value: usageStats?.invalid_emails.toLocaleString() || '0', 
+      value: usageStats?.invalid_emails?.toLocaleString() || '0', 
       change: '-3%', 
       changeType: 'negative' as const, 
       icon: TrendingDown 
@@ -138,7 +186,7 @@ const Dashboard: React.FC = () => {
   const recentActivity = history?.results.slice(0, 4).map(result => ({
     email: result.email,
     status: result.is_valid ? 'valid' : 'invalid',
-    time: new Date(result.id).toLocaleString() // Using ID as timestamp placeholder
+    time: dayjs((result as any).created_at).format('ddd DD MMM, YYYY - HH:mm')
   })) || [
     { email: 'Loading...', status: 'valid', time: '' },
   ];
@@ -162,14 +210,14 @@ const Dashboard: React.FC = () => {
             </div>
             <p className="text-gray-600 dark:text-gray-400 text-lg">
               {loading ? 'Loading your dashboard...' : (
-                <>You have validated <span className="font-semibold text-[#2ED8A3]">{usageStats?.total_validations.toLocaleString() || '0'} emails</span> this month.</>
+                <>You have validated <span className="font-semibold text-[#2ED8A3]">{usageStats?.total_validations?.toLocaleString() || '0'} emails</span> this month.</>
               )}
             </p>
           </div>
           <div className="hidden md:flex items-center space-x-4">
             <div className="text-right">
               <p className="text-sm text-gray-500 dark:text-gray-400">Credits Remaining</p>
-              <p className="text-2xl font-bold text-[#2ED8A3]">{billingProfile?.credits_remaining.toLocaleString() || '0'}</p>
+              <p className="text-2xl font-bold text-[#2ED8A3]">{billingProfile?.credits_remaining?.toLocaleString() || '0'}</p>
             </div>
             <div className="w-16 h-16 bg-[#2ED8A3]/10 rounded-2xl flex items-center justify-center">
               <Activity className="w-8 h-8 text-[#2ED8A3]" />
@@ -281,7 +329,7 @@ const Dashboard: React.FC = () => {
             <div className="flex justify-between items-center">
               <span className="text-gray-600 dark:text-gray-400 text-sm">This month</span>
               <span className="font-semibold text-gray-900 dark:text-white">
-                {usageStats?.this_month.validations.toLocaleString() || '0'} validations
+                {usageStats?.this_month?.validations?.toLocaleString() || '0'} validations
               </span>
             </div>
             <div className="space-y-2">
@@ -295,13 +343,13 @@ const Dashboard: React.FC = () => {
               </div>
               <div className="flex justify-between text-xs text-gray-500 dark:text-gray-400">
                 <span>0</span>
-                <span>{billingProfile ? (billingProfile.credits_remaining + billingProfile.credits_used_this_month).toLocaleString() : '0'}</span>
+                <span>{billingProfile ? ((billingProfile.credits_remaining || 0) + (billingProfile.credits_used_this_month || 0)).toLocaleString() : '0'}</span>
               </div>
             </div>
             <div className="bg-[#2ED8A3]/5 rounded-lg p-3">
               <div className="flex items-center justify-between">
                 <span className="text-[#2ED8A3] font-medium text-sm">Credits Remaining</span>
-                <span className="text-lg font-bold text-[#2ED8A3]">{billingProfile?.credits_remaining.toLocaleString() || '0'}</span>
+                <span className="text-lg font-bold text-[#2ED8A3]">{billingProfile?.credits_remaining?.toLocaleString() || '0'}</span>
               </div>
             </div>
           </div>

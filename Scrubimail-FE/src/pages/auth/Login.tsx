@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { 
   Mail, 
@@ -16,19 +16,30 @@ import useSignIn from 'react-auth-kit/hooks/useSignIn';
 import { LoginUser } from '../../store/authSlice';
 import { RootState } from '../../store/index';
 import authAxiosInstance from '../../services/authAxiosInstance';
+import { getOrCreateDeviceId, getDeviceName, getDeviceInfo } from '../../utils/DeviceFingerPrint';
 
 const Login = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [trustDevice, setTrustDevice] = useState(localStorage.getItem('trustDevice') === 'true' ? true : false);
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const from = searchParams.get('from') || '/dashboard';
+
+  // Redirect to multi-step login for enhanced 2FA support
+  useEffect(() => {
+    navigate('/multi-login');
+  }, [navigate]);
   
   const dispatch = useDispatch();
   const signIn = useSignIn();
   const { loading, error: authError } = useSelector((state: RootState) => state.auth);
+  const { device_id, device_name, fingerprint, device_info } = getDeviceInfo();
+  const userIdFromState = localStorage.getItem('userId') || '';
+  const sessionIdFromState = getOrCreateDeviceId();
+
 
   const ssoProviders = [
     {
@@ -66,6 +77,14 @@ const Login = () => {
         LoginUser({
           email,
           password,
+          trust_device: trustDevice,
+          device_id,
+          device_name,
+          fingerprint,
+          user_id: userIdFromState,
+          session_id: sessionIdFromState,
+          device_info,
+
           extra: {
             signIn: signIn,
           },
@@ -243,6 +262,11 @@ const Login = () => {
                   name="remember-me"
                   type="checkbox"
                   disabled={loading}
+                  checked={trustDevice}
+                  onChange={(e) => {
+                    setTrustDevice(e.target.checked);
+                    localStorage.setItem('trustDevice', e.target.checked.toString());
+                  }}
                   className="h-4 w-4 text-[#2ED8A3] focus:ring-[#2ED8A3] border-gray-300 rounded disabled:opacity-50"
                 />
                 <label htmlFor="remember-me" className="ml-2 block text-sm text-[#333333] dark:text-gray-300">

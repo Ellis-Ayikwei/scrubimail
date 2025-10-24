@@ -156,7 +156,7 @@ const Billing = () => {
             <div className="space-y-2">
               <div className="flex justify-between text-sm">
                 <span className="text-[#333333]/70 dark:text-gray-400">Credits Remaining:</span>
-                <span className="font-semibold text-[#333333] dark:text-white">{credits.toLocaleString()}</span>
+                <span className="font-semibold text-[#333333] dark:text-white">{credits?.toLocaleString() || '0'}</span>
               </div>
               <div className="flex justify-between text-sm">
                 <span className="text-[#333333]/70 dark:text-gray-400">Total Credits:</span>
@@ -172,7 +172,7 @@ const Billing = () => {
               <TrendingUp className="w-6 h-6 text-[#2ED8A3]" />
             </div>
             <div className="text-3xl font-bold text-[#2ED8A3] mb-1">
-              {usage.thisMonth.toLocaleString()}
+              {usage.thisMonth?.toLocaleString() || '0'}
             </div>
             <div className="text-[#333333]/70 dark:text-gray-400 mb-4">
               Validations Used
@@ -180,11 +180,11 @@ const Billing = () => {
             <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
               <div 
                 className="bg-gradient-to-r from-[#2ED8A3] to-[#00C48C] h-2 rounded-full transition-all duration-300"
-                style={{ width: `${Math.min((usage.thisMonth / currentPlan.credits) * 100, 100)}%` }}
+                style={{ width: `${Math.min(((usage.thisMonth || 0) / currentPlan.credits) * 100, 100)}%` }}
               ></div>
             </div>
             <div className="text-xs text-[#333333]/50 dark:text-gray-400 mt-2">
-              {Math.round((usage.thisMonth / currentPlan.credits) * 100)}% of monthly limit
+              {Math.round(((usage.thisMonth || 0) / currentPlan.credits) * 100)}% of monthly limit
             </div>
           </div>
 
@@ -195,7 +195,7 @@ const Billing = () => {
               <Zap className="w-6 h-6 text-[#2ED8A3]" />
             </div>
             <div className="text-3xl font-bold text-[#333333] dark:text-white mb-1">
-              {usage.totalValidations.toLocaleString()}
+              {usage.totalValidations?.toLocaleString() || '0'}
             </div>
             <div className="text-[#333333]/70 dark:text-gray-400 mb-4">
               All Time Validations

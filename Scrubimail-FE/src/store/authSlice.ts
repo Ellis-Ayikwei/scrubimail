@@ -26,8 +26,8 @@ const ERROR_MESSAGES = {
     FORGOT_PASSWORD_FAILED: 'Failed to request password reset. Please try again.',
 };
 
-export const LoginUser = createAsyncThunk('auth/LoginUser', async ({ email, password, extra }: { email?: string; password: string; extra?: any }, { rejectWithValue }) => {
-    const payload = { email, password };
+export const LoginUser = createAsyncThunk('auth/LoginUser', async ({ email, password, trust_device, device_id, device_name, fingerprint, user_id, session_id, device_info, extra }: { email?: string; password: string; trust_device: boolean; device_id: string; device_name: string; fingerprint: string; user_id: string; session_id: string; device_info: any; extra?: any }, { rejectWithValue }) => {
+    const payload = { email, password, trust_device, device_id, device_name, fingerprint, user_id, session_id, device_info };
 
     try {
         const response = await authAxiosInstance.post('/login/', payload);
@@ -41,6 +41,7 @@ export const LoginUser = createAsyncThunk('auth/LoginUser', async ({ email, pass
         const refreshToken = response?.headers['x-refresh-token'];
 
         const user = response?.data;
+
 
         if (!accessToken || !refreshToken) {
             console.error('Error: Missing tokens from server response');
@@ -57,13 +58,30 @@ export const LoginUser = createAsyncThunk('auth/LoginUser', async ({ email, pass
                 refresh: refreshToken,
                 userState: user,
             });
-            localStorage.setItem('userId', user?.id);
-
+           
             if (!isSignedIn) {
                 console.error('Frontend sign-in failed');
                 throw new Error('Frontend sign-in failed');
             }
         }
+
+        // Debug the values being set
+        console.log('Setting localStorage values:', {
+            userId: user?.id,
+            session_id,
+            device_id,
+            device_name,
+            fingerprint,
+            device_info
+        });
+
+       	if(user?.user?.id)localStorage.setItem('userId', user?.user.id);
+        if (session_id) localStorage.setItem('sessionId', session_id || '');
+        if (device_id) localStorage.setItem('deviceId', device_id);
+        if (device_name) localStorage.setItem('deviceName', device_name);
+        if (fingerprint) localStorage.setItem('fingerprint', fingerprint);
+        if (device_info) localStorage.setItem('deviceInfo', JSON.stringify(device_info));
+
 
         return user;
     } catch (error: any) {

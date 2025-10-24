@@ -46,6 +46,49 @@ export interface ProfileUpdateRequest {
   profile_picture?: File;
 }
 
+export interface ComprehensiveProfile {
+  user: UserProfile;
+  billing: {
+    credits_remaining: number;
+    credits_used_this_month: number;
+    current_plan: {
+      name: string;
+      price: number;
+      credits: number;
+    };
+  } | null;
+  usage: {
+    total_validations: number;
+    valid_emails: number;
+    invalid_emails: number;
+    risky_emails: number;
+    success_rate: number;
+    credits_used: number;
+    credits_remaining: number;
+    cost_per_validation: number;
+    daily_usage: Array<{
+      date: string;
+      validations: number;
+    }>;
+    weekly_usage: Array<{
+      date: string;
+      validations: number;
+    }>;
+    monthly_usage: Array<{
+      date: string;
+      validations: number;
+    }>;
+  } | null;
+  stats: {
+    total_validations: number;
+    valid_emails: number;
+    invalid_emails: number;
+    risky_emails: number;
+    success_rate: number;
+  } | null;
+  error?: string;
+}
+
 class UserService {
   /**
    * Get current user's profile
@@ -53,7 +96,7 @@ class UserService {
   async getProfile(): Promise<UserProfile> {
     try {
       console.log('Fetching user profile...');
-      const response = await axiosInstance.get('/user/');
+      const response = await axiosInstance.get('/auth/user/');
       console.log('Profile response:', response.data);
       return response.data;
     } catch (error) {
@@ -61,6 +104,23 @@ class UserService {
       console.error('Error details:', error.response?.data);
       console.error('Error status:', error.response?.status);
       throw new Error('Failed to load user profile');
+    }
+  }
+
+  /**
+   * Get comprehensive user profile with billing and usage data
+   */
+  async getComprehensiveProfile(): Promise<ComprehensiveProfile> {
+    try {
+      console.log('Fetching comprehensive profile...');
+      const response = await axiosInstance.get('/auth/my-profile/');
+      console.log('Comprehensive profile response:', response.data);
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching comprehensive profile:', error);
+      console.error('Error details:', error.response?.data);
+      console.error('Error status:', error.response?.status);
+      throw new Error('Failed to load comprehensive profile');
     }
   }
 
@@ -76,7 +136,7 @@ class UserService {
       if (data.phone_number) formData.append('phone_number', data.phone_number);
       if (data.profile_picture) formData.append('profile_picture', data.profile_picture);
 
-      const response = await axiosInstance.patch('/user/', formData, {
+      const response = await axiosInstance.patch('/auth/user/', formData, {
         headers: {
           'Content-Type': 'multipart/form-data',
         },
@@ -93,7 +153,7 @@ class UserService {
    */
   async changePassword(data: PasswordChangeRequest): Promise<{ detail: string }> {
     try {
-      const response = await axiosInstance.post('/change-password/', data);
+      const response = await axiosInstance.post('/auth/change-password/', data);
       return response.data;
     } catch (error) {
       console.error('Error changing password:', error);
@@ -106,7 +166,7 @@ class UserService {
    */
   async updateNotificationPreferences(preferences: NotificationPreferences): Promise<{ detail: string }> {
     try {
-      const response = await axiosInstance.patch('/notification-preferences/', preferences);
+      const response = await axiosInstance.patch('/auth/notification-preferences/', preferences);
       return { detail: 'Notification preferences updated successfully' };
     } catch (error) {
       console.error('Error updating notification preferences:', error);
@@ -119,7 +179,7 @@ class UserService {
    */
   async deleteAccount(): Promise<{ detail: string }> {
     try {
-      const response = await axiosInstance.delete('/delete-account/');
+      const response = await axiosInstance.delete('/auth/delete-account/');
       return response.data;
     } catch (error) {
       console.error('Error deleting account:', error);
@@ -135,7 +195,7 @@ class UserService {
       const formData = new FormData();
       formData.append('profile_picture', file);
 
-      const response = await axiosInstance.patch('/user/', formData, {
+      const response = await axiosInstance.patch('/auth/user/', formData, {
         headers: {
           'Content-Type': 'multipart/form-data',
         },

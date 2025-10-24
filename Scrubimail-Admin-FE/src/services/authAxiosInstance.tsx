@@ -1,7 +1,10 @@
 import axios from 'axios';
 
-// const authApiUrl = 'https://127.0.0.1/sc/api/v1';
-export const authApiUrl = import.meta.env.VITE_API_URL + 'auth';
+// Normalize base URL and ensure /auth suffix
+const defaultApiUrl = 'http://192.168.100.12:8000/scrubimail/api/v1/';
+const rawBaseUrl: string = (import.meta as any)?.env?.VITE_API_URL || defaultApiUrl;
+const normalizedBaseUrl = rawBaseUrl.endsWith('/') ? rawBaseUrl : `${rawBaseUrl}/`;
+export const authApiUrl = `${normalizedBaseUrl}auth`;
 
 //export const authApiUrl = 'http://127.0.0.1:5004/alumni/api/v1/auth';
 //const authApiUrl = 'http://172.20.10.4:5004/alumni/api/v1/auth';
@@ -63,7 +66,8 @@ authAxiosInstance.interceptors.request.use(
             const refreshToken = getCookie('_auth_refresh');
             
             if (token) {
-                config.headers.Authorization = token;
+                const hasBearerPrefix = /^Bearer\s+/i.test(token);
+                config.headers.Authorization = hasBearerPrefix ? token : `Bearer ${token}`;
             }
             
             if (refreshToken) {

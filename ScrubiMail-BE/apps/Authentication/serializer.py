@@ -152,3 +152,98 @@ class UserProfileSerializer(serializers.ModelSerializer):
             "last_active",
             "device_tokens",
         )
+
+
+# TOTP 2FA Serializers
+class TOTPSetupSerializer(serializers.Serializer):
+    """Serializer for TOTP setup response"""
+
+    secret_key = serializers.CharField(read_only=True)
+    qr_code = serializers.CharField(read_only=True)
+    backup_codes = serializers.ListField(read_only=True)
+
+
+class TOTPVerifySerializer(serializers.Serializer):
+    """Serializer for TOTP token verification"""
+
+    token = serializers.CharField(max_length=6, min_length=6)
+
+    def validate_token(self, value):
+        if not value.isdigit():
+            raise serializers.ValidationError("Token must contain only digits")
+        return value
+
+
+class TOTPEnableSerializer(serializers.Serializer):
+    """Serializer for enabling TOTP 2FA"""
+
+    verification_token = serializers.CharField(max_length=6, min_length=6)
+
+    def validate_verification_token(self, value):
+        if not value.isdigit():
+            raise serializers.ValidationError(
+                "Verification token must contain only digits"
+            )
+        return value
+
+
+class TOTPDisableSerializer(serializers.Serializer):
+    """Serializer for disabling TOTP 2FA"""
+
+    password = serializers.CharField(required=True)
+
+
+class BackupCodeSerializer(serializers.Serializer):
+    """Serializer for backup code verification"""
+
+    backup_code = serializers.CharField(max_length=8, min_length=8)
+
+    def validate_backup_code(self, value):
+        if not value.isalnum():
+            raise serializers.ValidationError(
+                "Backup code must contain only alphanumeric characters"
+            )
+        return value.upper()
+
+
+class LoginWithTOTPSerializer(serializers.Serializer):
+    """Serializer for login with TOTP verification and device fingerprinting"""
+
+    email = serializers.EmailField()
+    password = serializers.CharField(
+        style={"input_type": "password"}, trim_whitespace=False
+    )
+    totp_token = serializers.CharField(max_length=6, min_length=6, required=False)
+    backup_code = serializers.CharField(max_length=8, min_length=8, required=False)
+
+    # Device fingerprinting fields
+    device_id = serializers.CharField(max_length=255, required=False)
+    device_name = serializers.CharField(max_length=255, required=False)
+    fingerprint = serializers.CharField(max_length=512, required=False)
+    device_fingerprint = serializers.CharField(max_length=512, required=False)
+    device_info = serializers.JSONField(required=False)
+
+    # Remember me functionality
+    trust_device = serializers.BooleanField(required=False, default=False)
+    remember_device = serializers.BooleanField(required=False, default=False)
+    remember_me = serializers.BooleanField(required=False, default=False)
+
+    def validate(self, data):
+        # At least one 2FA method must be provided if user has 2FA enabled
+        if not data.get("totp_token") and not data.get("backup_code"):
+            raise serializers.ValidationError(
+                "Either TOTP token or backup code is required for 2FA"
+            )
+        return data
+
+    def validate_totp_token(self, value):
+        if value and not value.isdigit():
+            raise serializers.ValidationError("TOTP token must contain only digits")
+        return value
+
+    def validate_backup_code(self, value):
+        if value and not value.isalnum():
+            raise serializers.ValidationError(
+                "Backup code must contain only alphanumeric characters"
+            )
+        return value.upper() if value else value
