@@ -42,7 +42,7 @@ import moment from 'moment';
 
 interface ValidationRecord {
   id: number;
-  user: {
+  user?: {
     id: number;
     name: string;
     email: string;
@@ -167,8 +167,8 @@ const ValidationsManagement: React.FC = () => {
         <Space>
           <Avatar icon={<UserOutlined />} size="small" />
           <div>
-            <div style={{ fontWeight: 'bold' }}>{record.user.name}</div>
-            <Text type="secondary" style={{ fontSize: '12px' }}>{record.user.email}</Text>
+            <div style={{ fontWeight: 'bold' }}>{record.user?.name || 'Unknown User'}</div>
+            <Text type="secondary" style={{ fontSize: '12px' }}>{record.user?.email || 'No email'}</Text>
           </div>
         </Space>
       ),
@@ -260,11 +260,11 @@ const ValidationsManagement: React.FC = () => {
 
   const filteredValidations = validations.filter(validation => {
     const matchesSearch = validation.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         validation.user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         validation.user.email.toLowerCase().includes(searchTerm.toLowerCase());
+                         (validation.user?.name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         (validation.user?.email || '').toLowerCase().includes(searchTerm.toLowerCase());
     
     const matchesStatus = filterStatus === 'all' || validation.status === filterStatus;
-    const matchesUser = filterUser === 'all' || validation.user.id.toString() === filterUser;
+    const matchesUser = filterUser === 'all' || validation.user?.id?.toString() === filterUser;
     
     let matchesDate = true;
     if (dateRange) {

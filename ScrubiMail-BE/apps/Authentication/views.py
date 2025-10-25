@@ -286,12 +286,35 @@ class LoginAPIView(APIView):
             user.save(update_fields=["last_login"])
 
             # Create refresh token for the user
-            refresh = RefreshToken.for_user(user)
-            access_token = str(refresh.access_token)
-            refresh_token = str(refresh)
+            try:
+                refresh = RefreshToken.for_user(user)
+                access_token = str(refresh.access_token)
+                refresh_token = str(refresh)
+
+                # Debug token generation
+                print(f"LoginAPI Generated access_token: {access_token[:20]}...")
+                print(f"LoginAPI Generated refresh_token: {refresh_token[:20]}...")
+
+            except Exception as e:
+                logger.error(f"LoginAPI Token generation failed: {str(e)}")
+                return Response(
+                    {"detail": "Token generation failed"},
+                    status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                )
+
+            # Serialize user data
+            try:
+                user_data = MinimalUserSerializer(user).data
+                print(f"LoginAPI User data: {user_data}")
+            except Exception as e:
+                logger.error(f"LoginAPI User serialization failed: {str(e)}")
+                return Response(
+                    {"detail": "User serialization failed"},
+                    status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                )
 
             # Create response with minimal user data to keep cookie size small
-            response = Response({"user": MinimalUserSerializer(user).data})
+            response = Response({"user": user_data})
 
             # Add tokens to response headers
             response["Authorization"] = f"Bearer {access_token}"
@@ -299,6 +322,11 @@ class LoginAPIView(APIView):
 
             # Set Access-Control-Expose-Headers to make headers available to JavaScript
             response["Access-Control-Expose-Headers"] = "Authorization, X-Refresh-Token"
+
+            # Debug response headers
+            print("LoginAPI Response headers before return:")
+            for key, value in response.headers.items():
+                print(f"  {key}: {value}")
 
             return response
 
@@ -984,14 +1012,35 @@ class LoginWithTOTPView(APIView):
             user.save(update_fields=["last_login"])
 
             # Add tokens to response headers
-            refresh = RefreshToken.for_user(user)
-            access_token = str(refresh.access_token)
-            refresh_token = str(refresh)
+            try:
+                refresh = RefreshToken.for_user(user)
+                access_token = str(refresh.access_token)
+                refresh_token = str(refresh)
+
+                # Debug token generation
+                print(f"Generated access_token: {access_token[:20]}...")
+                print(f"Generated refresh_token: {refresh_token[:20]}...")
+
+            except Exception as e:
+                logger.error(f"Token generation failed: {str(e)}")
+                return Response(
+                    {"detail": "Token generation failed"},
+                    status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                )
+
+            # Serialize user data
+            try:
+                user_data = MinimalUserSerializer(user).data
+                print(f"User data: {user_data}")
+            except Exception as e:
+                logger.error(f"User serialization failed: {str(e)}")
+                return Response(
+                    {"detail": "User serialization failed"},
+                    status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                )
 
             # Create response with minimal user data to keep cookie size small
-            response = Response(
-                {"user": MinimalUserSerializer(user).data, "requires_2fa": False}
-            )
+            response = Response({"user": user_data, "requires_2fa": False})
 
             # Add tokens to response headers
             response["Authorization"] = f"Bearer {access_token}"
@@ -999,6 +1048,11 @@ class LoginWithTOTPView(APIView):
 
             # Set Access-Control-Expose-Headers to make headers available to JavaScript
             response["Access-Control-Expose-Headers"] = "Authorization, X-Refresh-Token"
+
+            # Debug response headers
+            print("Response headers before return:")
+            for key, value in response.headers.items():
+                print(f"  {key}: {value}")
 
             return response
 
@@ -1046,14 +1100,35 @@ class LoginWithTOTPView(APIView):
             user.last_login = timezone.now()
             user.save(update_fields=["last_login"])
 
-            refresh = RefreshToken.for_user(user)
-            access_token = str(refresh.access_token)
-            refresh_token = str(refresh)
+            try:
+                refresh = RefreshToken.for_user(user)
+                access_token = str(refresh.access_token)
+                refresh_token = str(refresh)
+
+                # Debug token generation
+                print(f"2FA Generated access_token: {access_token[:20]}...")
+                print(f"2FA Generated refresh_token: {refresh_token[:20]}...")
+
+            except Exception as e:
+                logger.error(f"2FA Token generation failed: {str(e)}")
+                return Response(
+                    {"detail": "Token generation failed"},
+                    status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                )
+
+            # Serialize user data
+            try:
+                user_data = MinimalUserSerializer(user).data
+                print(f"2FA User data: {user_data}")
+            except Exception as e:
+                logger.error(f"2FA User serialization failed: {str(e)}")
+                return Response(
+                    {"detail": "User serialization failed"},
+                    status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                )
 
             # Create response with minimal user data to keep cookie size small
-            response = Response(
-                {"user": MinimalUserSerializer(user).data, "requires_2fa": False}
-            )
+            response = Response({"user": user_data, "requires_2fa": False})
 
             # Add tokens to response headers
             response["Authorization"] = f"Bearer {access_token}"
@@ -1061,6 +1136,11 @@ class LoginWithTOTPView(APIView):
 
             # Set Access-Control-Expose-Headers to make headers available to JavaScript
             response["Access-Control-Expose-Headers"] = "Authorization, X-Refresh-Token"
+
+            # Debug response headers
+            print("2FA Response headers before return:")
+            for key, value in response.headers.items():
+                print(f"  {key}: {value}")
 
             return response
 

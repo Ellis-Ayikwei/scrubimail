@@ -137,8 +137,6 @@ else:
     }
 
 
-import os
-
 AUTH_PASSWORD_VALIDATORS = [
     {
         "NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator",
@@ -264,6 +262,12 @@ CORS_ALLOW_HEADERS = [
     "x-requested-with",
     "x-refresh-token",
     "x-api-key",
+]
+
+# Expose custom headers to the frontend
+CORS_EXPOSE_HEADERS = [
+    "Authorization",
+    "X-Refresh-Token",
 ]
 
 # settings.py

@@ -152,29 +152,17 @@ const MultiStepLogin: React.FC = () => {
     setError(null);
 
     try {
-      const response = await fetch(`${import.meta.env.VITE_API_URL}auth/login-with-totp/`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        credentials: 'include',
-        body: JSON.stringify({
-          email,
-          password,
-          device_id: deviceInfo?.device_id,
-          device_name: deviceInfo?.device_name,
-          fingerprint: deviceInfo?.fingerprint,
-          device_info: deviceInfo?.device_info,
-          trust_device: rememberMe,
-          remember_device: rememberMe,
-          remember_me: rememberMe,
-        }),
-      });
+      const response = await totpService.loginWithTOTP(
+        email, 
+        password, 
+        totpToken,
+        useBackupCode ? backupCode : undefined, 
+        rememberMe); 
 
-      const data = await response.json();
 
-      if (response.ok) {
-        if (data.requires_2fa) {
+      if (response.status === 200 || response.status === 201) {
+        console.log("the response....", response);
+        if (response.data?.requires_2fa) {
           setRequires2FA(true);
           setCurrentStep('totp');
         } else {
@@ -182,7 +170,7 @@ const MultiStepLogin: React.FC = () => {
           handleSuccessfulLogin(response);
         }
       } else {
-        setError(data.detail || 'Login failed. Please check your credentials.');
+        setError(response.data?.detail || 'Login failed. Please check your credentials.');
       }
     } catch (err: any) {
       setError('Network error. Please try again.');
@@ -207,8 +195,8 @@ const MultiStepLogin: React.FC = () => {
 
       
 
-      console.log("the response", response);
-      if (response.status === 200 || response.status === 201) {
+        if (response.status === 200 || response.status === 201) {
+        console.log("the response ...", response);
         handleSuccessfulLogin(response);
       } else {
         setError(response.data?.detail || 'Invalid 2FA code. Please try again.');
@@ -223,12 +211,14 @@ const MultiStepLogin: React.FC = () => {
   const handleSuccessfulLogin = (response: any) => {
 
     console.log("handle successful login");
+    console.log("the response", response);
     // Extract tokens from response headers
     const accessToken = response?.headers?.get('authorization');
     const refreshToken = response?.headers?.get('x-refresh-token');
     const userData = response?.data?.user;
     
     if (!accessToken || !refreshToken || !userData) {
+        console.error('Invalid response from server');
         throw new Error('Invalid response from server');
     }
 
