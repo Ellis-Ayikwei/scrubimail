@@ -30,7 +30,7 @@ const ForgotPassword = lazy(() => import('../pages/auth/ForgotPassword'));
 const ResetPassword = lazy(() => import('../pages/auth/ResetPassword'));
 const OAuthCallback = lazy(() => import('../pages/auth/OAuthCallback'));
 const SSO = lazy(() => import('../pages/auth/SSO'));
-const LoginWithTOTP = lazy(() => import('../pages/auth/LoginWithTOTP'));
+
 const MultiStepLogin = lazy(() => import('../pages/auth/MultiStepLogin'));
 const TOTPSetup = lazy(() => import('../pages/Security/TOTPSetup'));
 const PrivacyPolicy = lazy(() => import('../pages/legal/PrivacyPolicy'));
@@ -125,15 +125,7 @@ const routes = [
         element: <SSO />,
         layout: 'blank',
     },
-    {
-        path: '/login-with-totp',
-        element: (
-            <AuthRedirect>
-                <LoginWithTOTP />
-            </AuthRedirect>
-        ),
-        layout: 'blank',
-    },
+    
     {
         path: '/multi-login',
         element: (
