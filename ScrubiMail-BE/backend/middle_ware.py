@@ -30,19 +30,22 @@ class APIKeyAuthentication(BaseAuthentication):
     """
 
     def authenticate(self, request):
-        # Only check for X-API-Key header
-        api_key = request.headers.get("X-API-Key")
-
-        # If no X-API-Key, return None (let JWT authentication handle it)
+        # Try X-API-Key first, fall back to Authorization header
+        api_key = request.headers.get("X-API-Key") or request.headers.get("Authorization")
+        
+        # If neither exists, let JWT authentication handle it
         if not api_key:
             return None
-
+        
+        # Strip "Bearer " prefix if present in Authorization header
+        if api_key.startswith("Bearer "):
+            api_key = api_key[7:]
+        
         # Validate the API key
         try:
             key_obj = APIKey.objects.get(key=api_key, is_active=True)
             return (key_obj.user, None)
         except APIKey.DoesNotExist:
-            # If API key is invalid, raise authentication failed
             raise exceptions.AuthenticationFailed("Invalid or inactive API key")
 
 
