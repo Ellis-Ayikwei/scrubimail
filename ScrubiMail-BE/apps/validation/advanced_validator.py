@@ -490,9 +490,15 @@ class AdvancedEmailValidator:
 
         # DNS/MX validation
         dns_result = validation_results.get("dns", {})
+        mx_records = dns_result.get("mx_records", [])
+        
         if not dns_result.get("valid", False):
-            score -= 30
-            deductions.append("No valid DNS/MX records")
+            score -= 50
+            deductions.append("No valid DNS records")
+            explanations.append("Domain does not exist")
+        elif len(mx_records) == 0:
+            score -= 40
+            deductions.append("No MX records")
             explanations.append("Domain has no mail exchange records")
         else:
             dns_score = dns_result.get("score", 0)
@@ -504,7 +510,8 @@ class AdvancedEmailValidator:
         # SMTP validation
         smtp_result = validation_results.get("smtp", {})
         if not smtp_result.get("valid", False):
-            score -= 25
+            # Higher penalty - if SMTP explicitly fails, it's a strong signal
+            score -= 35
             deductions.append("SMTP validation failed")
             explanations.append("Email address does not exist on mail server")
 
@@ -590,14 +597,24 @@ class AdvancedEmailValidator:
 
             # Step 3: SMTP handshake
             smtp_result = {}
-            if dns_result.get("valid", False):
+            mx_records = dns_result.get("mx_records", [])
+            a_records = dns_result.get("a_records", [])
+            
+            if mx_records:
+                # Use MX records (preferred)
+                smtp_result = self.smtp_handshake(email, domain, mx_records)
+            elif a_records:
+                # Fallback to A record as MX (RFC 5321)
                 smtp_result = self.smtp_handshake(
-                    email, domain, dns_result.get("mx_records", [])
+                    email, 
+                    domain, 
+                    [{"host": domain, "preference": 0, "score": 30}]
                 )
             else:
+                # No DNS records at all
                 smtp_result = {
                     "valid": False,
-                    "error": "DNS validation failed",
+                    "error": "No DNS or MX records available",
                     "catch_all": False,
                     "greylisting": False,
                 }
