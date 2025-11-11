@@ -30,17 +30,19 @@ class APIKeyAuthentication(BaseAuthentication):
     """
 
     def authenticate(self, request):
-        # Try X-API-Key first, fall back to Authorization header
-        api_key = request.headers.get("X-API-Key") or request.headers.get("Authorization")
-        
-        # If neither exists, let JWT authentication handle it
+        # Prefer explicit X-API-Key header
+        api_key = request.headers.get("X-API-Key")
+        auth_header = request.headers.get("Authorization")
+
+        # If no X-API-Key, accept Authorization only when it uses an ApiKey prefix.
+        # Explicitly ignore Bearer so JWT auth can run.
         if not api_key:
-            return None
-        
-        # Strip "Bearer " prefix if present in Authorization header
-        if api_key.startswith("Bearer "):
-            api_key = api_key[7:]
-        
+            if auth_header and auth_header.startswith("ApiKey "):
+                api_key = auth_header[len("ApiKey "):]
+            else:
+                # Let other authenticators (e.g. JWT Bearer) handle the request
+                return None
+
         # Validate the API key
         try:
             key_obj = APIKey.objects.get(key=api_key, is_active=True)
