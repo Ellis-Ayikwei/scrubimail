@@ -34,3 +34,4 @@ urlpatterns = [
     ),
     path("validations/stats/", admin_validations_stats, name="admin-validations-stats"),
 ]
+
