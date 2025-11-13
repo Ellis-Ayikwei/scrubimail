@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <style>
+        body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+        .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+        .header { background: #DC2626; color: white; padding: 20px; text-align: center; border-radius: 8px 8px 0 0; }
+        .content { background: #f9fafb; padding: 30px; border: 1px solid #e5e7eb; }
+        .alert-box { background: #FEE2E2; border-left: 4px solid #DC2626; padding: 15px; margin: 20px 0; }
+        .stats { background: white; padding: 15px; border-radius: 6px; margin: 20px 0; }
+        .button { display: inline-block; background: #DC2626; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; margin: 15px 0; }
+        .footer { text-align: center; color: #6b7280; font-size: 12px; margin-top: 20px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>⚠️ 90% of Credits Used - Urgent!</h1>
+        </div>
+        <div class="content">
+            <p>Hi {{ user_name }},</p>
+            
+            <div class="alert-box">
+                <strong>🚨 CRITICAL: You've used 90% of your {{ plan_name }} plan credits!</strong>
+            </div>
+            
+            <div class="stats">
+                <p><strong>Current Usage:</strong></p>
+                <ul>
+                    <li>Credits Used: {{ credits_used }}</li>
+                    <li>Credits Remaining: <strong style="color: #DC2626;">{{ credits_remaining }}</strong></li>
+                    <li>Usage: {{ usage_percentage }}%</li>
+                </ul>
+            </div>
+            
+            <p><strong>Action Required:</strong> You're nearly out of credits! Add more credits now to ensure uninterrupted service.</p>
+            
+            {% if upgrade_suggestion %}
+            <p>💡 <strong>Best Value:</strong> Upgrade to the <strong>{{ upgrade_suggestion.plan_name }}</strong> plan for {{ upgrade_suggestion.price }}/month and get {{ upgrade_suggestion.credits }} credits immediately. This saves you {{ upgrade_suggestion.savings }} compared to one-time purchases!</p>
+            {% endif %}
+            
+            <center>
+                <a href="{{ frontend_url }}/billing" class="button">Add Credits Immediately</a>
+            </center>
+            
+            <div class="footer">
+                <p>ScrubiMail - Professional Email Validation Service</p>
+                <p>Need urgent help? Contact us at support@scrubimail.com</p>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
