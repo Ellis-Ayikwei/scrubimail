@@ -32,6 +32,7 @@ urlpatterns = [
                 *static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT),
                 path("", include("apps.validation.urls")),
                 path("", include("apps.billing.urls")),
+                path("plans/", include("apps.plan.urls")),
                 path("", include("apps.apikey.urls")),
                 path("auth/", include("apps.Authentication.urls")),
             ]

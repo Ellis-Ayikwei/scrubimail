@@ -27,10 +27,12 @@ from rest_framework.permissions import IsAuthenticatedOrReadOnly
 from rest_framework.permissions import BasePermission
 from apps.billing.services import BillingService
 from apps.billing.models import CreditTransaction, EmailValidationUsage
+from backend.throttling import PlanBasedRateThrottle, BulkValidationThrottle, PlanFeatureThrottle
 
 
 class SingleEmailValidationView(APIView):
     permission_classes = [AllowJWTOrAPIKey]
+    throttle_classes = [PlanBasedRateThrottle, PlanFeatureThrottle]
 
     def post(self, request):
         """Single email validation with real-time option"""
@@ -177,9 +179,22 @@ class SingleEmailValidationView(APIView):
 
 class BulkEmailValidationView(APIView):
     permission_classes = [AllowJWTOrAPIKey]
+    throttle_classes = [BulkValidationThrottle, PlanFeatureThrottle]
 
     def post(self, request):
         """Bulk email validation with job tracking"""
+        # Check if bulk limit was exceeded by throttle
+        if hasattr(request, 'bulk_limit_exceeded') and request.bulk_limit_exceeded:
+            return Response(
+                {
+                    "error": f"Bulk validation limit exceeded. Your plan allows {request.bulk_limit} emails per request, but you requested {request.bulk_requested}. Please upgrade your plan or reduce the number of emails.",
+                    "limit": request.bulk_limit,
+                    "requested": request.bulk_requested,
+                    "upgrade_url": "/plans/",
+                },
+                status=status.HTTP_429_TOO_MANY_REQUESTS,
+            )
+        
         serializer = BulkEmailValidationSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 

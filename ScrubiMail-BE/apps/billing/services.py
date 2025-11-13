@@ -15,6 +15,14 @@ class PaystackService:
         self.secret_key = settings.PAYSTACK_SECRET_KEY
         self.public_key = settings.PAYSTACK_PUBLIC_KEY
         self.base_url = "https://api.paystack.co"
+        
+        # Validate credentials
+        if not self.secret_key or not self.public_key:
+            raise ValueError(
+                "Paystack credentials not configured. Please set PAYSTACK_SECRET_KEY "
+                "and PAYSTACK_PUBLIC_KEY in your environment variables."
+            )
+        
         self.headers = {
             "Authorization": f"Bearer {self.secret_key}",
             "Content-Type": "application/json",
@@ -245,6 +253,9 @@ class BillingService:
             self._handle_payment_failed(data)
         elif event_type == "invoice.payment_successful":
             self._handle_payment_successful(data)
+        elif event_type == "charge.success":
+            # Handle one-time payments (credit packages, etc.)
+            self._handle_charge_success(data)
 
     def _handle_subscription_created(self, data):
         """Handle subscription created event"""
@@ -326,6 +337,45 @@ class BillingService:
 
         except Exception as e:
             print(f"Error handling payment successful: {e}")
+    
+    def _handle_charge_success(self, data):
+        """Handle successful one-time charge (credit packages, etc.)"""
+        from .models import CreditPackagePurchase
+        
+        reference = data.get("reference")
+        metadata = data.get("metadata", {})
+        
+        try:
+            # Check if this is a credit package purchase
+            if metadata.get("type") == "credit_package":
+                purchase_id = metadata.get("purchase_id")
+                
+                if purchase_id:
+                    purchase = CreditPackagePurchase.objects.get(id=purchase_id)
+                    
+                    if purchase.status == "pending":
+                        # Complete the purchase
+                        purchase.complete_purchase()
+                        
+                        print(f"Credit package purchase {purchase_id} completed successfully")
+            
+            # Handle other one-time payment types here
+            elif metadata.get("type") == "credit_purchase":
+                # Handle direct credit purchases (existing logic)
+                customer_code = data["customer"]["customer_code"]
+                profile = BillingProfile.objects.get(paystack_customer_id=customer_code)
+                
+                amount = data["amount"] / 100  # Convert from kobo to naira
+                credits = int(amount)  # 1 naira = 1 credit
+                
+                profile.add_credits(
+                    credits,
+                    f"Credit purchase via Paystack (Ref: {reference})"
+                )
+                
+        except Exception as e:
+            print(f"Error handling charge success: {e}")
+
 
     def get_usage_analytics(self, user):
         """Get usage analytics for user"""

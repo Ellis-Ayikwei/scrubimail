@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <style>
+        body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+        .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+        .header { background: #F59E0B; color: white; padding: 20px; text-align: center; border-radius: 8px 8px 0 0; }
+        .content { background: #f9fafb; padding: 30px; border: 1px solid #e5e7eb; }
+        .alert-box { background: #FEF3C7; border-left: 4px solid #F59E0B; padding: 15px; margin: 20px 0; }
+        .stats { background: white; padding: 15px; border-radius: 6px; margin: 20px 0; }
+        .button { display: inline-block; background: #F59E0B; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; margin: 15px 0; }
+        .footer { text-align: center; color: #6b7280; font-size: 12px; margin-top: 20px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>⚠️ Low Credits Warning</h1>
+        </div>
+        <div class="content">
+            <p>Hi {{ user_name }},</p>
+            
+            <div class="alert-box">
+                <strong>Your credit balance is running low!</strong>
+            </div>
+            
+            <div class="stats">
+                <p><strong>Account Status:</strong></p>
+                <ul>
+                    <li>Current Plan: {{ plan_name }}</li>
+                    <li>Credits Remaining: <strong>{{ credits_remaining }}</strong></li>
+                    <li>Threshold: {{ threshold }} credits</li>
+                </ul>
+            </div>
+            
+            <p>To avoid service interruption, we recommend adding more credits to your account.</p>
+            
+            <p><strong>Quick Options:</strong></p>
+            <ul>
+                <li>Purchase a one-time credit package</li>
+                <li>Upgrade to a higher plan with more monthly credits</li>
+                <li>Enable auto-renewal for uninterrupted service</li>
+            </ul>
+            
+            <center>
+                <a href="{{ frontend_url }}/billing" class="button">Add Credits</a>
+            </center>
+            
+            <div class="footer">
+                <p>ScrubiMail - Professional Email Validation Service</p>
+                <p>Questions? Contact us at support@scrubimail.com</p>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
