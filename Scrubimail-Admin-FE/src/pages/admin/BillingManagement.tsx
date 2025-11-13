@@ -454,7 +454,7 @@ const BillingManagement: React.FC = () => {
 
               <Table
                 columns={billingColumns}
-                dataSource={filteredBillingRecords}
+                dataSource={Array.isArray(filteredBillingRecords) ? filteredBillingRecords : []}
                 loading={loading}
                 pagination={{
                   pageSize: 10,
@@ -474,7 +474,7 @@ const BillingManagement: React.FC = () => {
             <Card>
               <Table
                 columns={planColumns}
-                dataSource={plans}
+                dataSource={Array.isArray(plans) ? plans : []}
                 loading={loading}
                 pagination={{
                   pageSize: 10,

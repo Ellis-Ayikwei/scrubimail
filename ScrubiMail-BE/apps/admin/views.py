@@ -15,6 +15,8 @@ from apps.billing.serializers import (
 )
 from apps.validation.serializers import EmailValidationSerializer
 from apps.plan.serializers import PlanSerializer
+from apps.apikey.models import APIKey
+from apps.apikey.serializers import APIKeySerializer, APIKeyCreateSerializer, APIKeyUpdateSerializer
 
 User = get_user_model()
 
@@ -166,3 +168,81 @@ class AdminValidationsListView(generics.ListAPIView):
 
     def get_queryset(self):
         return EmailValidation.objects.all().order_by("-created_at")
+
+
+class AdminAPIKeyListView(generics.ListCreateAPIView):
+    """List and create API keys for admin"""
+
+    serializer_class = APIKeySerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_serializer_class(self):
+        if self.request.method == "POST":
+            return APIKeyCreateSerializer
+        return APIKeySerializer
+
+    def get_queryset(self):
+        return APIKey.objects.all().select_related('user').order_by("-created_at")
+
+    def perform_create(self, serializer):
+        """Create API key for specified user"""
+        user_id = self.request.data.get('user_id')
+        if not user_id:
+            from rest_framework.exceptions import ValidationError
+            raise ValidationError({'user_id': 'This field is required.'})
+        
+        try:
+            user = User.objects.get(id=user_id)
+        except User.DoesNotExist:
+            from rest_framework.exceptions import ValidationError
+            raise ValidationError({'user_id': 'User not found.'})
+        
+        # Get client IP and user agent
+        ip_address = self.get_client_ip()
+        user_agent = self.request.META.get("HTTP_USER_AGENT", "")
+
+        # Generate new API key
+        api_key = APIKey.generate_for_user(
+            user=user,
+            name=serializer.validated_data.get("name"),
+            description=serializer.validated_data.get("description"),
+            expires_at=serializer.validated_data.get("expires_at"),
+            rate_limit_per_hour=serializer.validated_data.get("rate_limit_per_hour", 1000),
+            ip_address=ip_address,
+            user_agent=user_agent,
+        )
+
+        # Return the created API key
+        self.object = api_key
+
+    def get_client_ip(self):
+        """Get client IP address from request"""
+        x_forwarded_for = self.request.META.get("HTTP_X_FORWARDED_FOR")
+        if x_forwarded_for:
+            ip = x_forwarded_for.split(",")[0]
+        else:
+            ip = self.request.META.get("REMOTE_ADDR")
+        return ip
+
+
+class AdminAPIKeyDetailView(generics.RetrieveUpdateDestroyAPIView):
+    """Get, update, or delete a specific API key for admin"""
+
+    serializer_class = APIKeySerializer
+    permission_classes = [permissions.IsAuthenticated]
+    lookup_field = "pk"
+
+    def get_serializer_class(self):
+        if self.request.method in ["PUT", "PATCH"]:
+            return APIKeyUpdateSerializer
+        return APIKeySerializer
+
+    def get_queryset(self):
+        return APIKey.objects.all().select_related('user')
+
+    def perform_update(self, serializer):
+        serializer.save()
+
+    def perform_destroy(self, instance):
+        # Soft delete by deactivating
+        instance.deactivate()

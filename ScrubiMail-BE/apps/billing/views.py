@@ -610,7 +610,7 @@ class ListCreditPackagesView(APIView):
         """Get all active credit packages"""
         packages = CreditPackage.objects.filter(
             is_active=True
-        ).order_by('display_order', 'price')
+        ).order_by('sort_order', 'price')
         
         # Filter by featured if requested
         if request.query_params.get('featured') == 'true':
@@ -1254,7 +1254,7 @@ class RedeemPromoCodeView(APIView):
         if bonus_credits > 0:
             billing_profile.add_credits(
                 amount=bonus_credits,
-                description=f\"Bonus credits from promo code: {code}\",
+                description=f"Bonus credits from promo code: {code}",
                 expiry_days=90  # Bonus credits expire in 90 days
             )
         
@@ -1272,14 +1272,14 @@ class RedeemPromoCodeView(APIView):
 
 
 class ListPromoCodesView(APIView):
-    """List available promo codes (admin only)"""
+    """List and create promo codes (admin only)"""
     
     permission_classes = [AllowJWTOrAPIKey]
     
     def get(self, request):
         """Get all promo codes"""
         # Check if user is admin
-        if not request.user.is_staff:
+        if not (request.user.is_authenticated and (request.user.is_staff or getattr(request.user, 'user_type', None) == 'admin')):
             return Response({
                 'success': False,
                 'message': 'Admin access required',
@@ -1298,6 +1298,122 @@ class ListPromoCodesView(APIView):
             'promo_codes': serializer.data,
             'count': promo_codes.count(),
         })
+    
+    def post(self, request):
+        """Create a new promo code"""
+        # Check if user is admin
+        if not (request.user.is_authenticated and (request.user.is_staff or getattr(request.user, 'user_type', None) == 'admin')):
+            return Response({
+                'success': False,
+                'message': 'Admin access required',
+            }, status=status.HTTP_403_FORBIDDEN)
+        
+        # Normalize request data
+        data = dict(request.data)
+        # Map frontend field names to backend field names
+        if 'min_purchase_amount' in data:
+            data['minimum_purchase_amount'] = data.pop('min_purchase_amount')
+        if 'applicable_plans' in data:
+            data['valid_for_plans'] = data.pop('applicable_plans')
+        if 'applicable_packages' in data:
+            data['valid_for_packages'] = data.pop('applicable_packages')
+        # Map discount_type
+        if data.get('discount_type') == 'fixed_amount':
+            data['discount_type'] = 'fixed'
+        
+        serializer = PromoCodeSerializer(data=data)
+        if serializer.is_valid():
+            promo_code = serializer.save()
+            return Response({
+                'success': True,
+                'promo_code': PromoCodeSerializer(promo_code).data,
+                'message': 'Promo code created successfully',
+            }, status=status.HTTP_201_CREATED)
+        
+        return Response({
+            'success': False,
+            'errors': serializer.errors,
+        }, status=status.HTTP_400_BAD_REQUEST)
+
+
+class PromoCodeDetailView(APIView):
+    """Get, update, or delete a specific promo code (admin only)"""
+    
+    permission_classes = [AllowJWTOrAPIKey]
+    
+    def get(self, request, pk):
+        """Get a specific promo code"""
+        # Check if user is admin
+        if not (request.user.is_authenticated and (request.user.is_staff or getattr(request.user, 'user_type', None) == 'admin')):
+            return Response({
+                'success': False,
+                'message': 'Admin access required',
+            }, status=status.HTTP_403_FORBIDDEN)
+        
+        promo_code = get_object_or_404(PromoCode, pk=pk)
+        serializer = PromoCodeSerializer(promo_code)
+        
+        return Response({
+            'success': True,
+            'promo_code': serializer.data,
+        })
+    
+    def put(self, request, pk):
+        """Update a promo code"""
+        # Check if user is admin
+        if not (request.user.is_authenticated and (request.user.is_staff or getattr(request.user, 'user_type', None) == 'admin')):
+            return Response({
+                'success': False,
+                'message': 'Admin access required',
+            }, status=status.HTTP_403_FORBIDDEN)
+        
+        promo_code = get_object_or_404(PromoCode, pk=pk)
+        # Normalize request data
+        data = dict(request.data)
+        # Map frontend field names to backend field names
+        if 'min_purchase_amount' in data:
+            data['minimum_purchase_amount'] = data.pop('min_purchase_amount')
+        if 'applicable_plans' in data:
+            data['valid_for_plans'] = data.pop('applicable_plans')
+        if 'applicable_packages' in data:
+            data['valid_for_packages'] = data.pop('applicable_packages')
+        # Map discount_type
+        if data.get('discount_type') == 'fixed_amount':
+            data['discount_type'] = 'fixed'
+        
+        serializer = PromoCodeSerializer(promo_code, data=data, partial=True)
+        
+        if serializer.is_valid():
+            promo_code = serializer.save()
+            return Response({
+                'success': True,
+                'promo_code': PromoCodeSerializer(promo_code).data,
+                'message': 'Promo code updated successfully',
+            })
+        
+        return Response({
+            'success': False,
+            'errors': serializer.errors,
+        }, status=status.HTTP_400_BAD_REQUEST)
+    
+    def delete(self, request, pk):
+        """Delete (deactivate) a promo code"""
+        # Check if user is admin
+        if not (request.user.is_authenticated and (request.user.is_staff or getattr(request.user, 'user_type', None) == 'admin')):
+            return Response({
+                'success': False,
+                'message': 'Admin access required',
+            }, status=status.HTTP_403_FORBIDDEN)
+        
+        promo_code = get_object_or_404(PromoCode, pk=pk)
+        # Soft delete by deactivating
+        promo_code.is_active = False
+        promo_code.save()
+        
+        return Response({
+            'success': True,
+            'message': 'Promo code deactivated successfully',
+        }, status=status.HTTP_200_OK)
 
 
 class PromoCodeRedemptionHistoryView(APIView):
@@ -1460,7 +1576,7 @@ class GenerateInvoiceView(APIView):
                 # Create line item
                 InvoiceLineItem.objects.create(
                     invoice=invoice,
-                    description=f\"{purchase.package.name} - {purchase.credits_purchased} credits\",
+                    description=f"{purchase.package.name} - {purchase.credits_purchased} credits",
                     quantity=1,
                     unit_price=purchase.amount_paid,
                     credit_package=purchase.package,
@@ -1501,7 +1617,7 @@ class DownloadInvoicePDFView(APIView):
     permission_classes = [AllowJWTOrAPIKey]
     
     def get(self, request, invoice_id):
-        \"\"\"Download PDF invoice\"\"\"
+        """Download PDF invoice"""
         from django.http import HttpResponse
         from .invoice_generator import InvoiceGenerator
         

@@ -29,6 +29,12 @@ const ValidationsManagement = lazy(() => import('../pages/admin/ValidationsManag
 const PlansManagement = lazy(() => import('../pages/admin/PlansManagement'));
 const UserDetail = lazy(() => import('../pages/admin/UserDetail'));
 
+// New Billing Management pages
+const CreditPackagesManagement = lazy(() => import('../pages/admin/CreditPackagesManagement'));
+const PromoCodesManagement = lazy(() => import('../pages/admin/PromoCodesManagement'));
+const InvoicesManagement = lazy(() => import('../pages/admin/InvoicesManagement'));
+const UsageAlertsDashboard = lazy(() => import('../pages/admin/UsageAlertsDashboard'));
+
 // Auth pages
 const Login = lazy(() => import('../pages/auth/Login'));
 
@@ -148,7 +154,7 @@ const routes = [
         path: '/admin/invoices',
         element: (
             <ProtectedRoute>
-                <AdminInvoices />
+                <InvoicesManagement />
             </ProtectedRoute>
         ),
         layout: 'admin',
@@ -272,6 +278,42 @@ const routes = [
         ),
         layout: 'admin',
     },
+    {
+        path: '/admin/billing/credit-packages',
+        element: (
+            <ProtectedRoute>
+                <CreditPackagesManagement />
+            </ProtectedRoute>
+        ),
+        layout: 'admin',
+    },
+    {
+        path: '/admin/billing/promo-codes',
+        element: (
+            <ProtectedRoute>
+                <PromoCodesManagement />
+            </ProtectedRoute>
+        ),
+        layout: 'admin',
+    },
+    {
+        path: '/admin/billing/invoices',
+        element: (
+            <ProtectedRoute>
+                <InvoicesManagement />
+            </ProtectedRoute>
+        ),
+        layout: 'admin',
+    },
+    {
+        path: '/admin/billing/usage-alerts',
+        element: (
+            <ProtectedRoute>
+                <UsageAlertsDashboard />
+            </ProtectedRoute>
+        ),
+        layout: 'admin',
+    },
 
     // Error pages
     {
@@ -283,7 +325,7 @@ const routes = [
         path: '*',
         element: <NotFound />,
         layout: 'blank',
-    },
+    }
 ];
 
 export { routes };

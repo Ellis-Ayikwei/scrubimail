@@ -1,30 +1,21 @@
 import React, { useState } from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { Link } from 'react-router-dom';
+import { useDispatch } from 'react-redux';
 import { 
-  BarChart3, 
   CheckCircle, 
-  History, 
   Menu, 
   X,
-  Sun,
-  Moon,
   FileText
 } from 'lucide-react';
 import useIsAuthenticated from 'react-auth-kit/hooks/useIsAuthenticated';
+import { toggleSidebar } from '../store/themeConfigSlice';
 import UserMenu from './UserMenu';
 import DarkModeToggle from './DarkModeToggle';
 
 const TopBar: React.FC = () => {
-  const location = useLocation();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const isAuthenticated = useIsAuthenticated();
-
-  const navLinks = [
-    { to: '/dashboard', label: 'Dashboard', icon: BarChart3 },
-    { to: '/validate', label: 'Validate', icon: CheckCircle },
-    { to: '/history', label: 'History', icon: History },
-    { to: '/api-docs', label: 'API Docs', icon: FileText },
-  ];
+  const dispatch = useDispatch();
 
   // If not authenticated, show minimal header with just logo and auth buttons
   if (!isAuthenticated) {
@@ -157,22 +148,21 @@ const TopBar: React.FC = () => {
     <header className="sticky top-0 z-50 bg-white/80 dark:bg-gray-900/80 backdrop-blur-md border-b border-gray-200 dark:border-gray-700">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-16">
-          {/* Left side - Mobile menu button + Logo */}
+          {/* Left side - Sidebar toggle button + Logo */}
           <div className="flex items-center space-x-3">
-            {/* Mobile menu button - only show on small screens when authenticated */}
-            <button
-              onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-              className="lg:hidden p-2 rounded-md text-[#333333] dark:text-gray-300 hover:bg-[#F4F5F7] dark:hover:bg-gray-800"
-            >
-              {isMobileMenuOpen ? (
-                <X className="w-6 h-6" />
-              ) : (
+            {/* Sidebar toggle button - show when authenticated */}
+            {isAuthenticated && (
+              <button
+                onClick={() => dispatch(toggleSidebar())}
+                className="p-2 rounded-md text-[#333333] dark:text-gray-300 hover:bg-[#F4F5F7] dark:hover:bg-gray-800"
+                aria-label="Toggle sidebar"
+              >
                 <Menu className="w-6 h-6" />
-              )}
-            </button>
+              </button>
+            )}
 
             {/* Logo and Brand */}
-            <Link to="/dashboard" className="flex items-center space-x-2">
+            <Link to={isAuthenticated ? "/dashboard" : "/"} className="flex items-center space-x-2">
               <img src='assets/images/scrubiLogo.png' alt="Logo" />
               <span className="text-xl font-bold bg-gradient-to-r from-[#2ED8A3] to-[#004E8A] bg-clip-text text-transparent">
                 Scrubimail
@@ -180,26 +170,7 @@ const TopBar: React.FC = () => {
             </Link>
           </div>
 
-          {/* Desktop Navigation */}
-          <nav className="hidden lg:flex items-center space-x-1">
-            {navLinks.map((link) => {
-              const IconComponent = link.icon;
-              return (
-                <Link
-                  key={link.to}
-                  to={link.to}
-                  className={`px-3 py-2 rounded-md text-sm font-medium transition-all duration-200 flex items-center space-x-1 ${
-                    location.pathname === link.to
-                      ? 'bg-[#2ED8A3]/10 text-[#004E8A] dark:text-[#2ED8A3]'
-                      : 'text-[#333333] dark:text-gray-300 hover:bg-[#F4F5F7] dark:hover:bg-gray-800 hover:text-[#004E8A] dark:hover:text-white'
-                  }`}
-                >
-                  <IconComponent className="w-4 h-4" />
-                  <span>{link.label}</span>
-                </Link>
-              );
-            })}
-          </nav>
+          {/* Desktop Navigation - removed, now in sidebar */}
 
           {/* Right side actions */}
           <div className="flex items-center space-x-4">
@@ -219,38 +190,7 @@ const TopBar: React.FC = () => {
           </div>
         </div>
 
-        {/* Mobile Navigation */}
-        {isMobileMenuOpen && (
-          <div className="lg:hidden border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900">
-            <div className="px-4 py-3 space-y-1">
-              {navLinks.map((link) => {
-                const IconComponent = link.icon;
-                return (
-                  <Link
-                    key={link.to}
-                    to={link.to}
-                    onClick={() => setIsMobileMenuOpen(false)}
-                    className={`flex px-3 py-3 rounded-lg text-base font-medium transition-all duration-200 items-center space-x-3 ${
-                      location.pathname === link.to
-                        ? 'bg-[#2ED8A3]/10 text-[#004E8A] dark:text-[#2ED8A3]'
-                        : 'text-[#333333] dark:text-gray-300 hover:bg-[#F4F5F7] dark:hover:bg-gray-800 hover:text-[#004E8A] dark:hover:text-white'
-                    }`}
-                  >
-                    <IconComponent className="w-5 h-5" />
-                    <span>{link.label}</span>
-                  </Link>
-                );
-              })}
-              {/* Mobile credits display */}
-              <div className="px-3 py-3 flex items-center space-x-3 bg-[#00C48C]/5 rounded-lg">
-                <div className="w-2 h-2 bg-[#00C48C] rounded-full"></div>
-                <span className="text-sm font-medium text-[#00C48C]">
-                  1,250 credits
-                </span>
-              </div>
-            </div>
-          </div>
-        )}
+        {/* Mobile Navigation - removed, now in sidebar */}
       </div>
     </header>
   );

@@ -7,6 +7,8 @@ from .views import (
     AdminPlansListView,
     AdminPlanDetailView,
     AdminValidationsListView,
+    AdminAPIKeyListView,
+    AdminAPIKeyDetailView,
     admin_user_stats,
     admin_billing_stats,
     admin_validations_stats,
@@ -16,7 +18,7 @@ from .views import (
 urlpatterns = [
     # User management
     path("users/", AdminUserListView.as_view(), name="admin-users-list"),
-    path("users/<int:pk>/", AdminUserDetailView.as_view(), name="admin-user-detail"),
+    path("users/<uuid:pk>/", AdminUserDetailView.as_view(), name="admin-user-detail"),
     path("users/create/", AdminUserCreateView.as_view(), name="admin-user-create"),
     path("users/stats/", admin_user_stats, name="admin-users-stats"),
     # Billing management
@@ -33,5 +35,8 @@ urlpatterns = [
         name="admin-validations-list",
     ),
     path("validations/stats/", admin_validations_stats, name="admin-validations-stats"),
+    # API Keys management
+    path("api-keys/", AdminAPIKeyListView.as_view(), name="admin-api-keys-list"),
+    path("api-keys/<uuid:pk>/", AdminAPIKeyDetailView.as_view(), name="admin-api-key-detail"),
 ]
 

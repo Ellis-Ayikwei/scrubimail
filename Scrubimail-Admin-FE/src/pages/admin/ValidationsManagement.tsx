@@ -411,7 +411,7 @@ const ValidationsManagement: React.FC = () => {
 
               <Table
                 columns={columns}
-                dataSource={filteredValidations}
+                dataSource={Array.isArray(filteredValidations) ? filteredValidations : []}
                 loading={loading}
                 pagination={{
                   pageSize: 10,

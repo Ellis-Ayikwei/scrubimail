@@ -98,7 +98,7 @@ ROOT_URLCONF = "backend.urls"
 TEMPLATES = [
     {
         "BACKEND": "django.template.backends.django.DjangoTemplates",
-        "DIRS": [os.path.join(BASE_DIR, 'templates')],
+        "DIRS": [os.path.join(BASE_DIR, "templates")],
         "APP_DIRS": True,
         "OPTIONS": {
             "context_processors": [
@@ -201,7 +201,8 @@ REST_FRAMEWORK = {
         "user": "1000/day",
         "anon": "100/day",
         "plan_based": "100/hour",  # Fallback rate
-        "bulk_validation": "10/hour",  # Fallback for bulk
+        "bulk_validation": "100/hour",  # Fallback for bulk
+        "plan_feature": "10000/hour",  # High rate for feature access checks (not time-based throttling)
     },
     "EXCEPTION_HANDLER": "backend.exception_handlers.custom_exception_handler",
     # Configure renderers so that responses are in camelCase.
@@ -401,16 +402,18 @@ MEDIA_URL = "/uploads/"
 MEDIA_ROOT = os.path.join(BASE_DIR, "uploads")
 
 # Email Configuration
-EMAIL_BACKEND = os.getenv('EMAIL_BACKEND', 'django.core.mail.backends.console.EmailBackend')
-EMAIL_HOST = os.getenv('EMAIL_HOST', 'smtp.gmail.com')
-EMAIL_PORT = int(os.getenv('EMAIL_PORT', 587))
-EMAIL_USE_TLS = os.getenv('EMAIL_USE_TLS', 'True') == 'True'
-EMAIL_HOST_USER = os.getenv('EMAIL_HOST_USER')
-EMAIL_HOST_PASSWORD = os.getenv('EMAIL_HOST_PASSWORD')
-DEFAULT_FROM_EMAIL = os.getenv('DEFAULT_FROM_EMAIL', 'noreply@scrubimail.com')
+EMAIL_BACKEND = os.getenv(
+    "EMAIL_BACKEND", "django.core.mail.backends.console.EmailBackend"
+)
+EMAIL_HOST = os.getenv("EMAIL_HOST", "smtp.gmail.com")
+EMAIL_PORT = int(os.getenv("EMAIL_PORT", 587))
+EMAIL_USE_TLS = os.getenv("EMAIL_USE_TLS", "True") == "True"
+EMAIL_HOST_USER = os.getenv("EMAIL_HOST_USER")
+EMAIL_HOST_PASSWORD = os.getenv("EMAIL_HOST_PASSWORD")
+DEFAULT_FROM_EMAIL = os.getenv("DEFAULT_FROM_EMAIL", "noreply@scrubimail.com")
 
 # Frontend URL for email links
-FRONTEND_URL = os.getenv('FRONTEND_URL', 'http://localhost:5173')
+FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:5173")
 
 # Prevent Heroku from running collectstatic on deploy
 if os.environ.get("DISABLE_COLLECTSTATIC", "") == "1":

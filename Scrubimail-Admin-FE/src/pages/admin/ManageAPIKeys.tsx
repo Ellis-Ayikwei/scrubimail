@@ -43,19 +43,20 @@ import {
 import axiosInstance from '../../services/axiosInstance';
 
 interface APIKey {
-  id: number;
+  id: string; // UUID
   key: string;
+  masked_key?: string;
   name?: string;
   is_active: boolean;
   created_at: string;
   last_used?: string;
-  user: {
+  user?: {
     id: number;
     email: string;
     name?: string;
   };
   usage_count?: number;
-  rate_limit?: number;
+  rate_limit_per_hour?: number;
 }
 
 interface User {
@@ -123,20 +124,21 @@ const ManageAPIKeys: React.FC = () => {
       const response = await axiosInstance.post('/admin/api-keys/', {
         name: values.name,
         user_id: parseInt(values.user_id),
-        rate_limit: values.rate_limit
+        rate_limit_per_hour: values.rate_limit || 1000
       });
       
       setApiKeys(prev => [response.data, ...prev]);
       setShowCreateModal(false);
       form.resetFields();
       message.success('API key created successfully');
+      fetchAPIKeys(); // Refresh to get updated list
     } catch (err: any) {
-      setError('Failed to create API key');
-      message.error('Failed to create API key');
+      setError(err.response?.data?.detail || 'Failed to create API key');
+      message.error(err.response?.data?.detail || 'Failed to create API key');
     }
   };
 
-  const handleToggleKey = async (keyId: number, isActive: boolean) => {
+  const handleToggleKey = async (keyId: string, isActive: boolean) => {
     try {
       await axiosInstance.patch(`/admin/api-keys/${keyId}/`, {
         is_active: !isActive
@@ -151,7 +153,7 @@ const ManageAPIKeys: React.FC = () => {
     }
   };
 
-  const handleDeleteKey = async (keyId: number) => {
+  const handleDeleteKey = async (keyId: string) => {
     try {
       await axiosInstance.delete(`/admin/api-keys/${keyId}/`);
       setApiKeys(prev => prev.filter(key => key.id !== keyId));
@@ -191,23 +193,23 @@ const ManageAPIKeys: React.FC = () => {
           />
           <div>
             <div style={{ fontFamily: 'monospace', fontSize: '12px', background: '#f5f5f5', padding: '4px 8px', borderRadius: '4px' }}>
-              {showSecretKeys.has(record.key) ? record.key : '••••••••••••••••••••••••••••••••'}
+              {showSecretKeys.has(record.id) ? (record.key || record.masked_key || 'N/A') : (record.masked_key || '••••••••••••••••••••••••••••••••')}
             </div>
             <Space style={{ marginTop: '4px' }}>
-              <Tooltip title={showSecretKeys.has(record.key) ? 'Hide key' : 'Show key'}>
+              <Tooltip title={showSecretKeys.has(record.id) ? 'Hide key' : 'Show key'}>
                 <Button 
                   type="text" 
                   size="small" 
-                  icon={showSecretKeys.has(record.key) ? <EyeInvisibleOutlined /> : <EyeOutlined />}
-                  onClick={() => toggleKeyVisibility(record.key)}
+                  icon={showSecretKeys.has(record.id) ? <EyeInvisibleOutlined /> : <EyeOutlined />}
+                  onClick={() => toggleKeyVisibility(record.id)}
                 />
               </Tooltip>
               <Tooltip title="Copy key">
                 <Button 
                   type="text" 
                   size="small" 
-                  icon={copiedKey === record.key ? <CheckOutlined /> : <CopyOutlined />}
-                  onClick={() => copyToClipboard(record.key)}
+                  icon={copiedKey === record.id ? <CheckOutlined /> : <CopyOutlined />}
+                  onClick={() => copyToClipboard(record.key || record.masked_key || '')}
                 />
               </Tooltip>
             </Space>
@@ -222,8 +224,8 @@ const ManageAPIKeys: React.FC = () => {
         <Space>
           <Avatar icon={<UserOutlined />} size="small" />
           <div>
-            <div style={{ fontWeight: 'bold' }}>{record.user.name || 'No name'}</div>
-            <Text type="secondary" style={{ fontSize: '12px' }}>{record.user.email}</Text>
+            <div style={{ fontWeight: 'bold' }}>{record.user?.name || 'No name'}</div>
+            <Text type="secondary" style={{ fontSize: '12px' }}>{record.user?.email || 'N/A'}</Text>
           </div>
         </Space>
       ),
@@ -290,10 +292,10 @@ const ManageAPIKeys: React.FC = () => {
 
   const filteredKeys = (Array.isArray(apiKeys) ? apiKeys : []).filter(key => {
     const matchesSearch = key.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         key.user.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         key.key.toLowerCase().includes(searchTerm.toLowerCase());
+                         key.user?.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         (key.key || key.masked_key || '').toLowerCase().includes(searchTerm.toLowerCase());
     
-    const matchesUser = filterUser === 'all' || key.user.id.toString() === filterUser;
+    const matchesUser = filterUser === 'all' || key.user?.id?.toString() === filterUser;
     const matchesStatus = filterStatus === 'all' || 
                          (filterStatus === 'active' && key.is_active) ||
                          (filterStatus === 'inactive' && !key.is_active);
@@ -410,6 +412,7 @@ const ManageAPIKeys: React.FC = () => {
         <Table
           columns={columns}
           dataSource={filteredKeys}
+          rowKey={(record) => record.id}
           loading={loading}
           pagination={{
             pageSize: 10,
@@ -467,6 +470,16 @@ const ManageAPIKeys: React.FC = () => {
               max={100000} 
               style={{ width: '100%' }}
               placeholder="Enter rate limit"
+            />
+          </Form.Item>
+          
+          <Form.Item
+            name="description"
+            label="Description (optional)"
+          >
+            <Input.TextArea 
+              rows={3}
+              placeholder="Enter description for this API key"
             />
           </Form.Item>
           

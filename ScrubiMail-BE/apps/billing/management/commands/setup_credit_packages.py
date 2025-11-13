@@ -20,7 +20,7 @@ class Command(BaseCommand):
                 'expiry_days': 90,
                 'is_active': True,
                 'is_featured': False,
-                'display_order': 1,
+                'sort_order': 1,
                 'max_purchases_per_user': 10,
             },
             {
@@ -33,7 +33,7 @@ class Command(BaseCommand):
                 'expiry_days': 120,
                 'is_active': True,
                 'is_featured': True,
-                'display_order': 2,
+                'sort_order': 2,
                 'max_purchases_per_user': 10,
             },
             {
@@ -46,7 +46,7 @@ class Command(BaseCommand):
                 'expiry_days': 180,
                 'is_active': True,
                 'is_featured': True,
-                'display_order': 3,
+                'sort_order': 3,
                 'max_purchases_per_user': 10,
             },
             {
@@ -59,7 +59,7 @@ class Command(BaseCommand):
                 'expiry_days': 365,
                 'is_active': True,
                 'is_featured': True,
-                'display_order': 4,
+                'sort_order': 4,
                 'max_purchases_per_user': 5,
             },
             {
@@ -72,7 +72,7 @@ class Command(BaseCommand):
                 'expiry_days': 365,
                 'is_active': True,
                 'is_featured': False,
-                'display_order': 5,
+                'sort_order': 5,
                 'max_purchases_per_user': 3,
             },
         ]

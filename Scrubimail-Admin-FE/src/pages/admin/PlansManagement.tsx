@@ -183,10 +183,10 @@ const PlansManagement: React.FC = () => {
       render: (record: Plan) => (
         <div>
           <Text strong style={{ fontSize: '16px' }}>
-            ${record.price} {record.currency.toUpperCase()}
+            ${record.price || 0} {(record.currency || 'USD').toUpperCase()}
           </Text>
           <div>
-            <Tag>{record.billing_cycle}</Tag>
+            <Tag>{record.billing_cycle || 'monthly'}</Tag>
           </div>
         </div>
       ),
@@ -199,19 +199,25 @@ const PlansManagement: React.FC = () => {
           <div>
             <Text type="secondary">Validations:</Text>
             <Text style={{ marginLeft: '4px' }}>
-              {record.max_validations === -1 ? 'Unlimited' : record.max_validations.toLocaleString()}
+              {record.max_validations === -1 || record.max_validations === null || record.max_validations === undefined 
+                ? 'Unlimited' 
+                : (record.max_validations || 0).toLocaleString()}
             </Text>
           </div>
           <div>
             <Text type="secondary">API Calls:</Text>
             <Text style={{ marginLeft: '4px' }}>
-              {record.max_api_calls === -1 ? 'Unlimited' : record.max_api_calls.toLocaleString()}
+              {record.max_api_calls === -1 || record.max_api_calls === null || record.max_api_calls === undefined 
+                ? 'Unlimited' 
+                : (record.max_api_calls || 0).toLocaleString()}
             </Text>
           </div>
           <div>
             <Text type="secondary">Users:</Text>
             <Text style={{ marginLeft: '4px' }}>
-              {record.max_users === -1 ? 'Unlimited' : record.max_users.toLocaleString()}
+              {record.max_users === -1 || record.max_users === null || record.max_users === undefined 
+                ? 'Unlimited' 
+                : (record.max_users || 0).toLocaleString()}
             </Text>
           </div>
         </Space>
@@ -222,13 +228,14 @@ const PlansManagement: React.FC = () => {
       dataIndex: 'support_level',
       key: 'support_level',
       render: (level: string) => {
+        if (!level) return <Tag>N/A</Tag>;
         const colors = {
           basic: 'default',
           standard: 'blue',
           premium: 'purple',
           enterprise: 'gold'
         };
-        return <Tag color={colors[level as keyof typeof colors]}>{level.toUpperCase()}</Tag>;
+        return <Tag color={colors[level as keyof typeof colors] || 'default'}>{level.toUpperCase()}</Tag>;
       },
     },
     {
@@ -236,7 +243,7 @@ const PlansManagement: React.FC = () => {
       dataIndex: 'subscription_count',
       key: 'subscription_count',
       render: (count: number) => (
-        <Badge count={count} style={{ backgroundColor: '#52c41a' }} />
+        <Badge count={count || 0} style={{ backgroundColor: '#52c41a' }} />
       ),
     },
     {
@@ -244,7 +251,7 @@ const PlansManagement: React.FC = () => {
       dataIndex: 'revenue',
       key: 'revenue',
       render: (revenue: number) => (
-        <Text strong>${revenue.toLocaleString()}</Text>
+        <Text strong>${(revenue || 0).toLocaleString()}</Text>
       ),
     },
     {
@@ -275,7 +282,7 @@ const PlansManagement: React.FC = () => {
                 setEditingPlan(record);
                 form.setFieldsValue({
                   ...record,
-                  features: record.features.join('\n')
+                  features: Array.isArray(record.features) ? record.features.join('\n') : ''
                 });
                 setShowPlanModal(true);
               }}

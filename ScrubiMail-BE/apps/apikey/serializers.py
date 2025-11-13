@@ -9,6 +9,7 @@ class APIKeySerializer(serializers.ModelSerializer):
     is_expired = serializers.SerializerMethodField()
     is_valid = serializers.SerializerMethodField()
     days_until_expiry = serializers.SerializerMethodField()
+    user = serializers.SerializerMethodField()
 
     class Meta:
         model = APIKey
@@ -21,6 +22,7 @@ class APIKeySerializer(serializers.ModelSerializer):
             "is_valid",
             "name",
             "description",
+            "user",
             "last_used",
             "usage_count",
             "expires_at",
@@ -73,6 +75,16 @@ class APIKeySerializer(serializers.ModelSerializer):
         delta = obj.expires_at - timezone.now()
         return delta.days if delta.days > 0 else 0
 
+    def get_user(self, obj):
+        """Return user information"""
+        if obj.user:
+            return {
+                'id': obj.user.id,
+                'email': obj.user.email,
+                'name': getattr(obj.user, 'name', None) or getattr(obj.user, 'first_name', None) or None
+            }
+        return None
+
     def validate_expires_at(self, value):
         if value and value <= timezone.now():
             raise serializers.ValidationError("Expiration date must be in the future.")
@@ -91,10 +103,11 @@ class APIKeySerializer(serializers.ModelSerializer):
 
 class APIKeyCreateSerializer(serializers.ModelSerializer):
     """Serializer for creating new API keys with additional options"""
+    user_id = serializers.IntegerField(required=False, write_only=True)
 
     class Meta:
         model = APIKey
-        fields = ["name", "description", "expires_at", "rate_limit_per_hour"]
+        fields = ["name", "description", "expires_at", "rate_limit_per_hour", "user_id"]
 
     def validate_expires_at(self, value):
         if value and value <= timezone.now():

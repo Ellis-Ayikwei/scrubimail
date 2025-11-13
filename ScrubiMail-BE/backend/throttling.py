@@ -31,11 +31,12 @@ class PlanBasedRateThrottle(SimpleRateThrottle):
     def get_rate(self):
         """
         Get rate limit from user's plan.
-        Returns None if no plan or unlimited.
+        Returns fallback rate for initialization (will be overridden in allow_request).
         """
-        # This is called during allow_request, so we need request context
-        # We'll override allow_request instead
-        return None
+        # This is called during __init__ before we have request context
+        # The actual rate will be set dynamically in allow_request()
+        # Return fallback rate from settings to avoid ImproperlyConfigured
+        return '100/hour'  # Fallback rate, will be overridden in allow_request()
     
     def allow_request(self, request, view):
         """
@@ -97,7 +98,9 @@ class PlanBasedRateThrottle(SimpleRateThrottle):
         view_name = view.__class__.__name__
         validation_views = [
             'ValidateEmailView',
+            'SingleEmailValidationView',
             'BulkValidateView',
+            'BulkEmailValidationView',
             'EmailValidationViewSet',
         ]
         return any(v in view_name for v in validation_views)
@@ -219,7 +222,33 @@ class PlanFeatureThrottle(SimpleRateThrottle):
             return True
             
         except BillingProfile.DoesNotExist:
-            return False
+            # No billing profile - create one with Free plan
+            from apps.billing.services import BillingService
+            billing_service = BillingService()
+            profile = billing_service.get_or_create_billing_profile(request.user)
+            
+            plan = profile.current_plan
+            if not plan:
+                free_plan = Plan.objects.filter(name='Free', is_active=True).first()
+                plan = free_plan
+            
+            if not plan:
+                return False
+            
+            # Check feature access
+            view_name = view.__class__.__name__
+            
+            # API access check
+            if 'API' in view_name or request.headers.get('X-API-Key'):
+                if not plan.supports_api:
+                    return False
+            
+            # Bulk validation check
+            if 'Bulk' in view_name:
+                if not plan.supports_bulk:
+                    return False
+            
+            return True
     
     def _is_public_endpoint(self, view):
         """Check if endpoint is publicly accessible"""
