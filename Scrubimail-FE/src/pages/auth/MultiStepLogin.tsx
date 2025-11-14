@@ -139,14 +139,14 @@ const MultiStepLogin: React.FC = () => {
       color: 'bg-gray-900 hover:bg-gray-800',
       textColor: 'text-white'
     },
-    {
-      id: 'gitlab',
-      name: 'GitLab',
-      icon: Gitlab,
-      description: 'Sign in with your GitLab account',
-      color: 'bg-orange-600 hover:bg-orange-700',
-      textColor: 'text-white'
-    },
+    // {
+    //   id: 'gitlab',
+    //   name: 'GitLab',
+    //   icon: Gitlab,
+    //   description: 'Sign in with your GitLab account',
+    //   color: 'bg-orange-600 hover:bg-orange-700',
+    //   textColor: 'text-white'
+    // },
     {
       id: 'google',
       name: 'Google',
