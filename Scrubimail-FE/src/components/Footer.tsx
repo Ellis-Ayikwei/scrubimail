@@ -40,11 +40,12 @@ const Footer: React.FC = () => {
           
           {/* Brand Section */}
           <div className="sm:col-span-2 lg:col-span-2">
-            <div className="flex items-center space-x-3 mb-4 sm:mb-6">
-              <div className="w-8 h-8 sm:w-10 sm:h-10 bg-[#10B981] rounded-2xl sm:rounded-3xl flex items-center justify-center">
-                <Mail className="w-4 h-4 sm:w-6 sm:h-6 text-white" />
-              </div>
-              <span className="text-xl sm:text-2xl font-bold">ScrubiMail</span>
+            <div className="flex items-center mb-4 sm:mb-6">
+              <img 
+                src="/assets/images/scrubi mail full.png" 
+                alt="Scrubimail Logo" 
+                className="h-10 sm:h-12 w-auto"
+              />
             </div>
             <p className="text-[#7d8590] text-base sm:text-lg mb-4 sm:mb-6 max-w-md">
               Emails flowing safely into inboxes. The most accurate email validation API trusted by developers worldwide.

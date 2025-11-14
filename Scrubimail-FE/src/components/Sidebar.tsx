@@ -254,8 +254,8 @@ const Sidebar = () => {
           <div className="flex justify-between items-center px-3 py-2.5 border-b border-white/20">
             <NavLink to="/dashboard" className="main-logo flex items-center shrink-0">
               <img 
-                className="w-[140px] ml-[5px] flex-none brightness-0 invert" 
-                src="assets/images/scrubiLogo.png" 
+                className="h-10 w-auto ml-[5px] flex-none brightness-0 invert" 
+                src="/assets/images/scrubi mail icon.png" 
                 alt="Scrubimail Logo" 
               />
             </NavLink>

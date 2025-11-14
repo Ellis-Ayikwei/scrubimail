@@ -34,7 +34,7 @@ const ApiDocs: React.FC = () => {
     {
       name: 'Single Email Validation',
       method: 'POST',
-      path: '/api/validation/validate/',
+      path: '/scrubimail/api/v1/validate/',
       description: 'Validate a single email address in real-time',
       request: {
         email: 'user@example.com',
@@ -62,7 +62,7 @@ const ApiDocs: React.FC = () => {
     {
       name: 'Bulk Email Validation',
       method: 'POST',
-      path: '/api/validation/validate-bulk/',
+      path: '/scrubimail/api/v1/validate-bulk/',
       description: 'Submit multiple emails for bulk validation',
       request: {
         emails: ['user1@example.com', 'user2@example.com']
@@ -77,7 +77,7 @@ const ApiDocs: React.FC = () => {
     {
       name: 'Bulk Job Status',
       method: 'GET',
-      path: '/api/validation/bulk-status/{job_id}/',
+      path: '/scrubimail/api/v1/bulk-status/{job_id}/',
       description: 'Get bulk job status and progress',
       response: {
         job_id: 456,
@@ -98,7 +98,7 @@ const ApiDocs: React.FC = () => {
     {
       name: 'Validation History',
       method: 'GET',
-      path: '/api/validation/history/',
+      path: '/scrubimail/api/v1/history/',
       description: 'Get validation history with filtering options',
       response: {
         results: [],
@@ -115,7 +115,7 @@ const ApiDocs: React.FC = () => {
     {
       name: 'Analytics',
       method: 'GET',
-      path: '/api/validation/analytics/',
+      path: '/scrubimail/api/v1/analytics/',
       description: 'Get validation analytics and statistics',
       response: {
         period: {
@@ -136,7 +136,7 @@ const ApiDocs: React.FC = () => {
     {
       name: 'Domain Reputation',
       method: 'GET',
-      path: '/api/validation/domain-reputation/{domain}/',
+      path: '/scrubimail/api/v1/domain-reputation/{domain}/',
       description: 'Get domain reputation information',
       response: {
         domain: 'example.com',
@@ -185,7 +185,7 @@ const ApiDocs: React.FC = () => {
   ];
 
   const codeExamples = {
-    curl: `curl -X POST "https://api.scrubimail.com/api/validation/validate/" \\
+    curl: `curl -X POST "https://api.scrubimail.com/scrubimail/api/v1/validate/" \\
   -H "Authorization: Bearer YOUR_API_KEY" \\
   -H "Content-Type: application/json" \\
   -d '{
@@ -193,7 +193,7 @@ const ApiDocs: React.FC = () => {
     "real_time": true
   }'`,
     
-    javascript: `const response = await fetch('https://api.scrubimail.com/api/validation/validate/', {
+    javascript: `const response = await fetch('https://api.scrubimail.com/scrubimail/api/v1/validate/', {
   method: 'POST',
   headers: {
     'Authorization': 'Bearer YOUR_API_KEY',
@@ -210,7 +210,7 @@ console.log(result);`,
     
     python: `import requests
 
-url = "https://api.scrubimail.com/api/validation/validate/"
+url = "https://api.scrubimail.com/scrubimail/api/v1/validate/"
 headers = {
     "Authorization": "Bearer YOUR_API_KEY",
     "Content-Type": "application/json"
@@ -225,7 +225,7 @@ result = response.json()
 print(result)`,
     
     php: `<?php
-$url = 'https://api.scrubimail.com/api/validation/validate/';
+$url = 'https://api.scrubimail.com/scrubimail/api/v1/validate/';
 $data = [
     'email' => 'user@example.com',
     'real_time' => true

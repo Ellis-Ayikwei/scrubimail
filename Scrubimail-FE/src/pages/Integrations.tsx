@@ -32,14 +32,15 @@ const Integrations: React.FC = () => {
       color: 'bg-yellow-500',
       description: 'Perfect for web applications and Node.js projects',
       code: `// Using fetch API
-const response = await fetch('https://api.scrubimail.com/v1/validate', {
+const response = await fetch('https://api.scrubimail.com/scrubimail/api/v1/validate/', {
   method: 'POST',
   headers: {
     'Authorization': 'Bearer YOUR_API_KEY',
     'Content-Type': 'application/json'
   },
   body: JSON.stringify({
-    email: 'user@example.com'
+    email: 'user@example.com',
+    real_time: true
   })
 });
 
@@ -55,12 +56,12 @@ console.log(result);`,
       code: `import requests
 
 response = requests.post(
-    'https://api.scrubimail.com/v1/validate',
+    'https://api.scrubimail.com/scrubimail/api/v1/validate/',
     headers={
         'Authorization': 'Bearer YOUR_API_KEY',
         'Content-Type': 'application/json'
     },
-    json={'email': 'user@example.com'}
+    json={'email': 'user@example.com', 'real_time': True}
 )
 
 result = response.json()
@@ -73,13 +74,14 @@ print(result)`,
       color: 'bg-purple-500',
       description: 'Great for web applications and WordPress plugins',
       code: `$ch = curl_init();
-curl_setopt($ch, CURLOPT_URL, 'https://api.scrubimail.com/v1/validate');
+curl_setopt($ch, CURLOPT_URL, 'https://api.scrubimail.com/scrubimail/api/v1/validate/');
 curl_setopt($ch, CURLOPT_POST, true);
-curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode(['email' => 'user@example.com']));
+curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode(['email' => 'user@example.com', 'real_time' => true]));
 curl_setopt($ch, CURLOPT_HTTPHEADER, [
     'Authorization: Bearer YOUR_API_KEY',
     'Content-Type: application/json'
 ]);
+curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
 
 $response = curl_exec($ch);
 $result = json_decode($response, true);
@@ -93,8 +95,9 @@ curl_close($ch);`,
       description: 'Perfect for server-side applications and APIs',
       code: `const axios = require('axios');
 
-const response = await axios.post('https://api.scrubimail.com/v1/validate', {
-  email: 'user@example.com'
+const response = await axios.post('https://api.scrubimail.com/scrubimail/api/v1/validate/', {
+  email: 'user@example.com',
+  real_time: true
 }, {
   headers: {
     'Authorization': 'Bearer YOUR_API_KEY',
@@ -113,14 +116,14 @@ console.log(response.data);`,
       code: `require 'net/http'
 require 'json'
 
-uri = URI('https://api.scrubimail.com/v1/validate')
+uri = URI('https://api.scrubimail.com/scrubimail/api/v1/validate/')
 http = Net::HTTP.new(uri.host, uri.port)
 http.use_ssl = true
 
 request = Net::HTTP::Post.new(uri)
 request['Authorization'] = 'Bearer YOUR_API_KEY'
 request['Content-Type'] = 'application/json'
-request.body = { email: 'user@example.com' }.to_json
+request.body = { email: 'user@example.com', real_time: true }.to_json
 
 response = http.request(request)
 result = JSON.parse(response.body)`,
@@ -144,10 +147,13 @@ type EmailRequest struct {
 }
 
 func validateEmail(email string) {
-    data := EmailRequest{Email: email}
+    data := map[string]interface{}{
+        "email": email,
+        "real_time": true,
+    }
     jsonData, _ := json.Marshal(data)
     
-    req, _ := http.NewRequest("POST", "https://api.scrubimail.com/v1/validate", bytes.NewBuffer(jsonData))
+    req, _ := http.NewRequest("POST", "https://api.scrubimail.com/scrubimail/api/v1/validate/", bytes.NewBuffer(jsonData))
     req.Header.Set("Authorization", "Bearer YOUR_API_KEY")
     req.Header.Set("Content-Type", "application/json")
     
@@ -167,10 +173,10 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 
 HttpClient client = HttpClient.newHttpClient();
-String json = "{\\"email\\": \\"user@example.com\\"}";
+String json = "{\\"email\\": \\"user@example.com\\", \\"real_time\\": true}";
 
 HttpRequest request = HttpRequest.newBuilder()
-    .uri(URI.create("https://api.scrubimail.com/v1/validate"))
+    .uri(URI.create("https://api.scrubimail.com/scrubimail/api/v1/validate/"))
     .header("Authorization", "Bearer YOUR_API_KEY")
     .header("Content-Type", "application/json")
     .POST(HttpRequest.BodyPublishers.ofString(json))
@@ -190,13 +196,13 @@ using System.Text;
 using Newtonsoft.Json;
 
 var client = new HttpClient();
-var data = new { email = "user@example.com" };
+var data = new { email = "user@example.com", real_time = true };
 var json = JsonConvert.SerializeObject(data);
 var content = new StringContent(json, Encoding.UTF8, "application/json");
 
 client.DefaultRequestHeaders.Add("Authorization", "Bearer YOUR_API_KEY");
 
-var response = await client.PostAsync("https://api.scrubimail.com/v1/validate", content);
+var response = await client.PostAsync("https://api.scrubimail.com/scrubimail/api/v1/validate/", content);
 var result = await response.Content.ReadAsStringAsync();`,
       docs: 'https://docs.scrubimail.com/csharp'
     }

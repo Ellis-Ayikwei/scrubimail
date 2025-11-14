@@ -25,13 +25,12 @@ const TopBar: React.FC = () => {
           <div className="flex justify-between items-center h-16">
             {/* Logo and Brand */}
             <div className="flex items-center">
-              <Link to="/" className="flex items-center space-x-3">
-                <div className="w-8 h-8 bg-gradient-to-r from-[#2ED8A3] to-[#00C48C] rounded-lg flex items-center justify-center">
-                  <CheckCircle className="w-5 h-5 text-white" />
-                </div>
-                <span className="text-xl font-medium text-gray-900 dark:text-white">
-                  ScrubiMail
-                </span>
+              <Link to="/" className="flex items-center">
+                <img 
+                  src="/assets/images/scrubi mail full.png" 
+                  alt="Scrubimail Logo" 
+                  className="h-8 sm:h-10 w-auto"
+                />
               </Link>
             </div>
 
@@ -162,11 +161,12 @@ const TopBar: React.FC = () => {
             )}
 
             {/* Logo and Brand */}
-            <Link to={isAuthenticated ? "/dashboard" : "/"} className="flex items-center space-x-2">
-              <img src='assets/images/scrubiLogo.png' alt="Logo" />
-              <span className="text-xl font-bold bg-gradient-to-r from-[#2ED8A3] to-[#004E8A] bg-clip-text text-transparent">
-                Scrubimail
-              </span>
+            <Link to={isAuthenticated ? "/dashboard" : "/"} className="flex items-center">
+              <img 
+                src="/assets/images/scrubi mail full.png" 
+                alt="Scrubimail Logo" 
+                className="h-8 sm:h-10 w-auto"
+              />
             </Link>
           </div>
 

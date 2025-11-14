@@ -1,5 +1,4 @@
 import { FC } from 'react';
-import aluminiLogo from './scrubi.png';
 
 interface IconLoaderProps {
     className?: string;
@@ -30,7 +29,7 @@ const IconLoader: FC<IconLoaderProps> = ({ className = '', fill = false, duotone
 
                 {/* The centered image */}
                 <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2" style={{ width: `${imageSize}px`, height: `${imageSize}px` }}>
-                    <img src={aluminiLogo} alt="Alumni Logo" className="w-full h-full object-contain" />
+                    <img src="/assets/images/scrubi mail icon.png" alt="Scrubimail Logo" className="w-full h-full object-contain" />
                 </div>
             </div>
         </div>

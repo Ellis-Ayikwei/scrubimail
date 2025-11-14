@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { useDispatch } from 'react-redux';
 import { 
   Mail, 
@@ -14,7 +14,8 @@ import {
   Smartphone,
   Github,
   Chrome,
-  Gitlab
+  Gitlab,
+  Home
 } from 'lucide-react';
 import { LoginUser } from '../../store/authSlice';
 import { showMessage } from '../../utils/notifications';
@@ -22,6 +23,8 @@ import { getDeviceInfo } from '../../utils/DeviceFingerPrint';
 import ssoService, { OAuthProviders } from '../../services/ssoService';
 import useSignIn from 'react-auth-kit/hooks/useSignIn';
 import totpService from '../../services/totpService';
+import AuthFooter from '../../components/AuthFooter';
+import authAxiosInstance from '../../services/authAxiosInstance';
 
 interface LoginStep {
   step: 'credentials' | 'totp' | 'success';
@@ -55,7 +58,6 @@ const MultiStepLogin: React.FC = () => {
   const [deviceInfo, setDeviceInfo] = useState<any>(null);
   
   // SSO states
-  const [ssoProviders, setSsoProviders] = useState<OAuthProviders | null>(null);
   const [ssoLoading, setSsoLoading] = useState<string | null>(null);
 
   useEffect(() => {
@@ -72,58 +74,109 @@ const MultiStepLogin: React.FC = () => {
 
   const loadSSOProviders = async () => {
     try {
-      const providers = await ssoService.getProviders();
-      setSsoProviders(providers);
+      // Load providers if needed for availability checks
+      await ssoService.getProviders();
     } catch (error) {
       console.error('Failed to load SSO providers:', error);
     }
   };
 
-  const handleOAuthCallback = () => {
+  const handleOAuthCallback = async () => {
     const callbackData = ssoService.handleCallbackFromUrl();
     if (callbackData) {
-      // Handle successful OAuth login
-      dispatch(LoginUser({
-        email: '', // OAuth users don't need email/password
-        password: '',
-        trust_device: false,
-        device_id: deviceInfo?.device_id,
-        device_name: deviceInfo?.device_name,
-        fingerprint: deviceInfo?.fingerprint,
-        user_id: '', // Will be set by backend
-        session_id: '',
-        device_info: deviceInfo?.device_info,
-        extra: {
-          access_token: callbackData.access_token,
-          refresh_token: callbackData.refresh_token,
-          provider: callbackData.provider
+      try {
+        setLoading(true);
+        setError(null);
+        
+        // SSO login bypasses TOTP - directly sign in with tokens
+        // Fetch user data using the access token
+        const userResponse = await authAxiosInstance.get('/user/', {
+          headers: {
+            'Authorization': `Bearer ${callbackData.access_token}`
+          }
+        });
+
+        const userData = userResponse.data;
+
+        if (signIn) {
+          const isSignedIn = signIn({
+            auth: {
+              token: callbackData.access_token,
+              type: 'Bearer',
+            },
+            refresh: callbackData.refresh_token,
+            userState: userData,
+          });
+
+          if (isSignedIn) {
+            showMessage(`Successfully logged in with ${callbackData.provider}!`, 'success');
+            setCurrentStep('success');
+            
+            // Redirect after a short delay
+            setTimeout(() => {
+              navigate('/dashboard', { replace: true });
+            }, 1500);
+          } else {
+            setError('Failed to sign in with OAuth tokens');
+          }
         }
-      }));
-      
-      showMessage(`Successfully logged in with ${callbackData.provider}!`, 'success');
-      navigate('/dashboard', { replace: true });
-      
-      // Clear URL parameters
-      ssoService.clearCallbackFromUrl();
+        
+        // Clear URL parameters
+        ssoService.clearCallbackFromUrl();
+      } catch (err: any) {
+        console.error('OAuth callback error:', err);
+        setError('Failed to complete OAuth login. Please try again.');
+        setLoading(false);
+      }
     }
   };
-
-  const handleSSOLogin = async (provider: 'github' | 'gitlab' | 'google') => {
-    if (!ssoProviders?.[provider]?.available) {
-      showMessage(`${provider} SSO is not available`, 'error');
-      return;
+  const ssoProviders = [
+    {
+      id: 'github',
+      name: 'GitHub',
+      icon: Github,
+      description: 'Sign in with your GitHub account',
+      color: 'bg-gray-900 hover:bg-gray-800',
+      textColor: 'text-white'
+    },
+    {
+      id: 'gitlab',
+      name: 'GitLab',
+      icon: Gitlab,
+      description: 'Sign in with your GitLab account',
+      color: 'bg-orange-600 hover:bg-orange-700',
+      textColor: 'text-white'
+    },
+    {
+      id: 'google',
+      name: 'Google',
+      icon: Chrome,
+      description: 'Sign in with your Google account',
+      color: 'bg-blue-600 hover:bg-blue-700',
+      textColor: 'text-white'
     }
+  ];
 
-    setSsoLoading(provider);
+  const handleSSO = async (providerId: string) => {
     try {
-      const redirectUri = `${window.location.origin}/oauth/callback`;
-      const response = await ssoService.initiateOAuthLogin(provider, redirectUri);
+      setError(null);
+      setSsoLoading(providerId);
       
-      // Redirect to OAuth provider
-      ssoService.redirectToProvider(response.authorization_url);
-    } catch (error: any) {
-      console.error(`${provider} SSO error:`, error);
-      showMessage(`Failed to initiate ${provider} login`, 'error');
+      // Call the backend OAuth login endpoint
+      const response = await authAxiosInstance.get(`/oauth/${providerId}/login/?redirect_uri=${encodeURIComponent(window.location.origin + '/oauth/callback')}`);
+      
+      const data = await response.data;
+      
+      if (data.authorization_url) {
+        // Redirect to the OAuth provider's authorization URL
+        window.location.href = data.authorization_url;
+      } else {
+        setError('Failed to initiate OAuth login');
+        setSsoLoading(null);
+      }
+    } catch (err: any) {
+      console.error('OAuth login error:', err);
+      setError('OAuth login failed. Please try again.');
       setSsoLoading(null);
     }
   };
@@ -268,14 +321,36 @@ const MultiStepLogin: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-[#F4F5F7] dark:bg-gray-900 py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-md w-full space-y-8">
+    <div className="min-h-screen flex flex-col bg-[#F4F5F7] dark:bg-gray-900 relative overflow-hidden">
+      {/* Background Mail Icon */}
+      <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+        <Mail 
+          className="w-[900px] h-[900px] md:w-[1200px] md:h-[1200px] lg:w-[1500px] lg:h-[1500px] text-primary/5 dark:text-primary/10"
+          strokeWidth={1}
+        />
+      </div>
+
+      {/* Home Button */}
+      <Link 
+        to="/" 
+        className="fixed top-4 left-4 z-50 flex items-center gap-2 px-4 py-2 bg-white dark:bg-gray-800 rounded-lg shadow-md hover:shadow-lg transition-shadow border border-gray-200 dark:border-gray-700"
+      >
+        <Home className="w-4 h-4 text-[#333333] dark:text-white" />
+        <span className="text-sm font-medium text-[#333333] dark:text-white">Home</span>
+      </Link>
+
+      <div className="flex-1 flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8 relative z-10">
+        <div className="max-w-md w-full space-y-8">
         {/* Header */}
         <div className="text-center">
-          <div className="flex justify-center">
-            <div className="w-12 h-12 bg-gradient-to-r from-[#2ED8A3] to-[#004E8A] rounded-xl flex items-center justify-center">
-              <span className="text-white font-bold text-xl">S</span>
-            </div>
+          <div className="flex justify-center mb-6">
+            <Link to="/" className="flex items-center">
+              <img 
+                src="/assets/images/scrubi mail full.png" 
+                alt="Scrubimail Logo" 
+                className="h-12 md:h-12 w-auto"
+              />
+            </Link>
           </div>
           <h2 className="mt-6 text-3xl font-bold text-[#333333] dark:text-white">
             {steps[currentStep].title}
@@ -286,24 +361,58 @@ const MultiStepLogin: React.FC = () => {
         </div>
 
         {/* Progress Indicator */}
-        <div className="flex items-center justify-center space-x-4">
+        {/* <div className="flex items-center justify-center space-x-4">
           <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
-            currentStep === 'credentials' ? 'bg-[#2ED8A3] text-white' : 
-            currentStep === 'totp' ? 'bg-[#2ED8A3] text-white' : 'bg-green-500 text-white'
+            currentStep === 'credentials' ? 'bg-primary text-white' : 
+            currentStep === 'totp' ? 'bg-primary text-white' : 'bg-green-500 text-white'
           }`}>
             {currentStep === 'credentials' ? '1' : currentStep === 'totp' ? '2' : <CheckCircle className="w-5 h-5" />}
           </div>
-          <div className={`w-16 h-1 ${currentStep === 'totp' || currentStep === 'success' ? 'bg-[#2ED8A3]' : 'bg-gray-300'}`}></div>
+          <div className={`w-16 h-1 ${currentStep === 'totp' || currentStep === 'success' ? 'bg-primary' : 'bg-gray-300'}`}></div>
           <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
-            currentStep === 'totp' ? 'bg-[#2ED8A3] text-white' : 
+            currentStep === 'totp' ? 'bg-primary text-white' : 
             currentStep === 'success' ? 'bg-green-500 text-white' : 'bg-gray-300 text-gray-500'
           }`}>
             {currentStep === 'totp' ? '2' : currentStep === 'success' ? <CheckCircle className="w-5 h-5" /> : '2'}
           </div>
-        </div>
+        </div> */}
 
         {/* Login Form */}
         <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl border border-gray-200 dark:border-gray-700 p-8">
+           {/* SSO Providers */}
+           <div className="mb-6">
+            <div className="flex justify-center space-x-3">
+              {ssoProviders.map((provider) => {
+                const IconComponent = provider.icon;
+                return (
+                  <button
+                    key={provider.id}
+                    onClick={() => handleSSO(provider.id)}
+                    disabled={loading}
+                    className={`flex-1 p-3 rounded-lg border-2 transition-all duration-200 ${provider.color} ${provider.textColor} hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed`}
+                  >
+                    <div className="flex items-center justify-center space-x-2">
+                      <IconComponent className="w-4 h-4" />
+                      <span className="text-sm font-medium">{provider.name}</span>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Divider */}
+          <div className="relative mb-6">
+            <div className="absolute inset-0 flex items-center">
+              <div className="w-full border-t border-gray-300 dark:border-gray-600" />
+            </div>
+            <div className="relative flex justify-center text-sm">
+              <span className="px-2 bg-white dark:bg-gray-800 text-[#333333]/70 dark:text-gray-400">
+                Or continue with email
+              </span>
+            </div>
+          </div>
+          
           {currentStep === 'credentials' && (
             <form className="space-y-6" onSubmit={handleCredentialsSubmit}>
               {/* Email Field */}
@@ -323,7 +432,7 @@ const MultiStepLogin: React.FC = () => {
                     required
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    className="w-full pl-10 pr-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-[#2ED8A3] focus:border-transparent bg-white dark:bg-gray-700 text-[#333333] dark:text-white placeholder-[#333333]/50 dark:placeholder-gray-400 transition-colors duration-200"
+                    className="w-full pl-10 pr-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent bg-white dark:bg-gray-700 text-[#333333] dark:text-white placeholder-[#333333]/50 dark:placeholder-gray-400 transition-colors duration-200"
                     placeholder="Enter your email"
                   />
                 </div>
@@ -346,7 +455,7 @@ const MultiStepLogin: React.FC = () => {
                     required
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    className="w-full pl-10 pr-12 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-[#2ED8A3] focus:border-transparent bg-white dark:bg-gray-700 text-[#333333] dark:text-white placeholder-[#333333]/50 dark:placeholder-gray-400 transition-colors duration-200"
+                    className="w-full pl-10 pr-12 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent bg-white dark:bg-gray-700 text-[#333333] dark:text-white placeholder-[#333333]/50 dark:placeholder-gray-400 transition-colors duration-200"
                     placeholder="Enter your password"
                   />
                   <button
@@ -372,7 +481,7 @@ const MultiStepLogin: React.FC = () => {
                     type="checkbox"
                     checked={rememberMe}
                     onChange={(e) => setRememberMe(e.target.checked)}
-                    className="h-4 w-4 text-[#2ED8A3] focus:ring-[#2ED8A3] border-gray-300 rounded"
+                    className="h-4 w-4 text-primary focus:ring-primary border-gray-300 rounded"
                   />
                   <label htmlFor="remember-me" className="ml-2 block text-sm text-[#333333] dark:text-gray-300">
                     Remember this device
@@ -395,7 +504,7 @@ const MultiStepLogin: React.FC = () => {
                 <button
                   type="submit"
                   disabled={loading}
-                  className="group relative w-full flex justify-center py-3 px-4 border border-transparent text-sm font-medium rounded-lg text-white bg-gradient-to-r from-[#2ED8A3] to-[#004E8A] hover:from-[#00C48C] hover:to-[#2ED8A3] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#2ED8A3] disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
+                  className="group relative w-full flex justify-center py-3 px-4 border border-transparent text-sm font-medium rounded-lg text-white bg-primary hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 shadow-sm"
                 >
                   {loading ? (
                     <div className="flex items-center">
@@ -408,66 +517,7 @@ const MultiStepLogin: React.FC = () => {
                 </button>
               </div>
 
-              {/* Divider */}
-              <div className="relative">
-                <div className="absolute inset-0 flex items-center">
-                  <div className="w-full border-t border-gray-300 dark:border-gray-600" />
-                </div>
-                <div className="relative flex justify-center text-sm">
-                  <span className="px-2 bg-white dark:bg-gray-800 text-gray-500 dark:text-gray-400">Or continue with</span>
-                </div>
-              </div>
-
-              {/* SSO Buttons */}
-              <div className="grid grid-cols-3 gap-3">
-                {/* GitHub */}
-                {ssoProviders?.github?.available && (
-                  <button
-                    type="button"
-                    onClick={() => handleSSOLogin('github')}
-                    disabled={!!ssoLoading}
-                    className="flex items-center justify-center px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    {ssoLoading === 'github' ? (
-                      <Loader2 className="w-5 h-5 animate-spin text-gray-600 dark:text-gray-400" />
-                    ) : (
-                      <Github className="w-5 h-5 text-gray-600 dark:text-gray-400" />
-                    )}
-                  </button>
-                )}
-
-                {/* GitLab */}
-                {ssoProviders?.gitlab?.available && (
-                  <button
-                    type="button"
-                    onClick={() => handleSSOLogin('gitlab')}
-                    disabled={!!ssoLoading}
-                    className="flex items-center justify-center px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    {ssoLoading === 'gitlab' ? (
-                      <Loader2 className="w-5 h-5 animate-spin text-gray-600 dark:text-gray-400" />
-                    ) : (
-                      <Gitlab className="w-5 h-5 text-gray-600 dark:text-gray-400" />
-                    )}
-                  </button>
-                )}
-
-                {/* Google */}
-                {ssoProviders?.google?.available && (
-                  <button
-                    type="button"
-                    onClick={() => handleSSOLogin('google')}
-                    disabled={!!ssoLoading}
-                    className="flex items-center justify-center px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    {ssoLoading === 'google' ? (
-                      <Loader2 className="w-5 h-5 animate-spin text-gray-600 dark:text-gray-400" />
-                    ) : (
-                      <Chrome className="w-5 h-5 text-gray-600 dark:text-gray-400" />
-                    )}
-                  </button>
-                )}
-              </div>
+             
 
               {/* SSO Loading State */}
               {ssoLoading && (
@@ -489,7 +539,7 @@ const MultiStepLogin: React.FC = () => {
                   onClick={() => setUseBackupCode(false)}
                   className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
                     !useBackupCode
-                      ? 'bg-[#2ED8A3] text-white'
+                      ? 'bg-primary text-white'
                       : 'bg-gray-200 dark:bg-gray-600 text-gray-700 dark:text-gray-300'
                   }`}
                 >
@@ -501,7 +551,7 @@ const MultiStepLogin: React.FC = () => {
                   onClick={() => setUseBackupCode(true)}
                   className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
                     useBackupCode
-                      ? 'bg-[#2ED8A3] text-white'
+                      ? 'bg-primary text-white'
                       : 'bg-gray-200 dark:bg-gray-600 text-gray-700 dark:text-gray-300'
                   }`}
                 >
@@ -528,7 +578,7 @@ const MultiStepLogin: React.FC = () => {
                       required
                       value={totpToken}
                       onChange={(e) => setTotpToken(e.target.value.replace(/\D/g, '').slice(0, 6))}
-                      className="w-full pl-10 pr-12 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-[#2ED8A3] focus:border-transparent bg-white dark:bg-gray-700 text-[#333333] dark:text-white placeholder-[#333333]/50 dark:placeholder-gray-400 transition-colors duration-200 text-center text-2xl tracking-widest"
+                      className="w-full pl-10 pr-12 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent bg-white dark:bg-gray-700 text-[#333333] dark:text-white placeholder-[#333333]/50 dark:placeholder-gray-400 transition-colors duration-200 text-center text-2xl tracking-widest"
                       placeholder="000000"
                       maxLength={6}
                     />
@@ -565,7 +615,7 @@ const MultiStepLogin: React.FC = () => {
                       required
                       value={backupCode}
                       onChange={(e) => setBackupCode(e.target.value.toUpperCase())}
-                      className="w-full pl-10 pr-12 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-[#2ED8A3] focus:border-transparent bg-white dark:bg-gray-700 text-[#333333] dark:text-white placeholder-[#333333]/50 dark:placeholder-gray-400 transition-colors duration-200"
+                      className="w-full pl-10 pr-12 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent bg-white dark:bg-gray-700 text-[#333333] dark:text-white placeholder-[#333333]/50 dark:placeholder-gray-400 transition-colors duration-200"
                       placeholder="Enter backup code"
                     />
                     <button
@@ -598,7 +648,7 @@ const MultiStepLogin: React.FC = () => {
                 <button
                   type="submit"
                   disabled={loading || (!useBackupCode && totpToken.length !== 6) || (useBackupCode && !backupCode)}
-                  className="w-full flex justify-center py-3 px-4 border border-transparent text-sm font-medium rounded-lg text-white bg-gradient-to-r from-[#2ED8A3] to-[#004E8A] hover:from-[#00C48C] hover:to-[#2ED8A3] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#2ED8A3] disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
+                  className="w-full flex justify-center py-3 px-4 border border-transparent text-sm font-medium rounded-lg text-white bg-primary hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 shadow-sm"
                 >
                   {loading ? (
                     <div className="flex items-center">
@@ -613,7 +663,7 @@ const MultiStepLogin: React.FC = () => {
                 <button
                   type="button"
                   onClick={goBack}
-                  className="w-full flex justify-center items-center py-3 px-4 border border-gray-300 dark:border-gray-600 text-sm font-medium rounded-lg text-[#333333] dark:text-white bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#2ED8A3] transition-all duration-200"
+                  className="w-full flex justify-center items-center py-3 px-4 border border-gray-300 dark:border-gray-600 text-sm font-medium rounded-lg text-[#333333] dark:text-white bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary transition-all duration-200"
                 >
                   <ArrowLeft className="w-4 h-4 mr-2" />
                   Back to credentials
@@ -636,7 +686,7 @@ const MultiStepLogin: React.FC = () => {
                 </p>
               </div>
               <div className="flex items-center justify-center">
-                <Loader2 className="animate-spin h-5 w-5 text-[#2ED8A3] mr-2" />
+                <Loader2 className="animate-spin h-5 w-5 text-primary mr-2" />
                 <span className="text-sm text-[#333333]/70 dark:text-gray-400">
                   Redirecting to dashboard...
                 </span>
@@ -651,21 +701,25 @@ const MultiStepLogin: React.FC = () => {
             <div className="flex items-center justify-center space-x-4 text-sm">
               <a
                 href="/forgot-password"
-                className="text-[#2ED8A3] hover:text-[#004E8A] dark:text-[#2ED8A3] dark:hover:text-[#00C48C]"
+                className="text-primary hover:text-primary/80 dark:text-primary dark:hover:text-primary/80"
               >
                 Forgot your password?
               </a>
               <span className="text-[#333333]/50 dark:text-gray-400">•</span>
               <a
                 href="/register"
-                className="text-[#2ED8A3] hover:text-[#004E8A] dark:text-[#2ED8A3] dark:hover:text-[#00C48C]"
+                className="text-primary hover:text-primary/80 dark:text-primary dark:hover:text-primary/80"
               >
                 Create an account
               </a>
             </div>
           </div>
         )}
+        </div>
       </div>
+      
+      {/* Thin Footer */}
+      <AuthFooter />
     </div>
   );
 };

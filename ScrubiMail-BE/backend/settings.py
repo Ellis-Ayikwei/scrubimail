@@ -31,13 +31,89 @@ SECRET_KEY = os.getenv("DJANGO_SECRET_KEY")
 OPENWEATHERMAP_API_KEY = os.environ.get("OPENWEATHERMAP_API_KEY", "")
 GOOGLE_MAPS_API_KEY = os.getenv("GOOGLE_MAPS_API_KEY")
 
+# ============================================================================
 # OAuth Configuration
+# ============================================================================
+# OAuth providers: GitHub, GitLab, Google
+#
+# Required environment variables (add to .env file):
+# - GITHUB_CLIENT_ID: Your GitHub OAuth App Client ID
+# - GITHUB_CLIENT_SECRET: Your GitHub OAuth App Client Secret
+# - GITLAB_CLIENT_ID: Your GitLab OAuth Application ID
+# - GITLAB_CLIENT_SECRET: Your GitLab OAuth Application Secret
+# - GOOGLE_CLIENT_ID: Your Google OAuth 2.0 Client ID
+# - GOOGLE_CLIENT_SECRET: Your Google OAuth 2.0 Client Secret
+#
+# Optional OAuth settings:
+# - OAUTH_REDIRECT_BASE_URI: Base URI for OAuth redirects (defaults to production URL)
+# - OAUTH_ENABLED_PROVIDERS: Comma-separated list of enabled providers (defaults to all)
+#
+# Setup guides:
+# - GitHub: https://github.com/settings/developers
+# - GitLab: https://gitlab.com/-/profile/applications
+# - Google: https://console.cloud.google.com/apis/credentials
+# ============================================================================
+
+# GitHub OAuth Configuration
 GITHUB_CLIENT_ID = os.getenv("GITHUB_CLIENT_ID")
 GITHUB_CLIENT_SECRET = os.getenv("GITHUB_CLIENT_SECRET")
+
+# GitLab OAuth Configuration
 GITLAB_CLIENT_ID = os.getenv("GITLAB_CLIENT_ID")
 GITLAB_CLIENT_SECRET = os.getenv("GITLAB_CLIENT_SECRET")
+
+# Google OAuth Configuration
 GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID")
 GOOGLE_CLIENT_SECRET = os.getenv("GOOGLE_CLIENT_SECRET")
+
+# OAuth Redirect URIs (used for callback URLs)
+# These should match the redirect URIs configured in each OAuth provider's console
+# Note: DEBUG is defined later, so we use a simple default for development
+_DEBUG_MODE = os.getenv("DEBUG", "True").lower() == "true"
+# For local development, use localhost (Google OAuth doesn't allow private IPs like 192.168.x.x)
+# Set OAUTH_REDIRECT_BASE_URI in .env if you need a different value
+# For Google OAuth: Use localhost or 127.0.0.1, NOT private IPs (192.168.x.x)
+OAUTH_REDIRECT_BASE_URI = os.getenv(
+    "OAUTH_REDIRECT_BASE_URI",
+    "http://localhost:8000" if _DEBUG_MODE else "https://scrubimail.com",
+)
+
+# OAuth Callback Paths
+OAUTH_CALLBACK_BASE_PATH = "/scrubimail/api/v1/auth/oauth"
+
+# Construct full callback URLs
+GITHUB_CALLBACK_URL = (
+    f"{OAUTH_REDIRECT_BASE_URI}{OAUTH_CALLBACK_BASE_PATH}/github/callback/"
+)
+GITLAB_CALLBACK_URL = (
+    f"{OAUTH_REDIRECT_BASE_URI}{OAUTH_CALLBACK_BASE_PATH}/gitlab/callback/"
+)
+GOOGLE_CALLBACK_URL = (
+    f"{OAUTH_REDIRECT_BASE_URI}{OAUTH_CALLBACK_BASE_PATH}/google/callback/"
+)
+
+# OAuth Provider Availability Check
+# Providers are considered available if both CLIENT_ID and CLIENT_SECRET are set
+OAUTH_PROVIDERS_CONFIG = {
+    "github": {
+        "enabled": bool(GITHUB_CLIENT_ID and GITHUB_CLIENT_SECRET),
+        "client_id": GITHUB_CLIENT_ID,
+        "client_secret": GITHUB_CLIENT_SECRET,
+        "callback_url": GITHUB_CALLBACK_URL,
+    },
+    "gitlab": {
+        "enabled": bool(GITLAB_CLIENT_ID and GITLAB_CLIENT_SECRET),
+        "client_id": GITLAB_CLIENT_ID,
+        "client_secret": GITLAB_CLIENT_SECRET,
+        "callback_url": GITLAB_CALLBACK_URL,
+    },
+    "google": {
+        "enabled": bool(GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET),
+        "client_id": GOOGLE_CLIENT_ID,
+        "client_secret": GOOGLE_CLIENT_SECRET,
+        "callback_url": GOOGLE_CALLBACK_URL,
+    },
+}
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True

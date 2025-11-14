@@ -350,10 +350,10 @@ const SSO: React.FC = () => {
                       </button>
                     </div>
                     <pre className="text-xs text-[#333333] dark:text-white overflow-x-auto">
-{`curl -X POST "https://api.scrubimail.com/validate" \\
+{`curl -X POST "https://api.scrubimail.com/scrubimail/api/v1/validate/" \\
   -H "Authorization: Bearer YOUR_API_KEY" \\
   -H "Content-Type: application/json" \\
-  -d '{"email": "test@example.com"}'`}
+  -d '{"email": "test@example.com", "real_time": true}'`}
                     </pre>
                   </div>
                 </div>

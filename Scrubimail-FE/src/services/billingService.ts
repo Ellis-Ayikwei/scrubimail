@@ -6,8 +6,11 @@ export interface BillingProfile {
     id: number;
     name: string;
     price: number;
-    credits: number;
-    features: string[];
+    credits_per_month: number;
+    features?: string[];
+    supports_api?: boolean;
+    supports_bulk?: boolean;
+    priority_support?: boolean;
   };
   credits_remaining: number;
   credits_used_this_month: number;

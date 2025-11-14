@@ -12,6 +12,7 @@ import {
   EyeOff
 } from 'lucide-react';
 import authAxiosInstance from '../../services/authAxiosInstance';
+import AuthFooter from '../../components/AuthFooter';
 
 const ForgotPassword = () => {
   const [email, setEmail] = useState('');
@@ -53,14 +54,27 @@ const ForgotPassword = () => {
 
   if (success) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[#F4F5F7] dark:bg-gray-900 py-12 px-4 sm:px-6 lg:px-8">
-        <div className="max-w-md w-full space-y-8">
+      <div className="min-h-screen flex flex-col bg-[#F4F5F7] dark:bg-gray-900 relative overflow-hidden">
+        {/* Background Mail Icon */}
+        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+          <Mail 
+            className="w-[600px] h-[600px] md:w-[800px] md:h-[800px] lg:w-[1000px] lg:h-[1000px] text-primary/5 dark:text-primary/10"
+            strokeWidth={1}
+          />
+        </div>
+
+        <div className="flex-1 flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8 relative z-10">
+          <div className="max-w-md w-full space-y-8">
           {/* Logo and Header */}
           <div className="text-center">
-            <div className="flex justify-center">
-              <div className="w-12 h-12 bg-gradient-to-r from-[#2ED8A3] to-[#004E8A] rounded-xl flex items-center justify-center">
-                <span className="text-white font-bold text-xl">S</span>
-              </div>
+            <div className="flex justify-center mb-6">
+              <Link to="/" className="flex items-center">
+                <img 
+                  src="/assets/images/scrubi mail full.png" 
+                  alt="Scrubimail Logo" 
+                  className="h-12 sm:h-16 w-auto"
+                />
+              </Link>
             </div>
             <div className="mt-6 flex justify-center">
               <div className="w-16 h-16 bg-green-100 dark:bg-green-900 rounded-full flex items-center justify-center">
@@ -107,7 +121,7 @@ const ForgotPassword = () => {
               <div className="space-y-3">
                 <button
                   onClick={() => setSuccess(false)}
-                  className="w-full py-3 px-4 border border-transparent text-sm font-medium rounded-lg text-white bg-gradient-to-r from-[#2ED8A3] to-[#004E8A] hover:from-[#00C48C] hover:to-[#2ED8A3] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#2ED8A3] transition-all duration-200"
+                  className="w-full py-3 px-4 border border-transparent text-sm font-medium rounded-lg text-white bg-primary hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary transition-all duration-200 shadow-sm"
                 >
                   {recoveryMethod === 'email' ? 'Resend email' : 'Try again'}
                 </button>
@@ -122,19 +136,37 @@ const ForgotPassword = () => {
             </div>
           </div>
         </div>
+        </div>
       </div>
+      
+      {/* Thin Footer */}
+      <AuthFooter />
+    </div>
     );
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-[#F4F5F7] dark:bg-gray-900 py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-md w-full space-y-8">
+    <div className="min-h-screen flex flex-col bg-[#F4F5F7] dark:bg-gray-900 relative overflow-hidden">
+      {/* Background Mail Icon */}
+      <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+        <Mail 
+          className="w-[600px] h-[600px] md:w-[800px] md:h-[800px] lg:w-[1000px] lg:h-[1000px] text-primary/5 dark:text-primary/10"
+          strokeWidth={1}
+        />
+      </div>
+
+      <div className="flex-1 flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8 relative z-10">
+        <div className="max-w-md w-full space-y-8">
         {/* Logo and Header */}
         <div className="text-center">
-          <div className="flex justify-center">
-            <div className="w-12 h-12 bg-gradient-to-r from-[#2ED8A3] to-[#004E8A] rounded-xl flex items-center justify-center">
-              <span className="text-white font-bold text-xl">S</span>
-            </div>
+          <div className="flex justify-center mb-6">
+            <Link to="/" className="flex items-center">
+              <img 
+                src="/assets/images/scrubi mail full.png" 
+                alt="Scrubimail Logo" 
+                className="h-12 sm:h-16 w-auto"
+              />
+            </Link>
           </div>
           <h2 className="mt-6 text-3xl font-bold text-[#333333] dark:text-white">
             Forgot your password?
@@ -262,7 +294,7 @@ const ForgotPassword = () => {
               <button
                 type="submit"
                 disabled={loading}
-                className="group relative w-full flex justify-center py-3 px-4 border border-transparent text-sm font-medium rounded-lg text-white bg-gradient-to-r from-[#2ED8A3] to-[#004E8A] hover:from-[#00C48C] hover:to-[#2ED8A3] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#2ED8A3] disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
+                className="group relative w-full flex justify-center py-3 px-4 border border-transparent text-sm font-medium rounded-lg text-white bg-primary hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 shadow-sm"
               >
                 {loading ? (
                   <div className="flex items-center">
@@ -293,7 +325,11 @@ const ForgotPassword = () => {
             Need help? Contact our support team
           </p>
         </div>
+        </div>
       </div>
+      
+      {/* Thin Footer */}
+      <AuthFooter />
     </div>
   );
 };
