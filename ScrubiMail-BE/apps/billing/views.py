@@ -3,7 +3,7 @@ from django.utils.decorators import method_decorator
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import IsAuthenticated, AllowAny
 from backend.middle_ware import AllowJWTOrAPIKey
 from rest_framework.decorators import api_view, permission_classes
 from django.shortcuts import get_object_or_404
@@ -85,7 +85,7 @@ class BillingAnalyticsView(APIView):
 class PlansView(APIView):
     """Get available plans"""
 
-    permission_classes = [AllowJWTOrAPIKey]
+    permission_classes = [AllowAny]
 
     def get(self, request):
         plans = Plan.objects.filter(is_active=True).order_by("price")

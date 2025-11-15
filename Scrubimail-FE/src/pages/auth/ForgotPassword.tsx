@@ -137,11 +137,10 @@ const ForgotPassword = () => {
           </div>
         </div>
         </div>
-      </div>
       
       {/* Thin Footer */}
       <AuthFooter />
-    </div>
+      </div>
     );
   }
 

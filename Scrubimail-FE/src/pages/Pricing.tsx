@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { 
   Check, 
@@ -13,8 +13,24 @@ import {
   Globe,
   TrendingUp,
   Database,
-  Code
+  Code,
+  Loader2
 } from 'lucide-react';
+import billingService from '../services/billingService';
+
+interface Plan {
+  id: number;
+  name: string;
+  price: number;
+  yearly_price: number | null;
+  credits_per_month: number;
+  features?: string[] | Record<string, any>;
+  is_active: boolean;
+  supports_api: boolean;
+  supports_bulk: boolean;
+  priority_support: boolean;
+  description?: string;
+}
 
 interface PricingTier {
   id: string;
@@ -34,104 +50,146 @@ interface PricingTier {
 
 const Pricing: React.FC = () => {
   const [billingCycle, setBillingCycle] = useState<'monthly' | 'yearly'>('monthly');
+  const [plans, setPlans] = useState<PricingTier[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   
-  const pricingTiers: PricingTier[] = [
-    {
-      id: 'free',
-      name: 'Free',
-      description: 'Perfect for getting started with email validation',
-      price: 0,
-      period: billingCycle,
-      validations: '1,000/month',
-      support: 'Community support',
-      buttonText: 'Get started free',
-      buttonVariant: 'outline',
-      features: [
-        '1,000 email validations per month',
-        'Basic syntax validation',
-        'DNS record checking',
-        'API access',
-        'Standard response time',
-        'Email support'
-      ],
-      limitations: [
-        'No SMTP verification',
-        'No bulk processing',
-        'Limited analytics'
-      ]
-    },
-    {
-      id: 'starter',
-      name: 'Starter',
-      description: 'Ideal for small businesses and growing teams',
-      price: billingCycle === 'monthly' ? 29 : 290,
-      originalPrice: billingCycle === 'yearly' ? 348 : undefined,
-      period: billingCycle,
-      validations: '10,000/month',
-      support: 'Email & chat support',
-      buttonText: 'Start free trial',
-      buttonVariant: 'primary',
-      popular: true,
-      features: [
-        '10,000 email validations per month',
-        'Full syntax & DNS validation',
-        'SMTP verification',
-        'Disposable email detection',
-        'Role-based email detection',
-        'Fast response times (<300ms)',
-        'Basic analytics dashboard',
-        'API documentation',
-        'Email & chat support'
-      ]
-    },
-    {
-      id: 'professional',
-      name: 'Professional',
-      description: 'Advanced features for marketing teams and agencies',
-      price: billingCycle === 'monthly' ? 99 : 990,
-      originalPrice: billingCycle === 'yearly' ? 1188 : undefined,
-      period: billingCycle,
-      validations: '50,000/month',
-      support: 'Priority support',
-      buttonText: 'Start free trial',
-      buttonVariant: 'primary',
-      features: [
-        '50,000 email validations per month',
-        'All Starter features',
-        'Bulk file processing',
-        'Advanced spam trap detection',
-        'Catch-all domain detection',
-        'Domain reputation scoring',
-        'Advanced analytics & reporting',
-        'Webhook integrations',
-        'Custom validation rules',
-        'Priority support (24/7)'
-      ]
-    },
-    {
-      id: 'enterprise',
-      name: 'Enterprise',
-      description: 'Custom solutions for large organizations',
-      price: 0,
-      period: 'custom',
-      validations: 'Custom volume',
-      support: 'Dedicated account manager',
-      buttonText: 'Contact sales',
-      buttonVariant: 'secondary',
-      features: [
-        'Unlimited email validations',
-        'All Professional features',
-        'Custom API rate limits',
-        'White-label solutions',
-        'On-premise deployment',
-        'Custom integrations',
-        'Advanced security features',
-        'SLA guarantees',
-        'Dedicated account manager',
-        'Custom training & onboarding'
-      ]
-    }
-  ];
+  useEffect(() => {
+    const fetchPlans = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        const plansData = await billingService.getPlans();
+        const activePlans = Array.isArray(plansData) ? plansData : plansData.results || [];
+        
+        // Map API plans to component format
+        const mappedPlans: PricingTier[] = activePlans
+          .filter((plan: Plan) => plan.is_active)
+          .map((plan: Plan) => {
+            // Format features from plan
+            const features: string[] = [];
+            
+            // Handle features field (could be array or object)
+            if (plan.features) {
+              if (Array.isArray(plan.features)) {
+                features.push(...plan.features.filter(f => f != null));
+              } else if (typeof plan.features === 'object' && plan.features !== null) {
+                // Convert feature object to readable strings
+                Object.entries(plan.features).forEach(([key, value]) => {
+                  if (value === true) {
+                    // Convert key to readable format
+                    const readable = key?.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()) ?? '';
+                    if (readable) features.push(readable);
+                  } else if (typeof value === 'string' && value) {
+                    features.push(value);
+                  }
+                });
+              }
+            }
+            
+            // Add feature flags
+            if (plan.credits_per_month && plan.credits_per_month > 0) {
+              features.unshift(`${plan.credits_per_month.toLocaleString()} email validations per month`);
+            }
+            if (plan.supports_api) {
+              features.push('API access');
+            }
+            if (plan.supports_bulk) {
+              features.push('Bulk file processing');
+            }
+            if (plan.priority_support) {
+              features.push('Priority support (24/7)');
+            } else {
+              features.push('Email & chat support');
+            }
+            
+            // Format price based on billing cycle
+            const monthlyPrice = Number(plan.price ?? 0);
+            const isCustom = monthlyPrice === 0 || plan.name?.toLowerCase().includes('enterprise');
+            const yearlyPriceValue = plan.yearly_price != null ? Number(plan.yearly_price) : (monthlyPrice * 10); // Default to 10 months if not set
+            const currentPrice = billingCycle === 'yearly' ? yearlyPriceValue : monthlyPrice;
+            const originalPrice = billingCycle === 'yearly' && monthlyPrice > 0 ? (monthlyPrice * 12) : undefined;
+            
+            // Format credits
+            const planName = plan.name?.toLowerCase() ?? '';
+            const creditsPerMonth = plan.credits_per_month ?? 0;
+            const credits = creditsPerMonth === 0 || planName.includes('enterprise')
+              ? 'Custom volume'
+              : `${creditsPerMonth.toLocaleString()}/month`;
+            
+            // Determine support level
+            const support = plan.priority_support 
+              ? 'Priority support' 
+              : planName.includes('enterprise')
+              ? 'Dedicated account manager'
+              : 'Email & chat support';
+            
+            // Determine if popular (Professional or Pro plans)
+            const isPopular = planName.includes('professional') || 
+                            planName.includes('pro');
+            
+            // Button text and variant
+            let buttonText = 'Get started';
+            let buttonVariant: 'primary' | 'secondary' | 'outline' = 'primary';
+            
+            if (planName.includes('free')) {
+              buttonText = 'Get started free';
+              buttonVariant = 'outline';
+            } else if (planName.includes('enterprise')) {
+              buttonText = 'Contact sales';
+              buttonVariant = 'secondary';
+            } else {
+              buttonText = 'Start free trial';
+            }
+            
+            // Limitations for free plan
+            const limitations = planName.includes('free') ? [
+              'No SMTP verification',
+              'No bulk processing',
+              'Limited analytics'
+            ] : undefined;
+            
+            return {
+              id: planName.replace(/\s+/g, '-'),
+              name: plan.name ?? 'Unnamed Plan',
+              description: plan.description || '',
+              price: isCustom ? 0 : (currentPrice ?? 0),
+              originalPrice: billingCycle === 'yearly' && !isCustom && originalPrice ? originalPrice : undefined,
+              period: billingCycle,
+              popular: isPopular,
+              features: features.length > 0 ? features : ['Core validation features'],
+              limitations,
+              validations: credits,
+              support,
+              buttonText,
+              buttonVariant
+            };
+          })
+          // Sort plans: custom pricing plans go to the end
+          .sort((a: PricingTier, b: PricingTier) => {
+            const aPrice = Number(a.price ?? 0);
+            const bPrice = Number(b.price ?? 0);
+            const aName = a.name?.toLowerCase() ?? '';
+            const bName = b.name?.toLowerCase() ?? '';
+            const aIsCustom = aPrice === 0 && aName.includes('enterprise');
+            const bIsCustom = bPrice === 0 && bName.includes('enterprise');
+            if (aIsCustom === bIsCustom) {
+              return aPrice - bPrice;
+            }
+            return aIsCustom ? 1 : -1;
+          });
+        
+        setPlans(mappedPlans);
+      } catch (err: any) {
+        console.error('Error fetching plans:', err);
+        setError(err.message || 'Failed to load pricing plans');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchPlans();
+  }, [billingCycle]);
 
   const faqs = [
     {
@@ -242,8 +300,22 @@ const Pricing: React.FC = () => {
 
       {/* Pricing Cards */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 -mt-8 mb-20">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
-          {pricingTiers.map((tier) => (
+        {loading ? (
+          <div className="flex items-center justify-center py-20">
+            <Loader2 className="w-8 h-8 animate-spin text-[#2ED8A3]" />
+          </div>
+        ) : error ? (
+          <div className="text-center py-20">
+            <p className="text-red-600 dark:text-red-400 mb-4">{error}</p>
+            <p className="text-gray-600 dark:text-gray-400">Please try refreshing the page.</p>
+          </div>
+        ) : plans.length === 0 ? (
+          <div className="text-center py-20">
+            <p className="text-gray-600 dark:text-gray-400">No pricing plans available at the moment.</p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
+            {plans.map((tier) => (
             <div
               key={tier.id}
               className={`relative bg-white dark:bg-gray-800 rounded-2xl border-2 p-8 ${
@@ -262,28 +334,28 @@ const Pricing: React.FC = () => {
 
               <div className="text-center mb-8">
                 <h3 className="text-2xl font-semibold text-gray-900 dark:text-white mb-2">
-                  {tier.name}
+                  {tier.name || 'Unnamed Plan'}
                 </h3>
                 <p className="text-gray-600 dark:text-gray-400 text-sm mb-6">
-                  {tier.description}
+                  {tier.description || 'No description available'}
                 </p>
                 
                 <div className="mb-4">
-                  {tier.id === 'enterprise' ? (
+                  {(Number(tier.price ?? 0) === 0 && tier.name?.toLowerCase().includes('enterprise')) ? (
                     <div className="text-3xl font-bold text-gray-900 dark:text-white">
                       Custom
                     </div>
                   ) : (
                     <div className="flex items-baseline justify-center">
                       <span className="text-4xl font-bold text-gray-900 dark:text-white">
-                        ${tier.price}
+                        ${Number(tier.price ?? 0).toFixed(0)}
                       </span>
                       {tier.originalPrice && (
                         <span className="text-lg text-gray-400 line-through ml-2">
-                          ${tier.originalPrice}
+                          ${Number(tier.originalPrice).toFixed(0)}
                         </span>
                       )}
-                      {tier.price > 0 && (
+                      {Number(tier.price ?? 0) > 0 && (
                         <span className="text-gray-600 dark:text-gray-400 ml-1">
                           /{billingCycle === 'monthly' ? 'mo' : 'yr'}
                         </span>
@@ -293,11 +365,11 @@ const Pricing: React.FC = () => {
                 </div>
 
                 <div className="text-sm text-gray-600 dark:text-gray-400 mb-6">
-                  {tier.validations} • {tier.support}
+                  {tier.validations || 'N/A'} • {tier.support || 'N/A'}
                 </div>
 
                 <Link
-                  to={tier.id === 'enterprise' ? '/contact' : '/onboarding'}
+                  to={tier.name?.toLowerCase().includes('enterprise') ? '/contact' : '/onboarding'}
                   className={`w-full inline-flex items-center justify-center px-6 py-3 rounded-3xl font-medium transition-all duration-200 ${
                     tier.buttonVariant === 'primary'
                       ? 'bg-[#2ED8A3] text-white hover:bg-[#00C48C] shadow-lg hover:shadow-xl'
@@ -306,7 +378,7 @@ const Pricing: React.FC = () => {
                       : 'border-2 border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:border-[#2ED8A3] hover:text-[#2ED8A3]'
                   }`}
                 >
-                  {tier.buttonText}
+                  {tier.buttonText || 'Get started'}
                   <ArrowRight className="w-4 h-4 ml-2" />
                 </Link>
               </div>
@@ -316,27 +388,28 @@ const Pricing: React.FC = () => {
                   What's included:
                 </h4>
                 <ul className="space-y-3">
-                  {tier.features.map((feature, index) => (
+                  {(tier.features || []).map((feature, index) => (
                     <li key={index} className="flex items-start">
                       <Check className="w-5 h-5 text-green-500 mr-3 mt-0.5 flex-shrink-0" />
                       <span className="text-sm text-gray-600 dark:text-gray-400">
-                        {feature}
+                        {feature || 'N/A'}
                       </span>
                     </li>
                   ))}
-                  {tier.limitations?.map((limitation, index) => (
+                  {(tier.limitations || []).map((limitation, index) => (
                     <li key={`limit-${index}`} className="flex items-start">
                       <X className="w-5 h-5 text-gray-400 mr-3 mt-0.5 flex-shrink-0" />
                       <span className="text-sm text-gray-400">
-                        {limitation}
+                        {limitation || 'N/A'}
                       </span>
                     </li>
                   ))}
                 </ul>
               </div>
             </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Features Section */}

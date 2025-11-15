@@ -60,8 +60,9 @@ class Command(BaseCommand):
                 "name": "Free",
                 "description": "Perfect for getting started with email validation",
                 "price": 0.00,
+                "yearly_price": 0.00,
                 "currency": "USD",
-                "credits_per_month": 100,
+                "credits_per_month": 1000,
                 "additional_credit_price": 0.01,
                 "max_api_calls_per_hour": 10,
                 "max_bulk_emails": 50,
@@ -71,7 +72,7 @@ class Command(BaseCommand):
                 "trial_days": 0,
                 "is_active": True,
                 "features": {
-                    "validations_per_month": 100,
+                    "validations_per_month": 1000,
                     "api_access": True,
                     "bulk_validation": False,
                     "priority_support": False,
@@ -85,6 +86,7 @@ class Command(BaseCommand):
                 "name": "Starter",
                 "description": "Ideal for small businesses and growing teams",
                 "price": 29.00,
+                "yearly_price": 290.00,  # 10 months (17% discount)
                 "currency": "USD",
                 "credits_per_month": 10000,
                 "additional_credit_price": 0.0025,
@@ -112,6 +114,7 @@ class Command(BaseCommand):
                 "name": "Professional",
                 "description": "Advanced features for marketing teams and agencies",
                 "price": 99.00,
+                "yearly_price": 990.00,  # 10 months (17% discount)
                 "currency": "USD",
                 "credits_per_month": 50000,
                 "additional_credit_price": 0.0018,
@@ -142,6 +145,7 @@ class Command(BaseCommand):
                 "name": "Enterprise",
                 "description": "Custom solutions for large organizations",
                 "price": 0.00,  # Custom pricing - handled via sales
+                "yearly_price": None,  # Custom pricing - handled via sales
                 "currency": "USD",
                 "credits_per_month": 1000000,
                 "additional_credit_price": 0.001,

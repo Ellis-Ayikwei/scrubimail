@@ -46,8 +46,9 @@ interface Plan {
   name: string;
   description: string;
   price: number;
+  yearly_price: number | null;
   currency: string;
-  billing_cycle: 'monthly' | 'yearly';
+  billing_cycle?: 'monthly' | 'yearly';
   features: string[];
   is_active: boolean;
   is_popular: boolean;
@@ -516,20 +517,38 @@ const PlansManagement: React.FC = () => {
           </Form.Item>
           
           <Row gutter={16}>
-            <Col span={8}>
+            <Col span={12}>
               <Form.Item
                 name="price"
-                label="Price"
-                rules={[{ required: true, message: 'Please input the price!' }]}
+                label="Monthly Price"
+                rules={[{ required: true, message: 'Please input the monthly price!' }]}
               >
                 <InputNumber 
                   min={0} 
                   style={{ width: '100%' }}
-                  placeholder="Enter price"
+                  placeholder="Enter monthly price"
+                  prefix="$"
                 />
               </Form.Item>
             </Col>
-            <Col span={8}>
+            <Col span={12}>
+              <Form.Item
+                name="yearly_price"
+                label="Yearly Price"
+                tooltip="Leave empty to auto-calculate (monthly * 10)"
+              >
+                <InputNumber 
+                  min={0} 
+                  style={{ width: '100%' }}
+                  placeholder="Enter yearly price (optional)"
+                  prefix="$"
+                />
+              </Form.Item>
+            </Col>
+          </Row>
+          
+          <Row gutter={16}>
+            <Col span={12}>
               <Form.Item
                 name="currency"
                 label="Currency"
@@ -540,18 +559,6 @@ const PlansManagement: React.FC = () => {
                   <Select.Option value="USD">USD</Select.Option>
                   <Select.Option value="EUR">EUR</Select.Option>
                   <Select.Option value="GBP">GBP</Select.Option>
-                </Select>
-              </Form.Item>
-            </Col>
-            <Col span={8}>
-              <Form.Item
-                name="billing_cycle"
-                label="Billing Cycle"
-                rules={[{ required: true, message: 'Please select billing cycle!' }]}
-              >
-                <Select>
-                  <Select.Option value="monthly">Monthly</Select.Option>
-                  <Select.Option value="yearly">Yearly</Select.Option>
                 </Select>
               </Form.Item>
             </Col>
