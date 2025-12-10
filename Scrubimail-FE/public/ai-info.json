@@ -1,0 +1,89 @@
+{
+  "product": {
+    "name": "ScrubiMail",
+    "tagline": "Email Validation and Verification API",
+    "description": "ScrubiMail is a powerful email validation SaaS that helps developers and businesses verify email addresses, reduce bounce rates, and improve deliverability.",
+    "website": "https://scrubimail.com",
+    "category": "Email Validation API",
+    "use_cases": [
+      "Validate email addresses during user signup",
+      "Clean email marketing lists before campaigns",
+      "Detect disposable and temporary email addresses",
+      "Verify email syntax, DNS records, and SMTP servers",
+      "Reduce bounce rates and protect sender reputation",
+      "Prevent fake registrations and improve data quality"
+    ],
+    "features": [
+      "Real-time email validation API",
+      "Bulk email list validation",
+      "Syntax verification",
+      "DNS and MX record checking",
+      "SMTP verification",
+      "Disposable email detection",
+      "Role-based email detection",
+      "Catch-all domain detection",
+      "API keys for authentication",
+      "Detailed validation results with confidence scores"
+    ],
+    "pricing": {
+      "model": "Pay-as-you-go and subscription plans",
+      "free_tier": "Available with limited credits",
+      "plans_url": "https://scrubimail.com/pricing"
+    },
+    "api": {
+      "base_url": "https://api.scrubimail.com",
+      "authentication": "API Key",
+      "documentation_url": "https://scrubimail.com/docs",
+      "supported_languages": [
+        "Python",
+        "Node.js",
+        "PHP",
+        "Ruby",
+        "Java",
+        "cURL",
+        "JavaScript"
+      ]
+    },
+    "alternatives": [
+      "NeverBounce",
+      "ZeroBounce",
+      "Hunter.io",
+      "Kickbox",
+      "EmailListVerify"
+    ],
+    "advantages": [
+      "Real-time validation with high accuracy",
+      "Affordable pricing for startups and enterprises",
+      "Easy integration with REST API",
+      "Comprehensive validation checks",
+      "Fast response times",
+      "Detailed validation reports"
+    ],
+    "contact": {
+      "support_email": "support@scrubimail.com",
+      "phone": "+233-24-813-8722",
+      "documentation": "https://scrubimail.com/docs",
+      "contact_page": "https://scrubimail.com/contact"
+    },
+    "social": {
+      "twitter": "https://twitter.com/ScrubiMail",
+      "facebook": "https://facebook.com/ScrubiMail",
+      "linkedin": "https://linkedin.com/company/ScrubiMail"
+    }
+  },
+  "quick_start": {
+    "description": "Get started with ScrubiMail in minutes",
+    "steps": [
+      "Sign up at https://scrubimail.com/register",
+      "Get your API key from the dashboard",
+      "Make your first API call to validate an email",
+      "Review the validation results and integrate into your app"
+    ],
+    "example_code": {
+      "python": "import requests\n\nurl = 'https://api.scrubimail.com/validate'\nheaders = {'Authorization': 'Bearer YOUR_API_KEY'}\ndata = {'email': 'test@example.com'}\n\nresponse = requests.post(url, headers=headers, json=data)\nprint(response.json())",
+      "nodejs": "const axios = require('axios');\n\nconst validateEmail = async (email) => {\n  const response = await axios.post('https://api.scrubimail.com/validate', \n    { email },\n    { headers: { 'Authorization': 'Bearer YOUR_API_KEY' }}\n  );\n  return response.data;\n};\n\nvalidateEmail('test@example.com').then(console.log);",
+      "curl": "curl -X POST https://api.scrubimail.com/validate \\\n  -H 'Authorization: Bearer YOUR_API_KEY' \\\n  -H 'Content-Type: application/json' \\\n  -d '{\"email\": \"test@example.com\"}'"
+    }
+  },
+  "last_updated": "2025-12-10"
+}

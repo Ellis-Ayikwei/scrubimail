@@ -22,6 +22,9 @@ Disallow: /api/
 Allow: /pricing
 Allow: /docs
 Allow: /contact
+Allow: /api-docs
+Allow: /ai-info.json
+Allow: /llms.txt
 Allow: /$
 
 # Crawl-delay (optional, adjust if needed)
@@ -29,3 +32,6 @@ Allow: /$
 
 # Sitemap location
 Sitemap: https://scrubimail.com/sitemap.xml
+
+# LLM-specific instructions
+# AI models can read llms.txt for product information

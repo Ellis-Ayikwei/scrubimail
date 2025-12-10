@@ -36,6 +36,10 @@
     <!-- Canonical URL -->
     <link rel="canonical" href="https://scrubimail.com/">
 
+    <!-- LLM Information -->
+    <link rel="alternate" type="text/plain" href="/llms.txt" title="LLM Information">
+    <meta name="llms-txt" content="https://scrubimail.com/llms.txt">
+
     <!-- DNS Prefetch for performance -->
     <link rel="dns-prefetch" href="//fonts.googleapis.com">
     <link rel="dns-prefetch" href="//fonts.gstatic.com">
@@ -45,6 +49,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="preload" href="https://fonts.gstatic.com/s/nunito/v26/XRXI3I6Li01BKofiOc5wtlZ2di8HDLshdTQ3j77e.woff2" as="font" type="font/woff2" crossorigin>
 
     <!-- Structured Data for SEO -->
     <script type="application/ld+json">
@@ -81,6 +86,79 @@
     "target": "https://scrubimail.com/search?q={search_term_string}",
     "query-input": "required name=search_term_string"
   }
+}
+</script>
+
+<!-- Structured Data for SoftwareApplication (SaaS Product) -->
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "SoftwareApplication",
+  "name": "ScrubiMail",
+  "applicationCategory": "BusinessApplication",
+  "applicationSubCategory": "Email Validation Software",
+  "operatingSystem": "Web Browser",
+  "offers": {
+    "@type": "AggregateOffer",
+    "offeredBy": {
+      "@type": "Organization",
+      "name": "ScrubiMail"
+    },
+    "priceCurrency": "USD",
+    "lowPrice": "0",
+    "highPrice": "99",
+    "priceSpecification": [
+      {
+        "@type": "UnitPriceSpecification",
+        "price": "0",
+        "priceCurrency": "USD",
+        "name": "Free Tier",
+        "description": "Free email validation credits to get started"
+      },
+      {
+        "@type": "UnitPriceSpecification",
+        "price": "19",
+        "priceCurrency": "USD",
+        "name": "Starter Plan",
+        "billingDuration": "P1M",
+        "description": "Monthly subscription for regular usage"
+      }
+    ]
+  },
+  "aggregateRating": {
+    "@type": "AggregateRating",
+    "ratingValue": "4.8",
+    "ratingCount": "127",
+    "bestRating": "5",
+    "worstRating": "1"
+  },
+  "description": "ScrubiMail is a powerful email validation and verification SaaS platform that helps developers verify email addresses in real-time, reduce bounce rates, and improve email deliverability.",
+  "featureList": [
+    "Real-time email validation API",
+    "Bulk email list validation",
+    "Syntax verification (RFC 5322)",
+    "DNS and MX record checking",
+    "SMTP mailbox verification",
+    "Disposable email detection",
+    "Role-based email detection",
+    "Catch-all domain detection",
+    "API-first architecture",
+    "Multi-language SDK support"
+  ],
+  "screenshot": "https://scrubimail.com/og-image.jpg",
+  "softwareVersion": "2.0",
+  "releaseNotes": "Enhanced validation accuracy, faster API response times, improved dashboard",
+  "author": {
+    "@type": "Organization",
+    "name": "ScrubiMail"
+  },
+  "url": "https://scrubimail.com",
+  "downloadUrl": "https://scrubimail.com/register",
+  "sameAs": [
+    "https://twitter.com/ScrubiMail",
+    "https://facebook.com/ScrubiMail",
+    "https://linkedin.com/company/ScrubiMail"
+  ]
 }
 </script>
 

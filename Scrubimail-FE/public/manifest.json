@@ -1,25 +1,33 @@
 {
-  "short_name": "VRISTO - Multipurpose Tailwind Dashboard Template",
-  "name": "VRISTO - Multipurpose Tailwind Dashboard Template",
+  "short_name": "ScrubiMail",
+  "name": "ScrubiMail - Email Validation SaaS",
+  "description": "Powerful email validation and verification. Reduce bounce rates and improve deliverability.",
   "icons": [
     {
-      "src": "favicon.ico",
+      "src": "favicon/favicon.ico",
       "sizes": "64x64 32x32 24x24 16x16",
       "type": "image/x-icon"
     },
     {
-      "src": "logo192.png",
+      "src": "favicon/android-chrome-192x192.png",
       "type": "image/png",
-      "sizes": "192x192"
+      "sizes": "192x192",
+      "purpose": "any maskable"
     },
     {
-      "src": "logo512.png",
+      "src": "favicon/android-chrome-512x512.png",
       "type": "image/png",
-      "sizes": "512x512"
+      "sizes": "512x512",
+      "purpose": "any maskable"
     }
   ],
-  "start_url": ".",
+  "start_url": "/",
+  "scope": "/",
   "display": "standalone",
-  "theme_color": "#000000",
-  "background_color": "#ffffff"
+  "orientation": "portrait-primary",
+  "theme_color": "#dc711a",
+  "background_color": "#0e1726",
+  "categories": ["productivity", "utilities", "business"],
+  "lang": "en-US",
+  "dir": "ltr"
 }
