@@ -1,0 +1,31 @@
+# robots.txt for ScrubiMail
+# https://scrubimail.com/robots.txt
+
+# Allow all search engines to crawl the site
+User-agent: *
+Allow: /
+
+# Disallow authentication and user-specific pages
+Disallow: /login
+Disallow: /register
+Disallow: /reset-password
+Disallow: /verify-email
+Disallow: /dashboard
+Disallow: /profile
+Disallow: /settings
+Disallow: /account
+
+# Disallow API endpoints (if any are accessible via FE routes)
+Disallow: /api/
+
+# Allow important pages
+Allow: /pricing
+Allow: /docs
+Allow: /contact
+Allow: /$
+
+# Crawl-delay (optional, adjust if needed)
+# Crawl-delay: 10
+
+# Sitemap location
+Sitemap: https://scrubimail.com/sitemap.xml
