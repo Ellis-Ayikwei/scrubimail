@@ -426,7 +426,7 @@ const AdminUsers: React.FC = () => {
                 {/* Data Table */}
                 <Table
                     columns={columns}
-                    dataSource={filteredUsers}
+                    dataSource={Array.isArray(filteredUsers) ? filteredUsers : []}
                     rowSelection={rowSelection}
                     loading={loading}
                     pagination={{

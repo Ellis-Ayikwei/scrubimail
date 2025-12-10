@@ -47,37 +47,37 @@ const routes = [
     {
         path: '/integrations',
         element: <Integrations />,
-        layout: 'default',
+        layout: 'flexible',
     },
     {
         path: '/about',
         element: <About />,
-        layout: 'default',
+        layout: 'flexible',
     },
     {
         path: '/blog',
         element: <Blog />,
-        layout: 'default',
+        layout: 'flexible',
     },
     {
         path: '/contact',
         element: <Contact />,
-        layout: 'default',
+        layout: 'flexible',
     },
     {
         path: '/help',
         element: <Help />,
-        layout: 'default',
+        layout: 'flexible',
     },
     {
         path: '/pricing',
         element: <Pricing />,
-        layout: 'default',
+        layout: 'flexible',
     },
     {
         path: '/features',
         element: <Features />,
-        layout: 'default',
+        layout: 'flexible',
     },
     {
         path: '/login',
@@ -213,7 +213,7 @@ const routes = [
     {
         path: '/api-docs',
         element: <ApiDocs />,
-        layout: 'default',
+        layout: 'flexible',
     },
     {
         path: '/analytics',

@@ -13,7 +13,7 @@ import CTASection from '../components/CTASection';
 
 const Homepage: React.FC = () => {
   return (
-    <div className="min-h-screen bg-white dark:bg-gray-900">
+    <>
       <TopBar />
       <HeroSection />
       <FeaturesSection />
@@ -25,7 +25,7 @@ const Homepage: React.FC = () => {
       <PricingSection />
       <CTASection />
       <Footer />
-    </div>
+    </>
   );
 };
 

@@ -10,19 +10,19 @@ module.exports = {
             colors: {
                 // Core brand colors with standard Tailwind scale
                 primary: {
-                    50: '#f3f2fc', // Lightest tint
-                    100: '#e8eaf6', // Very light
-                    200: '#d1d4ed', // Light
-                    300: '#a3a9d9', // Medium light
-                    400: '#7575c0', // Medium
-                    500: '#2E2787', // DEFAULT - Deep indigo
-                    600: '#252060', // Darker
-                    700: '#1c1849', // Dark
-                    800: '#131132', // Very dark
-                    900: '#0a091b', // Darkest
-                    DEFAULT: '#2E2787',
-                    light: '#e8eaf6',
-                    'dark-light': 'rgba(46, 39, 135, 0.15)',
+                    50: '#f0fdfa', // Lightest tint
+                    100: '#ccfbf1', // Very light
+                    200: '#99f6e4', // Light
+                    300: '#5eead4', // Medium light
+                    400: '#2dd4bf', // Medium
+                    500: '#2ED8A3', // DEFAULT - Teal
+                    600: '#14b8a6', // Darker
+                    700: '#0d9488', // Dark
+                    800: '#0f766e', // Very dark
+                    900: '#134e4a', // Darkest
+                    DEFAULT: '#2ED8A3',
+                    light: '#ccfbf1',
+                    'dark-light': 'rgba(46, 216, 163, 0.15)',
                 },
                 secondary: {
                     50: '#fff5f2', // Lightest tint

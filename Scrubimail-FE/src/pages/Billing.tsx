@@ -13,36 +13,44 @@ import {
   Star,
   Users
 } from 'lucide-react';
-import axiosInstance from '../services/axiosInstance';
+import billingService, { BillingProfile, BillingAnalytics, UsageStats } from '../services/billingService';
+
+interface Plan {
+  id: number;
+  name: string;
+  price: number;
+  credits_per_month: number;
+  features?: string[];
+  is_active: boolean;
+  supports_api: boolean;
+  supports_bulk: boolean;
+  priority_support: boolean;
+}
 
 const Billing = () => {
-  const [credits, setCredits] = useState<number>(0);
-  const [plan, setPlan] = useState<string>('free');
-  const [loading, setLoading] = useState(false);
+  const [billingProfile, setBillingProfile] = useState<BillingProfile | null>(null);
+  const [plans, setPlans] = useState<Plan[]>([]);
+  const [usageStats, setUsageStats] = useState<UsageStats | null>(null);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [usage, setUsage] = useState<any>({
-    thisMonth: 0,
-    lastMonth: 0,
-    totalValidations: 0
-  });
 
   useEffect(() => {
     const fetchBillingData = async () => {
       setLoading(true);
       setError(null);
       try {
-        const [creditsRes, usageRes] = await Promise.all([
-          axiosInstance.get('/credits/'),
-          axiosInstance.get('/analytics/')
+        const [profileRes, plansRes, usageRes] = await Promise.all([
+          billingService.getBillingProfile(),
+          billingService.getPlans(),
+          billingService.getUsageStats()
         ]);
-        setCredits(creditsRes.data.credits);
-        setUsage({
-          thisMonth: usageRes.data.overview?.total_validations || 0,
-          lastMonth: 0, // TODO: Get from analytics
-          totalValidations: usageRes.data.overview?.total_validations || 0
-        });
+        
+        setBillingProfile(profileRes);
+        setPlans(Array.isArray(plansRes) ? plansRes : plansRes.results || []);
+        setUsageStats(usageRes);
       } catch (err: any) {
-        setError('Failed to fetch billing information');
+        console.error('Error fetching billing data:', err);
+        setError(err.message || 'Failed to fetch billing information');
       } finally {
         setLoading(false);
       }
@@ -50,67 +58,62 @@ const Billing = () => {
     fetchBillingData();
   }, []);
 
-  const plans = [
-    { 
-      name: 'Free', 
-      price: 0, 
-      credits: 100, 
-      popular: false,
-      icon: Star,
-      features: [
-        '100 validations/month',
-        'Basic email validation',
-        'Community support',
-        'Standard response times'
-      ],
-      color: 'from-gray-400 to-gray-600'
-    },
-    { 
-      name: 'Professional', 
-      price: 29, 
-      credits: 1000, 
-      popular: true,
-      icon: Crown,
-      features: [
-        '1,000 validations/month',
-        'Advanced validation features',
-        'Priority support',
-        'API access',
-        'Bulk validation',
-        'Analytics dashboard'
-      ],
-      color: 'from-[#2ED8A3] to-[#004E8A]'
-    },
-    { 
-      name: 'Enterprise', 
-      price: 99, 
-      credits: 5000, 
-      popular: false,
-      icon: Users,
-      features: [
-        '5,000 validations/month',
-        'All Professional features',
-        '24/7 phone support',
-        'Custom integrations',
-        'Dedicated account manager',
-        'SLA guarantee'
-      ],
-      color: 'from-purple-500 to-purple-700'
-    },
-  ];
+  const currentPlan = billingProfile?.current_plan;
+  const creditsRemaining = billingProfile?.credits_remaining || 0;
+  const creditsUsedThisMonth = billingProfile?.credits_used_this_month || 0;
+  const totalCredits = currentPlan?.credits_per_month || 0;
+  const usageThisMonth = usageStats?.this_month?.validations || creditsUsedThisMonth;
+  const totalValidations = usageStats?.total_validations || 0;
+  
+  // Map plan icons
+  const getPlanIcon = (planName: string) => {
+    const name = planName.toLowerCase();
+    if (name.includes('free')) return Star;
+    if (name.includes('enterprise')) return Users;
+    return Crown;
+  };
 
-  const currentPlan = plans.find(p => p.name.toLowerCase() === plan.toLowerCase()) || plans[0];
+  // Map plan colors
+  const getPlanColor = (planName: string) => {
+    const name = planName.toLowerCase();
+    if (name.includes('free')) return 'from-gray-400 to-gray-600';
+    if (name.includes('enterprise')) return 'from-purple-500 to-purple-700';
+    return 'from-[#2ED8A3] to-[#004E8A]';
+  };
 
-  // if (loading) {
-  //   return (
-  //     <div className="min-h-screen bg-[#F8FAFC] dark:bg-gray-900 flex items-center justify-center">
-  //       <div className="text-center">
-  //         <Loader2 className="w-8 h-8 animate-spin text-[#2ED8A3] mx-auto mb-4" />
-  //         <p className="text-[#333333] dark:text-white">Loading billing information...</p>
-  //       </div>
-  //     </div>
-  //   );
-  // }
+  // Format features from plan
+  const formatPlanFeatures = (plan: Plan): string[] => {
+    const features: string[] = [];
+    if (plan.credits_per_month) {
+      features.push(`${plan.credits_per_month.toLocaleString()} validations/month`);
+    }
+    if (plan.supports_api) {
+      features.push('API access');
+    }
+    if (plan.supports_bulk) {
+      features.push('Bulk validation');
+    }
+    if (plan.priority_support) {
+      features.push('Priority support');
+    } else {
+      features.push('Community support');
+    }
+    if (plan.features && Array.isArray(plan.features)) {
+      features.push(...plan.features);
+    }
+    return features;
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-[#F8FAFC] dark:bg-gray-900 flex items-center justify-center">
+        <div className="text-center">
+          <Loader2 className="w-8 h-8 animate-spin text-[#2ED8A3] mx-auto mb-4" />
+          <p className="text-[#333333] dark:text-white">Loading billing information...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-[#F8FAFC] dark:bg-gray-900">
@@ -143,24 +146,26 @@ const Billing = () => {
           <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-lg font-semibold text-[#333333] dark:text-white">Current Plan</h2>
-              <div className={`w-8 h-8 bg-gradient-to-r ${currentPlan.color} rounded-lg flex items-center justify-center`}>
-                <currentPlan.icon className="w-4 h-4 text-white" />
-              </div>
+              {currentPlan && (
+                <div className={`w-8 h-8 bg-gradient-to-r ${getPlanColor(currentPlan.name)} rounded-lg flex items-center justify-center`}>
+                  {React.createElement(getPlanIcon(currentPlan.name), { className: "w-4 h-4 text-white" })}
+                </div>
+              )}
             </div>
             <div className="text-3xl font-bold text-[#333333] dark:text-white mb-1">
-              {currentPlan.name}
+              {currentPlan?.name || 'Free'}
             </div>
             <div className="text-[#333333]/70 dark:text-gray-400 mb-4">
-              ${currentPlan.price}/month
+              ${currentPlan?.price || 0}/month
             </div>
             <div className="space-y-2">
               <div className="flex justify-between text-sm">
                 <span className="text-[#333333]/70 dark:text-gray-400">Credits Remaining:</span>
-                <span className="font-semibold text-[#333333] dark:text-white">{credits?.toLocaleString() || '0'}</span>
+                <span className="font-semibold text-[#333333] dark:text-white">{creditsRemaining.toLocaleString()}</span>
               </div>
               <div className="flex justify-between text-sm">
                 <span className="text-[#333333]/70 dark:text-gray-400">Total Credits:</span>
-                <span className="font-semibold text-[#333333] dark:text-white">{currentPlan.credits.toLocaleString()}</span>
+                <span className="font-semibold text-[#333333] dark:text-white">{totalCredits.toLocaleString()}</span>
               </div>
             </div>
           </div>
@@ -172,7 +177,7 @@ const Billing = () => {
               <TrendingUp className="w-6 h-6 text-[#2ED8A3]" />
             </div>
             <div className="text-3xl font-bold text-[#2ED8A3] mb-1">
-              {usage.thisMonth?.toLocaleString() || '0'}
+              {usageThisMonth.toLocaleString()}
             </div>
             <div className="text-[#333333]/70 dark:text-gray-400 mb-4">
               Validations Used
@@ -180,11 +185,11 @@ const Billing = () => {
             <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
               <div 
                 className="bg-gradient-to-r from-[#2ED8A3] to-[#00C48C] h-2 rounded-full transition-all duration-300"
-                style={{ width: `${Math.min(((usage.thisMonth || 0) / currentPlan.credits) * 100, 100)}%` }}
+                style={{ width: `${Math.min((totalCredits > 0 ? (usageThisMonth / totalCredits) * 100 : 0), 100)}%` }}
               ></div>
             </div>
             <div className="text-xs text-[#333333]/50 dark:text-gray-400 mt-2">
-              {Math.round(((usage.thisMonth || 0) / currentPlan.credits) * 100)}% of monthly limit
+              {totalCredits > 0 ? Math.round((usageThisMonth / totalCredits) * 100) : 0}% of monthly limit
             </div>
           </div>
 
@@ -195,7 +200,7 @@ const Billing = () => {
               <Zap className="w-6 h-6 text-[#2ED8A3]" />
             </div>
             <div className="text-3xl font-bold text-[#333333] dark:text-white mb-1">
-              {usage.totalValidations?.toLocaleString() || '0'}
+              {totalValidations.toLocaleString()}
             </div>
             <div className="text-[#333333]/70 dark:text-gray-400 mb-4">
               All Time Validations
@@ -211,22 +216,24 @@ const Billing = () => {
         <div className="mb-8">
           <h2 className="text-2xl font-bold text-[#333333] dark:text-white mb-6">Available Plans</h2>
           <div className="grid md:grid-cols-3 gap-6">
-            {plans.map((planItem) => {
-              const IconComponent = planItem.icon;
-              const isCurrentPlan = planItem.name.toLowerCase() === currentPlan.name.toLowerCase();
+            {plans.filter(p => p.is_active).map((planItem) => {
+              const IconComponent = getPlanIcon(planItem.name);
+              const isCurrentPlan = currentPlan?.id === planItem.id;
+              const features = formatPlanFeatures(planItem);
+              const isPopular = planItem.name.toLowerCase().includes('professional') || planItem.name.toLowerCase().includes('pro');
               
               return (
                 <div 
-                  key={planItem.name} 
+                  key={planItem.id} 
                   className={`relative bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-sm border-2 transition-all duration-200 hover:shadow-lg ${
-                    planItem.popular 
+                    isPopular 
                       ? 'border-[#2ED8A3]' 
                       : isCurrentPlan 
                         ? 'border-[#2ED8A3]/50' 
                         : 'border-gray-200 dark:border-gray-700'
                   }`}
                 >
-                  {planItem.popular && (
+                  {isPopular && (
                     <div className="absolute -top-3 left-1/2 transform -translate-x-1/2">
                       <span className="bg-[#2ED8A3] text-white px-3 py-1 rounded-full text-xs font-medium">
                         Most Popular
@@ -235,7 +242,7 @@ const Billing = () => {
                   )}
                   
                   <div className="text-center mb-6">
-                    <div className={`w-12 h-12 bg-gradient-to-r ${planItem.color} rounded-xl flex items-center justify-center mx-auto mb-3`}>
+                    <div className={`w-12 h-12 bg-gradient-to-r ${getPlanColor(planItem.name)} rounded-xl flex items-center justify-center mx-auto mb-3`}>
                       <IconComponent className="w-6 h-6 text-white" />
                     </div>
                     <h3 className="text-xl font-bold text-[#333333] dark:text-white mb-2">
@@ -250,12 +257,12 @@ const Billing = () => {
                       </span>
                     </div>
                     <p className="text-[#333333]/70 dark:text-gray-400">
-                      {planItem.credits.toLocaleString()} validations per month
+                      {planItem.credits_per_month.toLocaleString()} validations per month
                     </p>
                   </div>
                   
                   <ul className="space-y-3 mb-6">
-                    {planItem.features.map((feature, index) => (
+                    {features.map((feature, index) => (
                       <li key={index} className="flex items-start">
                         <CheckCircle className="w-5 h-5 text-[#2ED8A3] mr-3 mt-0.5 flex-shrink-0" />
                         <span className="text-sm text-[#333333] dark:text-gray-300">{feature}</span>
@@ -264,10 +271,19 @@ const Billing = () => {
                   </ul>
                   
                   <button 
+                    onClick={() => {
+                      if (!isCurrentPlan) {
+                        billingService.upgradePlan(planItem.id).then(() => {
+                          window.location.reload();
+                        }).catch(err => {
+                          setError(err.message || 'Failed to upgrade plan');
+                        });
+                      }
+                    }}
                     className={`w-full py-3 px-4 rounded-lg font-semibold text-center transition-all duration-200 ${
                       isCurrentPlan
                         ? 'bg-[#F4F5F7] dark:bg-gray-700 text-[#333333] dark:text-white cursor-default'
-                        : planItem.popular
+                        : isPopular
                           ? 'bg-gradient-to-r from-[#2ED8A3] to-[#004E8A] text-white hover:from-[#00C48C] hover:to-[#2ED8A3]'
                           : 'bg-[#F4F5F7] dark:bg-gray-700 text-[#333333] dark:text-white hover:bg-[#2ED8A3] hover:text-white dark:hover:bg-[#2ED8A3]'
                     }`}
@@ -294,7 +310,19 @@ const Billing = () => {
                 <span className="text-[#333333] dark:text-white">Update Payment Method</span>
                 <ArrowRight className="w-4 h-4 text-[#2ED8A3]" />
               </button>
-              <button className="w-full flex items-center justify-between p-3 bg-[#F4F5F7] dark:bg-gray-700 rounded-lg hover:bg-[#2ED8A3]/10 transition-colors">
+              <button 
+                onClick={async () => {
+                  if (window.confirm('Are you sure you want to cancel your subscription?')) {
+                    try {
+                      await billingService.cancelSubscription();
+                      window.location.reload();
+                    } catch (err: any) {
+                      setError(err.message || 'Failed to cancel subscription');
+                    }
+                  }
+                }}
+                className="w-full flex items-center justify-between p-3 bg-[#F4F5F7] dark:bg-gray-700 rounded-lg hover:bg-[#2ED8A3]/10 transition-colors"
+              >
                 <span className="text-[#333333] dark:text-white">Cancel Subscription</span>
                 <ArrowRight className="w-4 h-4 text-[#2ED8A3]" />
               </button>

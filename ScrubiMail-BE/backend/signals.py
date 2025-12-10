@@ -13,6 +13,11 @@ def create_user_profile(sender, instance, created, **kwargs):
     if created:
         if instance.user_type == "provider":
             ServiceProvider.objects.create(user=instance)
+        
+        # Automatically create billing profile with Free plan for all new users
+        from apps.billing.services import BillingService
+        billing_service = BillingService()
+        billing_service.get_or_create_billing_profile(instance)
 
 
 @receiver(post_save, sender=User)

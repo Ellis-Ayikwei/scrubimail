@@ -165,10 +165,10 @@ const Onboarding: React.FC = () => {
           <div className="bg-gray-50 dark:bg-gray-800 rounded-3xl p-4 border border-gray-200 dark:border-gray-700">
             <h3 className="font-medium text-[#333333] dark:text-white mb-2">Quick Start Example:</h3>
             <pre className="text-xs bg-black text-green-400 p-3 rounded-3xl overflow-x-auto">
-{`curl -X POST https://api.scrubimail.com/validate \\
+{`curl -X POST https://api.scrubimail.com/scrubimail/api/v1/validate/ \\
   -H "Authorization: Bearer sk_live_1234..." \\
   -H "Content-Type: application/json" \\
-  -d '{"email": "test@example.com"}'`}
+  -d '{"email": "test@example.com", "real_time": true}'`}
             </pre>
           </div>
         </div>

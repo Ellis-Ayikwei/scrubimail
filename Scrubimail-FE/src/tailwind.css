@@ -48,6 +48,45 @@
         @apply bg-[#060818];
     }
 
+    /* Reduce font sizes in main content area (but not sidebar) */
+    /* Scale down all text by ~15% in main content */
+    main {
+        font-size: 0.875rem !important; /* 14px - base text-sm */
+    }
+
+    /* Scale down headings proportionally */
+    main .text-6xl, main h1.text-6xl {
+        font-size: 2.5rem !important; /* ~40px instead of 60px */
+    }
+
+    main .text-5xl, main h1.text-5xl {
+        font-size: 2rem !important; /* ~32px instead of 48px */
+    }
+
+    main .text-4xl, main h1.text-4xl {
+        font-size: 1.75rem !important; /* ~28px instead of 36px */
+    }
+
+    main .text-3xl, main h1.text-3xl, main h2.text-3xl {
+        font-size: 1.5rem !important; /* 24px instead of 30px */
+    }
+
+    main .text-2xl, main h1.text-2xl, main h2.text-2xl {
+        font-size: 1.25rem !important; /* 20px instead of 24px */
+    }
+
+    main .text-xl, main h2.text-xl, main h3.text-xl {
+        font-size: 1.125rem !important; /* 18px instead of 20px */
+    }
+
+    main .text-lg, main h3.text-lg, main h4.text-lg {
+        font-size: 1rem !important; /* 16px instead of 18px */
+    }
+
+    main .text-base, main p.text-base {
+        font-size: 0.875rem !important; /* 14px instead of 16px */
+    }
+
     /* Panel */
     .panel {
         @apply relative rounded-md bg-white p-5 shadow dark:bg-black;
@@ -99,7 +138,7 @@
     }
 
     .main-container .main-content {
-        @apply transition-all duration-300 lg:ltr:ml-[290px] lg:rtl:mr-[290px];
+        @apply transition-all duration-300 lg:ltr:ml-[220px] lg:rtl:mr-[220px];
     }
 
     /* Horizontal layouts */
@@ -113,10 +152,10 @@
         @apply ltr:ml-0 rtl:mr-0;
     }
     .horizontal .sidebar {
-        @apply ltr:-left-[290px] rtl:-right-[290px];
+        @apply ltr:-left-[220px] rtl:-right-[220px];
     }
     .horizontal.toggle-sidebar .sidebar {
-        @apply ltr:left-0 rtl:right-0 lg:ltr:-left-[290px] lg:rtl:-right-[290px];
+        @apply ltr:left-0 rtl:right-0 lg:ltr:-left-[220px] lg:rtl:-right-[220px];
     }
 
     .horizontal .nav-item a div:first-child svg,
@@ -165,27 +204,27 @@
         @apply ltr:ml-0 rtl:mr-0;
     }
     .vertical .sidebar {
-        @apply ltr:-left-[290px] rtl:-right-[290px] lg:ltr:left-0 lg:rtl:right-0;
+        @apply ltr:-left-[220px] rtl:-right-[220px] lg:ltr:left-0 lg:rtl:right-0;
     }
     .vertical.toggle-sidebar .sidebar {
-        @apply ltr:left-0 rtl:right-0 lg:ltr:-left-[290px] lg:rtl:-right-[290px];
+        @apply ltr:left-0 rtl:right-0 lg:ltr:-left-[220px] lg:rtl:-right-[220px];
     }
 
     /* Collapsible vertical layouts */
     .collapsible-vertical .sidebar {
-        @apply hover:w-[290px] ltr:-left-[290px] rtl:-right-[290px] lg:w-[70px] lg:ltr:left-0 lg:rtl:right-0;
+        @apply hover:w-[220px] ltr:-left-[220px] rtl:-right-[220px] lg:w-[70px] lg:ltr:left-0 lg:rtl:right-0;
     }
     .collapsible-vertical.toggle-sidebar .sidebar {
         @apply ltr:left-0 rtl:right-0;
     }
     .collapsible-vertical.toggle-sidebar .sidebar {
-        @apply lg:w-[290px];
+        @apply lg:w-[220px];
     }
     .collapsible-vertical.toggle-sidebar .sidebar .nav-item > a {
         @apply w-auto;
     }
     .collapsible-vertical.toggle-sidebar .main-content {
-        @apply lg:w-[calc(100%-290px)] lg:ltr:ml-[290px] lg:rtl:mr-[290px];
+        @apply lg:w-[calc(100%-220px)] lg:ltr:ml-[220px] lg:rtl:mr-[220px];
     }
 
     .collapsible-vertical .sidebar .sub-menu {

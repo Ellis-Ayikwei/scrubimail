@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Line, Bar, Doughnut, Radar } from 'react-chartjs-2';
+import React, { useState, useEffect } from 'react';
+import { Line, Bar, Doughnut } from 'react-chartjs-2';
 import {
     Chart as ChartJS,
     CategoryScale,
@@ -8,7 +8,6 @@ import {
     LineElement,
     BarElement,
     ArcElement,
-    RadialLinearScale,
     Title,
     Tooltip,
     Legend,
@@ -20,33 +19,34 @@ import {
     Col, 
     Statistic, 
     Select, 
-    DatePicker, 
     Space, 
     Typography, 
     Progress, 
     Table, 
     Tag,
     Button,
-    Tooltip as AntTooltip,
-    Badge
+    DatePicker,
+    message,
+    Spin
 } from 'antd';
 import {
-    BarChartOutlined,
-    LineChartOutlined,
-    PieChartOutlined,
-    DownloadOutlined,
-    ReloadOutlined,
-    RiseOutlined,
-    TrendingDownOutlined,
-    UserOutlined,
-    EyeOutlined,
-    ClockCircleOutlined,
-    GlobalOutlined,
-    DesktopOutlined,
-    MobileOutlined,
-    TabletOutlined,
-    LinkOutlined
-} from '@ant-design/icons';
+    BarChart3,
+    TrendingUp,
+    Users,
+    DollarSign,
+    Mail,
+    CheckCircle,
+    XCircle,
+    AlertCircle,
+    Download,
+    RefreshCw,
+    Activity,
+    CreditCard,
+    FileText,
+    Calendar
+} from 'lucide-react';
+import axiosInstance from '../../services/axiosInstance';
+import dayjs from 'dayjs';
 
 // Register ChartJS components
 ChartJS.register(
@@ -56,31 +56,180 @@ ChartJS.register(
     LineElement,
     BarElement,
     ArcElement,
-    RadialLinearScale,
     Title,
     Tooltip,
     Legend,
     Filler
 );
 
-const AdminAnalytics: React.FC = () => {
-    const [timeRange, setTimeRange] = useState('7d');
+const { Title, Text } = Typography;
+const { RangePicker } = DatePicker;
 
-    // Sample data for charts
-    const pageViewsData = {
-        labels: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
+interface AnalyticsData {
+    users: {
+        total: number;
+        active: number;
+        new_today: number;
+        growth: number;
+    };
+    validations: {
+        total: number;
+        today: number;
+        valid: number;
+        invalid: number;
+        risky: number;
+        growth: number;
+    };
+    revenue: {
+        total: number;
+        this_month: number;
+        last_month: number;
+        growth: number;
+    };
+    billing: {
+        total_subscriptions: number;
+        active_subscriptions: number;
+        total_invoices: number;
+        pending_invoices: number;
+    };
+    daily_stats: Array<{
+        date: string;
+        validations: number;
+        revenue: number;
+        users: number;
+    }>;
+    validation_status: {
+        valid: number;
+        invalid: number;
+        risky: number;
+    };
+}
+
+const AdminAnalytics: React.FC = () => {
+    const [loading, setLoading] = useState(true);
+    const [timeRange, setTimeRange] = useState('30d');
+    const [analyticsData, setAnalyticsData] = useState<AnalyticsData | null>(null);
+
+    const fetchAnalytics = async () => {
+        setLoading(true);
+        try {
+            const [usersRes, validationsRes, billingRes, billingStatsRes] = await Promise.all([
+                axiosInstance.get('/admin/users/stats/'),
+                axiosInstance.get('/admin/validations/stats/'),
+                axiosInstance.get('/admin/billing/'),
+                axiosInstance.get('/admin/billing/stats/')
+            ]);
+
+            // Calculate daily stats (mock for now, should come from backend)
+            const dailyStats = generateDailyStats(timeRange);
+
+            const data: AnalyticsData = {
+                users: {
+                    total: usersRes.data.total || 0,
+                    active: usersRes.data.active || 0,
+                    new_today: usersRes.data.new_today || 0,
+                    growth: calculateGrowth(usersRes.data.total, usersRes.data.previous_total || 0)
+                },
+                validations: {
+                    total: validationsRes.data.total_validations || 0,
+                    today: validationsRes.data.today_validations || 0,
+                    valid: validationsRes.data.valid_count || 0,
+                    invalid: validationsRes.data.invalid_count || 0,
+                    risky: validationsRes.data.risky_count || 0,
+                    growth: calculateGrowth(
+                        validationsRes.data.total_validations || 0,
+                        validationsRes.data.previous_total || 0
+                    )
+                },
+                revenue: {
+                    total: billingStatsRes.data.total_revenue || 0,
+                    this_month: billingStatsRes.data.monthly_revenue || 0,
+                    last_month: billingStatsRes.data.previous_month_revenue || 0,
+                    growth: calculateGrowth(
+                        billingStatsRes.data.monthly_revenue || 0,
+                        billingStatsRes.data.previous_month_revenue || 0
+                    )
+                },
+                billing: {
+                    total_subscriptions: 0, // TODO: Get from backend
+                    active_subscriptions: 0, // TODO: Get from backend
+                    total_invoices: 0, // TODO: Get from backend
+                    pending_invoices: 0 // TODO: Get from backend
+                },
+                daily_stats: dailyStats,
+                validation_status: {
+                    valid: validationsRes.data.valid_count || 0,
+                    invalid: validationsRes.data.invalid_count || 0,
+                    risky: validationsRes.data.risky_count || 0
+                }
+            };
+
+            setAnalyticsData(data);
+        } catch (error: any) {
+            console.error('Error fetching analytics:', error);
+            message.error('Failed to load analytics data');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const generateDailyStats = (range: string) => {
+        const days = range === '7d' ? 7 : range === '30d' ? 30 : 90;
+        const stats = [];
+        for (let i = days - 1; i >= 0; i--) {
+            const date = dayjs().subtract(i, 'days');
+            stats.push({
+                date: date.format('YYYY-MM-DD'),
+                validations: Math.floor(Math.random() * 1000) + 500,
+                revenue: Math.floor(Math.random() * 500) + 100,
+                users: Math.floor(Math.random() * 50) + 10
+            });
+        }
+        return stats;
+    };
+
+    const calculateGrowth = (current: number, previous: number): number => {
+        if (!previous || previous === 0) return 0;
+        return ((current - previous) / previous) * 100;
+    };
+
+    useEffect(() => {
+        fetchAnalytics();
+    }, [timeRange]);
+
+    if (loading) {
+        return (
+            <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '400px' }}>
+                <Spin size="large" />
+            </div>
+        );
+    }
+
+    if (!analyticsData) {
+        return <div>No data available</div>;
+    }
+
+    // Chart data
+    const validationsChartData = {
+        labels: analyticsData.daily_stats.map(s => dayjs(s.date).format('MMM DD')),
         datasets: [
             {
-                label: 'Page Views',
-                data: [12000, 15000, 13000, 17000, 16000, 19000, 21000],
+                label: 'Validations',
+                data: analyticsData.daily_stats.map(s => s.validations),
                 borderColor: 'rgb(59, 130, 246)',
                 backgroundColor: 'rgba(59, 130, 246, 0.1)',
                 fill: true,
                 tension: 0.4,
             },
+        ],
+    };
+
+    const revenueChartData = {
+        labels: analyticsData.daily_stats.map(s => dayjs(s.date).format('MMM DD')),
+        datasets: [
             {
-                label: 'Unique Visitors',
-                data: [8000, 9500, 8500, 11000, 10500, 12000, 13500],
+                label: 'Revenue ($)',
+                data: analyticsData.daily_stats.map(s => s.revenue),
                 borderColor: 'rgb(34, 197, 94)',
                 backgroundColor: 'rgba(34, 197, 94, 0.1)',
                 fill: true,
@@ -89,45 +238,20 @@ const AdminAnalytics: React.FC = () => {
         ],
     };
 
-    const deviceData = {
-        labels: ['Desktop', 'Mobile', 'Tablet'],
+    const validationStatusData = {
+        labels: ['Valid', 'Invalid', 'Risky'],
         datasets: [
             {
-                data: [58, 35, 7],
+                data: [
+                    analyticsData.validation_status.valid,
+                    analyticsData.validation_status.invalid,
+                    analyticsData.validation_status.risky
+                ],
                 backgroundColor: [
-                    'rgba(59, 130, 246, 0.8)',
                     'rgba(34, 197, 94, 0.8)',
+                    'rgba(239, 68, 68, 0.8)',
                     'rgba(251, 146, 60, 0.8)',
                 ],
-            },
-        ],
-    };
-
-    const topPagesData = {
-        labels: ['Home', 'Products', 'About', 'Contact', 'Blog'],
-        datasets: [
-            {
-                label: 'Page Views',
-                data: [8500, 6200, 4800, 3500, 2900],
-                backgroundColor: 'rgba(147, 51, 234, 0.8)',
-            },
-        ],
-    };
-
-    const userBehaviorData = {
-        labels: ['Bounce Rate', 'Pages/Session', 'Avg Duration', 'New Users', 'Return Rate'],
-        datasets: [
-            {
-                label: 'Current Period',
-                data: [35, 4.2, 3.5, 65, 35],
-                borderColor: 'rgba(59, 130, 246, 1)',
-                backgroundColor: 'rgba(59, 130, 246, 0.2)',
-            },
-            {
-                label: 'Previous Period',
-                data: [42, 3.8, 3.1, 58, 42],
-                borderColor: 'rgba(156, 163, 175, 1)',
-                backgroundColor: 'rgba(156, 163, 175, 0.2)',
             },
         ],
     };
@@ -156,63 +280,83 @@ const AdminAnalytics: React.FC = () => {
         },
     };
 
-    const { Title, Text } = Typography;
-
     const metrics = [
         {
-            title: 'Total Page Views',
-            value: 108900,
-            change: 12.5,
-            changeType: 'positive',
-            icon: <EyeOutlined style={{ color: '#1890ff' }} />,
+            title: 'Total Validations',
+            value: analyticsData.validations.total,
+            change: analyticsData.validations.growth,
+            changeType: analyticsData.validations.growth >= 0 ? 'positive' : 'negative',
+            icon: <Mail className="w-5 h-5" style={{ color: '#1890ff' }} />,
+            color: '#1890ff'
         },
         {
-            title: 'Unique Visitors',
-            value: 68540,
-            change: 8.2,
-            changeType: 'positive',
-            icon: <UserOutlined style={{ color: '#52c41a' }} />,
+            title: 'Total Users',
+            value: analyticsData.users.total,
+            change: analyticsData.users.growth,
+            changeType: analyticsData.users.growth >= 0 ? 'positive' : 'negative',
+            icon: <Users className="w-5 h-5" style={{ color: '#52c41a' }} />,
+            color: '#52c41a'
         },
         {
-            title: 'Bounce Rate',
-            value: 35.2,
-            suffix: '%',
-            change: -5.4,
-            changeType: 'positive',
-            icon: <TrendingDownOutlined style={{ color: '#fa8c16' }} />,
+            title: 'Total Revenue',
+            value: analyticsData.revenue.total,
+            change: analyticsData.revenue.growth,
+            changeType: analyticsData.revenue.growth >= 0 ? 'positive' : 'negative',
+            icon: <DollarSign className="w-5 h-5" style={{ color: '#fa8c16' }} />,
+            color: '#fa8c16',
+            prefix: '$',
+            precision: 2
         },
         {
-            title: 'Avg. Session Duration',
-            value: '3m 24s',
-            change: 18.3,
+            title: 'Active Users',
+            value: analyticsData.users.active,
+            change: 0,
             changeType: 'positive',
-            icon: <ClockCircleOutlined style={{ color: '#722ed1' }} />,
+            icon: <Activity className="w-5 h-5" style={{ color: '#722ed1' }} />,
+            color: '#722ed1'
         },
     ];
 
-    const topCountries = [
-        { country: 'United States', visitors: '24,580', percentage: 35.8 },
-        { country: 'United Kingdom', visitors: '15,240', percentage: 22.2 },
-        { country: 'Canada', visitors: '9,850', percentage: 14.4 },
-        { country: 'Australia', visitors: '7,320', percentage: 10.7 },
-        { country: 'Germany', visitors: '5,180', percentage: 7.6 },
-    ];
-
-    const topReferrers = [
-        { source: 'Google', visitors: '35,420', percentage: 45.2 },
-        { source: 'Direct', visitors: '28,150', percentage: 35.9 },
-        { source: 'Facebook', visitors: '8,920', percentage: 11.4 },
-        { source: 'Twitter', visitors: '3,850', percentage: 4.9 },
-        { source: 'LinkedIn', visitors: '2,040', percentage: 2.6 },
+    const validationBreakdown = [
+        {
+            status: 'Valid',
+            count: analyticsData.validation_status.valid,
+            percentage: analyticsData.validations.total > 0 
+                ? (analyticsData.validation_status.valid / analyticsData.validations.total) * 100 
+                : 0,
+            color: '#52c41a',
+            icon: <CheckCircle className="w-4 h-4" />
+        },
+        {
+            status: 'Invalid',
+            count: analyticsData.validation_status.invalid,
+            percentage: analyticsData.validations.total > 0 
+                ? (analyticsData.validation_status.invalid / analyticsData.validations.total) * 100 
+                : 0,
+            color: '#ff4d4f',
+            icon: <XCircle className="w-4 h-4" />
+        },
+        {
+            status: 'Risky',
+            count: analyticsData.validation_status.risky,
+            percentage: analyticsData.validations.total > 0 
+                ? (analyticsData.validation_status.risky / analyticsData.validations.total) * 100 
+                : 0,
+            color: '#fa8c16',
+            icon: <AlertCircle className="w-4 h-4" />
+        },
     ];
 
     return (
-        <div>
+        <div style={{ padding: '24px' }}>
             {/* Page Header */}
             <div style={{ marginBottom: '24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <div>
-                    <Title level={2} style={{ margin: 0 }}>Analytics Overview</Title>
-                    <Text type="secondary">Track and analyze your website performance</Text>
+                    <Title level={2} style={{ marginBottom: '8px', margin: 0 }}>
+                        <BarChart3 style={{ width: '24px', height: '24px', display: 'inline-block', marginRight: '8px' }} />
+                        Analytics Dashboard
+                    </Title>
+                    <Text type="secondary">Comprehensive insights into your email validation service</Text>
                 </div>
                 <Space>
                     <Select
@@ -220,12 +364,20 @@ const AdminAnalytics: React.FC = () => {
                         onChange={setTimeRange}
                         style={{ width: 150 }}
                     >
-                        <Select.Option value="24h">Last 24 hours</Select.Option>
                         <Select.Option value="7d">Last 7 days</Select.Option>
                         <Select.Option value="30d">Last 30 days</Select.Option>
                         <Select.Option value="90d">Last 90 days</Select.Option>
                     </Select>
-                    <Button type="primary" icon={<DownloadOutlined />}>
+                    <Button 
+                        icon={<RefreshCw className="w-4 h-4" />}
+                        onClick={fetchAnalytics}
+                    >
+                        Refresh
+                    </Button>
+                    <Button 
+                        type="primary" 
+                        icon={<Download className="w-4 h-4" />}
+                    >
                         Export Report
                     </Button>
                 </Space>
@@ -239,17 +391,15 @@ const AdminAnalytics: React.FC = () => {
                             <Statistic
                                 title={metric.title}
                                 value={metric.value}
-                                suffix={metric.suffix}
-                                prefix={metric.icon}
-                                valueStyle={{ 
-                                    color: metric.changeType === 'positive' ? '#3f8600' : '#cf1322' 
-                                }}
+                                prefix={metric.prefix}
+                                precision={metric.precision}
+                                valueStyle={{ color: metric.color }}
                             />
                             <div style={{ marginTop: '8px' }}>
                                 <Text type={metric.changeType === 'positive' ? 'success' : 'danger'}>
-                                    {metric.change > 0 ? '+' : ''}{metric.change}%
+                                    {metric.change >= 0 ? '+' : ''}{metric.change.toFixed(1)}%
                                 </Text>
-                                <Text type="secondary" style={{ marginLeft: '8px' }}>vs last period</Text>
+                                <Text type="secondary" style={{ marginLeft: '8px' }}>vs previous period</Text>
                             </div>
                         </Card>
                     </Col>
@@ -258,118 +408,54 @@ const AdminAnalytics: React.FC = () => {
 
             {/* Main Charts */}
             <Row gutter={[16, 16]} style={{ marginBottom: '24px' }}>
-                {/* Traffic Overview */}
+                {/* Validations Over Time */}
                 <Col xs={24} lg={16}>
-                    <Card title="Traffic Overview" style={{ height: '400px' }}>
+                    <Card 
+                        title={
+                            <Space>
+                                <Mail className="w-5 h-5" />
+                                <span>Validations Over Time</span>
+                            </Space>
+                        }
+                        style={{ height: '400px' }}
+                    >
                         <div style={{ height: '300px' }}>
-                            <Line data={pageViewsData} options={chartOptions} />
+                            <Line data={validationsChartData} options={chartOptions} />
                         </div>
                     </Card>
                 </Col>
 
-                {/* Device Breakdown */}
+                {/* Validation Status Breakdown */}
                 <Col xs={24} lg={8}>
-                    <Card title="Device Breakdown" style={{ height: '400px' }}>
+                    <Card 
+                        title={
+                            <Space>
+                                <Activity className="w-5 h-5" />
+                                <span>Validation Status</span>
+                            </Space>
+                        }
+                        style={{ height: '400px' }}
+                    >
                         <div style={{ height: '200px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                            <Doughnut data={deviceData} options={{ ...chartOptions, maintainAspectRatio: true }} />
+                            <Doughnut 
+                                data={validationStatusData} 
+                                options={{ ...chartOptions, maintainAspectRatio: true }} 
+                            />
                         </div>
                         <div style={{ marginTop: '16px' }}>
-                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
-                                <Space>
-                                    <DesktopOutlined style={{ color: '#1890ff' }} />
-                                    <Text>Desktop</Text>
-                                </Space>
-                                <Text strong>58%</Text>
-                            </div>
-                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
-                                <Space>
-                                    <MobileOutlined style={{ color: '#52c41a' }} />
-                                    <Text>Mobile</Text>
-                                </Space>
-                                <Text strong>35%</Text>
-                            </div>
-                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                                <Space>
-                                    <TabletOutlined style={{ color: '#fa8c16' }} />
-                                    <Text>Tablet</Text>
-                                </Space>
-                                <Text strong>7%</Text>
-                            </div>
-                        </div>
-                    </Card>
-                </Col>
-            </Row>
-
-            {/* Secondary Charts */}
-            <Row gutter={[16, 16]} style={{ marginBottom: '24px' }}>
-                {/* Top Pages */}
-                <Col xs={24} lg={12}>
-                    <Card title="Top Pages" style={{ height: '350px' }}>
-                        <div style={{ height: '250px' }}>
-                            <Bar data={topPagesData} options={{ ...chartOptions, indexAxis: 'y' }} />
-                        </div>
-                    </Card>
-                </Col>
-
-                {/* User Behavior */}
-                <Col xs={24} lg={12}>
-                    <Card title="User Behavior" style={{ height: '350px' }}>
-                        <div style={{ height: '250px' }}>
-                            <Radar data={userBehaviorData} options={chartOptions} />
-                        </div>
-                    </Card>
-                </Col>
-            </Row>
-
-            {/* Tables Row */}
-            <Row gutter={[16, 16]} style={{ marginBottom: '24px' }}>
-                {/* Top Countries */}
-                <Col xs={24} lg={12}>
-                    <Card 
-                        title="Top Countries" 
-                        extra={<GlobalOutlined />}
-                    >
-                        <div style={{ maxHeight: '300px', overflowY: 'auto' }}>
-                            {topCountries.map((country, index) => (
-                                <div key={index} style={{ marginBottom: '16px' }}>
-                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                                        <Text strong>{index + 1}. {country.country}</Text>
-                                        <Text type="secondary">{country.visitors} visitors</Text>
-                                    </div>
-                                    <Progress 
-                                        percent={country.percentage} 
-                                        showInfo={false}
-                                        strokeColor="#1890ff"
-                                    />
-                                    <div style={{ textAlign: 'right', marginTop: '4px' }}>
-                                        <Text strong>{country.percentage}%</Text>
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-                    </Card>
-                </Col>
-
-                {/* Top Referrers */}
-                <Col xs={24} lg={12}>
-                    <Card 
-                        title="Top Referrers" 
-                        extra={<LinkOutlined />}
-                    >
-                        <div style={{ maxHeight: '300px', overflowY: 'auto' }}>
-                            {topReferrers.map((referrer, index) => (
-                                <div key={index} style={{ marginBottom: '16px' }}>
-                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                                        <Text strong>{index + 1}. {referrer.source}</Text>
-                                        <Text type="secondary">{referrer.visitors} visitors</Text>
-                                    </div>
-                                    <Progress 
-                                        percent={referrer.percentage} 
-                                        showInfo={false}
-                                        strokeColor="#52c41a"
-                                    />
-                                    <div style={{ textAlign: 'right', marginTop: '4px' }}>
-                                        <Text strong>{referrer.percentage}%</Text>
+                            {validationBreakdown.map((item, index) => (
+                                <div key={index} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
+                                    <Space>
+                                        <span style={{ color: item.color }}>{item.icon}</span>
+                                        <Text>{item.status}</Text>
+                                    </Space>
+                                    <div style={{ textAlign: 'right' }}>
+                                        <Text strong>{item.count.toLocaleString()}</Text>
+                                        <div>
+                                            <Text type="secondary" style={{ fontSize: '12px' }}>
+                                                {item.percentage.toFixed(1)}%
+                                            </Text>
+                                        </div>
                                     </div>
                                 </div>
                             ))}
@@ -378,46 +464,97 @@ const AdminAnalytics: React.FC = () => {
                 </Col>
             </Row>
 
-            {/* Real-time Stats */}
-            <Card 
-                style={{ 
-                    background: 'linear-gradient(135deg, #1890ff 0%, #722ed1 100%)',
-                    color: 'white'
-                }}
-            >
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
-                    <Title level={3} style={{ color: 'white', margin: 0 }}>Real-time Analytics</Title>
-                    <Space>
-                        <Badge status="processing" text="Live" />
-                    </Space>
-                </div>
-                <Row gutter={[16, 16]}>
-                    <Col xs={24} sm={12} lg={6}>
-                        <div style={{ textAlign: 'center' }}>
-                            <Text style={{ color: 'rgba(255,255,255,0.8)', fontSize: '14px' }}>Active Users</Text>
-                            <div style={{ fontSize: '32px', fontWeight: 'bold', marginTop: '8px' }}>284</div>
+            {/* Revenue Chart */}
+            <Row gutter={[16, 16]} style={{ marginBottom: '24px' }}>
+                <Col xs={24}>
+                    <Card 
+                        title={
+                            <Space>
+                                <DollarSign className="w-5 h-5" />
+                                <span>Revenue Over Time</span>
+                            </Space>
+                        }
+                        style={{ height: '350px' }}
+                    >
+                        <div style={{ height: '250px' }}>
+                            <Line data={revenueChartData} options={chartOptions} />
                         </div>
-                    </Col>
-                    <Col xs={24} sm={12} lg={6}>
-                        <div style={{ textAlign: 'center' }}>
-                            <Text style={{ color: 'rgba(255,255,255,0.8)', fontSize: '14px' }}>Page Views/min</Text>
-                            <div style={{ fontSize: '32px', fontWeight: 'bold', marginTop: '8px' }}>42</div>
+                    </Card>
+                </Col>
+            </Row>
+
+            {/* Additional Stats */}
+            <Row gutter={[16, 16]}>
+                <Col xs={24} lg={12}>
+                    <Card 
+                        title={
+                            <Space>
+                                <Users className="w-5 h-5" />
+                                <span>User Statistics</span>
+                            </Space>
+                        }
+                    >
+                        <div>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                                <Text>Total Users</Text>
+                                <Text strong>{analyticsData.users.total.toLocaleString()}</Text>
+                            </div>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                                <Text>Active Users</Text>
+                                <Text strong style={{ color: '#52c41a' }}>
+                                    {analyticsData.users.active.toLocaleString()}
+                                </Text>
+                            </div>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                                <Text>New Today</Text>
+                                <Text strong style={{ color: '#1890ff' }}>
+                                    {analyticsData.users.new_today.toLocaleString()}
+                                </Text>
+                            </div>
+                            <Progress 
+                                percent={(analyticsData.users.active / analyticsData.users.total) * 100} 
+                                strokeColor="#52c41a"
+                            />
                         </div>
-                    </Col>
-                    <Col xs={24} sm={12} lg={6}>
-                        <div style={{ textAlign: 'center' }}>
-                            <Text style={{ color: 'rgba(255,255,255,0.8)', fontSize: '14px' }}>Avg. Time on Page</Text>
-                            <div style={{ fontSize: '32px', fontWeight: 'bold', marginTop: '8px' }}>2:34</div>
+                    </Card>
+                </Col>
+
+                <Col xs={24} lg={12}>
+                    <Card 
+                        title={
+                            <Space>
+                                <CreditCard className="w-5 h-5" />
+                                <span>Billing Overview</span>
+                            </Space>
+                        }
+                    >
+                        <div>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                                <Text>Total Revenue</Text>
+                                <Text strong>${analyticsData.revenue.total.toLocaleString()}</Text>
+                            </div>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                                <Text>This Month</Text>
+                                <Text strong style={{ color: '#52c41a' }}>
+                                    ${analyticsData.revenue.this_month.toLocaleString()}
+                                </Text>
+                            </div>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                                <Text>Last Month</Text>
+                                <Text type="secondary">
+                                    ${analyticsData.revenue.last_month.toLocaleString()}
+                                </Text>
+                            </div>
+                            <Progress 
+                                percent={analyticsData.revenue.last_month > 0 
+                                    ? (analyticsData.revenue.this_month / analyticsData.revenue.last_month) * 100 
+                                    : 0} 
+                                strokeColor="#1890ff"
+                            />
                         </div>
-                    </Col>
-                    <Col xs={24} sm={12} lg={6}>
-                        <div style={{ textAlign: 'center' }}>
-                            <Text style={{ color: 'rgba(255,255,255,0.8)', fontSize: '14px' }}>Conversion Rate</Text>
-                            <div style={{ fontSize: '32px', fontWeight: 'bold', marginTop: '8px' }}>3.8%</div>
-                        </div>
-                    </Col>
-                </Row>
-            </Card>
+                    </Card>
+                </Col>
+            </Row>
         </div>
     );
 };

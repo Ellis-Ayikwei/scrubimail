@@ -25,6 +25,7 @@ from .views import (
     ValidatePromoCodeView,
     RedeemPromoCodeView,
     ListPromoCodesView,
+    PromoCodeDetailView,
     PromoCodeRedemptionHistoryView,
     ListInvoicesView,
     InvoiceDetailView,
@@ -61,6 +62,7 @@ urlpatterns = [
     path("promo-codes/validate/", ValidatePromoCodeView.as_view(), name="validate-promo-code"),
     path("promo-codes/redeem/", RedeemPromoCodeView.as_view(), name="redeem-promo-code"),
     path("promo-codes/", ListPromoCodesView.as_view(), name="list-promo-codes"),
+    path("promo-codes/<uuid:pk>/", PromoCodeDetailView.as_view(), name="promo-code-detail"),
     path("promo-codes/redemptions/", PromoCodeRedemptionHistoryView.as_view(), name="promo-redemption-history"),
     # Invoices
     path("invoices/", ListInvoicesView.as_view(), name="list-invoices"),

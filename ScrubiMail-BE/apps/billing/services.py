@@ -142,10 +142,43 @@ class BillingService:
         self.paystack = PaystackService()
 
     def get_or_create_billing_profile(self, user):
-        """Get or create billing profile for user"""
-        profile, created = BillingProfile.objects.get_or_create(
-            user=user, defaults={"credits_remaining": 100, "billing_status": "active"}
+        """Get or create billing profile for user with Free plan assigned by default"""
+        from apps.plan.models import Plan
+        
+        # Get or create Free plan (use existing if setup_plans was run, otherwise create with defaults)
+        free_plan, _ = Plan.objects.get_or_create(
+            name='Free',
+            defaults={
+                'description': 'Perfect for getting started with email validation',
+                'price': 0.00,
+                'currency': 'USD',
+                'credits_per_month': 100,  # Default, can be updated by setup_plans command
+                'additional_credit_price': 0.01,
+                'max_api_calls_per_hour': 10,
+                'max_bulk_emails': 50,
+                'supports_api': True,
+                'supports_bulk': False,
+                'priority_support': False,
+                'trial_days': 0,
+                'is_active': True,
+            }
         )
+        
+        profile, created = BillingProfile.objects.get_or_create(
+            user=user,
+            defaults={
+                "credits_remaining": free_plan.credits_per_month,
+                "billing_status": "active",
+                "current_plan": free_plan,
+            }
+        )
+        
+        # If profile exists but has no plan, assign Free plan
+        if not created and not profile.current_plan:
+            profile.current_plan = free_plan
+            profile.credits_remaining = free_plan.credits_per_month
+            profile.save(update_fields=['current_plan', 'credits_remaining'])
+        
         return profile
 
     def initialize_credit_purchase(self, user, amount, credits):

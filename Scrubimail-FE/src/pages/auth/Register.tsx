@@ -11,11 +11,13 @@ import {
   CheckCircle,
   Github,
   Chrome,
-  Gitlab
+  Gitlab,
+  Home
 } from 'lucide-react';
 import { useDispatch, useSelector } from 'react-redux';
 import { RegisterUser } from '../../store/authSlice';
 import { RootState } from '../../store/index';
+import AuthFooter from '../../components/AuthFooter';
 
 const Register = () => {
   const [formData, setFormData] = useState({
@@ -121,13 +123,35 @@ const Register = () => {
 
   if (success) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[#F4F5F7] dark:bg-gray-900 py-12 px-4 sm:px-6 lg:px-8">
-        <div className="max-w-md w-full space-y-8">
-          <div className="text-center">
-            <div className="flex justify-center">
+      <div className="min-h-screen flex flex-col bg-[#F4F5F7] dark:bg-gray-900 relative overflow-hidden">
+        {/* Background Mail Icon */}
+        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+        <Mail 
+          className="w-[900px] h-[900px] md:w-[1200px] md:h-[1200px] lg:w-[1500px] lg:h-[1500px] text-primary/5 dark:text-primary/10"
+          strokeWidth={1}
+        />
+      </div>
 
-            <img src='/assets/images/scrubi.png' alt="Logo" className='w-10' />
-              
+        {/* Home Button */}
+        <Link 
+          to="/" 
+          className="fixed top-4 left-4 z-50 flex items-center gap-2 px-4 py-2 bg-white dark:bg-gray-800 rounded-lg shadow-md hover:shadow-lg transition-shadow border border-gray-200 dark:border-gray-700"
+        >
+          <Home className="w-4 h-4 text-[#333333] dark:text-white" />
+          <span className="text-sm font-medium text-[#333333] dark:text-white">Home</span>
+        </Link>
+
+        <div className="flex-1 flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8 relative z-10">
+          <div className="max-w-md w-full space-y-8">
+          <div className="text-center">
+            <div className="flex justify-center mb-6">
+              <Link to="/" className="flex items-center">
+                <img 
+                  src="/assets/images/scrubi mail full.png" 
+                  alt="Scrubimail Logo" 
+                  className="h-12 sm:h-16 w-auto"
+                />
+              </Link>
             </div>
             <div className="mt-6 flex justify-center">
               <div className="w-16 h-16 bg-green-100 dark:bg-green-900 rounded-full flex items-center justify-center">
@@ -150,27 +174,52 @@ const Register = () => {
               
               <button
                 onClick={() => setSuccess(false)}
-                className="w-full py-3 px-4 border border-transparent text-sm font-medium rounded-lg text-white bg-gradient-to-r from-[#2ED8A3] to-[#004E8A] hover:from-[#00C48C] hover:to-[#2ED8A3] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#2ED8A3] transition-all duration-200"
+                className="w-full py-3 px-4 border border-transparent text-sm font-medium rounded-lg text-white bg-primary hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary transition-all duration-200 shadow-sm"
               >
                 Continue to Sign In
               </button>
             </div>
           </div>
         </div>
-      </div>
-    );
+        </div>
+      
+      {/* Thin Footer */}
+      <AuthFooter />
+    </div>
+  );
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-[#F4F5F7] dark:bg-gray-900 py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-md w-full space-y-8">
+    <div className="min-h-screen flex flex-col bg-[#F4F5F7] dark:bg-gray-900 relative overflow-hidden">
+      {/* Background Mail Icon */}
+      <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+        <Mail 
+          className="w-[600px] h-[600px] md:w-[800px] md:h-[800px] lg:w-[1000px] lg:h-[1000px] text-primary/5 dark:text-primary/10"
+          strokeWidth={1}
+        />
+      </div>
+
+      {/* Home Button */}
+      <Link 
+        to="/" 
+        className="fixed top-4 left-4 z-50 flex items-center gap-2 px-4 py-2 bg-white dark:bg-gray-800 rounded-lg shadow-md hover:shadow-lg transition-shadow border border-gray-200 dark:border-gray-700"
+      >
+        <Home className="w-4 h-4 text-[#333333] dark:text-white" />
+        <span className="text-sm font-medium text-[#333333] dark:text-white">Home</span>
+      </Link>
+
+      <div className="flex-1 flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8 relative z-10">
+        <div className="max-w-md w-full space-y-8">
         {/* Logo and Header */}
         <div className="text-center">
-          <div className="flex justify-center">
-          <Link to="/dashboard" className="flex items-center space-x-2">
-              <img src='/assets/images/scrubi.png' alt="Logo" className='w-10' />
-                
-              </Link>
+          <div className="flex justify-center mb-6">
+            <Link to="/" className="flex items-center">
+              <img 
+                src="/assets/images/scrubi mail full.png" 
+                alt="Scrubimail Logo" 
+                className="h-12 sm:h-16 w-auto"
+              />
+            </Link>
           </div>
           <h2 className="mt-6 text-3xl font-bold text-[#333333] dark:text-white">
             Create your account
@@ -403,7 +452,7 @@ const Register = () => {
               <button
                 type="submit"
                 disabled={loading}
-                className="group relative w-full flex justify-center py-3 px-4 border border-transparent text-sm font-medium rounded-lg text-white bg-gradient-to-r from-[#2ED8A3] to-[#004E8A] hover:from-[#00C48C] hover:to-[#2ED8A3] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#2ED8A3] disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
+                className="group relative w-full flex justify-center py-3 px-4 border border-transparent text-sm font-medium rounded-lg text-white bg-primary hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 shadow-sm"
               >
                 {loading ? (
                   <div className="flex items-center">
@@ -437,7 +486,11 @@ const Register = () => {
             Your data is protected with enterprise-grade security
           </p>
         </div>
+        </div>
       </div>
+      
+      {/* Thin Footer */}
+      <AuthFooter />
     </div>
   );
 };

@@ -226,7 +226,7 @@ class CreditPackageSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'name', 'description', 'credits', 'price', 'original_price',
             'discount_percentage', 'effective_price', 'price_per_credit',
-            'expiry_days', 'is_active', 'is_featured', 'display_order',
+            'expiry_days', 'is_active', 'is_featured', 'sort_order',
             'max_purchases_per_user', 'total_available', 'total_sold',
             'is_available', 'savings', 'created_at', 'updated_at'
         ]
@@ -342,10 +342,83 @@ class PromoCodeSerializer(serializers.ModelSerializer):
             'max_uses', 'max_uses_per_user', 'current_uses',
             'valid_from', 'valid_until', 'minimum_purchase_amount',
             'first_purchase_only', 'is_active', 'campaign_name',
+            'valid_for_plans', 'valid_for_packages',
             'is_valid', 'discount_display', 'usage_stats',
             'created_at', 'updated_at'
         ]
-        read_only_fields = ['current_uses', 'created_at', 'updated_at']
+        read_only_fields = ['current_uses', 'created_at', 'updated_at', 'is_valid', 'discount_display', 'usage_stats']
+    
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Set queryset for ManyToMany fields after initialization
+        from apps.plan.models import Plan
+        if 'valid_for_plans' in self.fields:
+            self.fields['valid_for_plans'] = serializers.PrimaryKeyRelatedField(
+                many=True,
+                queryset=Plan.objects.all(),
+                required=False,
+                allow_empty=True
+            )
+        if 'valid_for_packages' in self.fields:
+            self.fields['valid_for_packages'] = serializers.PrimaryKeyRelatedField(
+                many=True,
+                queryset=CreditPackage.objects.all(),
+                required=False,
+                allow_empty=True
+            )
+    
+    def validate_discount_type(self, value):
+        """Normalize discount_type values"""
+        # Map frontend values to backend values
+        mapping = {
+            'fixed_amount': 'fixed',
+            'percentage': 'percentage',
+            'free_credits': 'free_credits'
+        }
+        return mapping.get(value, value)
+    
+    def create(self, validated_data):
+        """Create promo code with ManyToMany relationships"""
+        valid_for_plans = validated_data.pop('valid_for_plans', [])
+        valid_for_packages = validated_data.pop('valid_for_packages', [])
+        # Handle frontend field name mapping
+        if 'min_purchase_amount' in validated_data:
+            validated_data['minimum_purchase_amount'] = validated_data.pop('min_purchase_amount')
+        if 'applicable_plans' in validated_data:
+            valid_for_plans = validated_data.pop('applicable_plans', [])
+        if 'applicable_packages' in validated_data:
+            valid_for_packages = validated_data.pop('applicable_packages', [])
+        
+        promo_code = PromoCode.objects.create(**validated_data)
+        if valid_for_plans:
+            promo_code.valid_for_plans.set(valid_for_plans)
+        if valid_for_packages:
+            promo_code.valid_for_packages.set(valid_for_packages)
+        
+        return promo_code
+    
+    def update(self, instance, validated_data):
+        """Update promo code with ManyToMany relationships"""
+        valid_for_plans = validated_data.pop('valid_for_plans', None)
+        valid_for_packages = validated_data.pop('valid_for_packages', None)
+        # Handle frontend field name mapping
+        if 'min_purchase_amount' in validated_data:
+            validated_data['minimum_purchase_amount'] = validated_data.pop('min_purchase_amount')
+        if 'applicable_plans' in validated_data:
+            valid_for_plans = validated_data.pop('applicable_plans', None)
+        if 'applicable_packages' in validated_data:
+            valid_for_packages = validated_data.pop('applicable_packages', None)
+        
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+        instance.save()
+        
+        if valid_for_plans is not None:
+            instance.valid_for_plans.set(valid_for_plans)
+        if valid_for_packages is not None:
+            instance.valid_for_packages.set(valid_for_packages)
+        
+        return instance
     
     def get_is_valid(self, obj):
         """Check if promo code is currently valid"""

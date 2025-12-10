@@ -1,14 +1,20 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import IconHome from '../Icon/IconHome';
-import IconUsersGroup from '../Icon/IconUsersGroup';
-import IconBox from '../Icon/IconBox';
-import IconSettings from '../Icon/IconSettings';
-import IconUser from '../Icon/IconUser';
-import IconLogout from '../Icon/IconLogout';
-import IconChartSquare from '../Icon/IconChartSquare';
-import IconDollarSign from '../Icon/IconDollarSign';
-import IconFile from '../Icon/IconFile';
+import {
+  Home,
+  BarChart3,
+  Users,
+  Key,
+  Package,
+  Ticket,
+  FileText,
+  Bell,
+  Settings,
+  User,
+  LogOut,
+  FileCheck,
+  CreditCard
+} from 'lucide-react';
 
 interface AdminSidebarProps {
     isMobileMenuOpen: boolean;
@@ -34,34 +40,50 @@ const AdminSidebar: React.FC<AdminSidebarProps> = ({
         {
             title: 'Dashboard',
             items: [
-                { icon: <IconHome />, label: 'Overview', path: '/admin/dashboard' },
-                { icon: <IconChartSquare />, label: 'Analytics', path: '/admin/analytics' },
+                { icon: <Home className="w-5 h-5" />, label: 'Overview', path: '/admin/dashboard' },
+                { icon: <BarChart3 className="w-5 h-5" />, label: 'Analytics', path: '/admin/analytics' },
             ]
         },
         {
             title: 'User Management',
             items: [
-                { icon: <IconUsersGroup />, label: 'Users', path: '/admin/users' },
-                { icon: <IconBox />, label: 'API Keys', path: '/admin/manage/api-keys' },
+                { icon: <Users className="w-5 h-5" />, label: 'Users', path: '/admin/users' },
+                { icon: <Key className="w-5 h-5" />, label: 'API Keys', path: '/admin/manage/api-keys' },
+            ]
+        },
+        {
+            title: 'Billing Management',
+            items: [
+                { icon: <CreditCard className="w-5 h-5" />, label: 'Billing Overview', path: '/admin/billing' },
+                { icon: <Package className="w-5 h-5" />, label: 'Credit Packages', path: '/admin/billing/credit-packages' },
+                { icon: <Ticket className="w-5 h-5" />, label: 'Promo Codes', path: '/admin/billing/promo-codes' },
+                { icon: <FileText className="w-5 h-5" />, label: 'Invoices', path: '/admin/billing/invoices' },
+                { icon: <Bell className="w-5 h-5" />, label: 'Usage Alerts', path: '/admin/billing/usage-alerts' },
             ]
         },
         {
             title: 'Business Management',
             items: [
-                { icon: <IconDollarSign />, label: 'Billing', path: '/admin/billing' },
-                { icon: <IconFile />, label: 'Validations', path: '/admin/validations' },
-                { icon: <IconBox />, label: 'Plans', path: '/admin/plans' },
+                { icon: <FileCheck className="w-5 h-5" />, label: 'Validations', path: '/admin/validations' },
+                { icon: <Package className="w-5 h-5" />, label: 'Plans', path: '/admin/plans' },
             ]
         },
         {
             title: 'System',
             items: [
-                { icon: <IconSettings />, label: 'Settings', path: '/admin/settings' },
+                { icon: <Settings className="w-5 h-5" />, label: 'Settings', path: '/admin/settings' },
             ]
         },
     ];
 
-    const isActive = (path: string) => location.pathname === path;
+    const isActive = (path: string) => {
+        // Exact match for specific paths
+        if (path === '/admin/billing') {
+            return location.pathname === path;
+        }
+        // For nested paths, check if current path starts with the menu path
+        return location.pathname === path || location.pathname.startsWith(path + '/');
+    };
 
     return (
         <>
@@ -127,7 +149,7 @@ const AdminSidebar: React.FC<AdminSidebarProps> = ({
                             {user?.avatar ? (
                                 <img src={user.avatar} alt="Avatar" className="w-full h-full rounded-full" />
                             ) : (
-                                <IconUser className="w-6 h-6 text-gray-600 dark:text-gray-400" />
+                                <User className="w-6 h-6 text-gray-600 dark:text-gray-400" />
                             )}
                         </div>
                         <div className="flex-1">
@@ -143,7 +165,7 @@ const AdminSidebar: React.FC<AdminSidebarProps> = ({
                             className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
                             title="Sign out"
                         >
-                            <IconLogout className="w-5 h-5" />
+                            <LogOut className="w-5 h-5" />
                         </button>
                     </div>
                 </div>
