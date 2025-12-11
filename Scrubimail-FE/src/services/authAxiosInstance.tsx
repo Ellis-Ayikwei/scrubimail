@@ -1,7 +1,7 @@
 import axios from 'axios';
 import { apiUrl } from './axiosInstance';
 
-export const authApiUrl = import.meta.env.VITE_API_URL + 'auth';
+export const authApiUrl = apiUrl + 'auth';
 
 export const getCookie = (name: string): string | undefined => {
     try {
