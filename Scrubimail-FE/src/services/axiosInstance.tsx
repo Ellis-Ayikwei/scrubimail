@@ -1,9 +1,9 @@
 import axios from 'axios';
 import { getCookie } from './authAxiosInstance';
 
-export const apiUrl = import.meta.env.VITE_API_URL || 'http://192.168.100.12:8000/scrubimail/api/v1/';
+export const apiUrl = import.meta.env.VITE_API_URL || 'import.meta.env.VITE_API_URL';
 //const apiUrl = 'http://172.20.10.4:5004/alumni/api/v1';
-export const imgApiUrl = import.meta.env.VITE_IMG_API_URL || 'http://192.168.100.12:8000/scrubimail/api/v1/';
+export const imgApiUrl = import.meta.env.VITE_IMG_API_URL || 'import.meta.env.VITE_API_URL';
 
 
 console.log('API URL:', apiUrl);

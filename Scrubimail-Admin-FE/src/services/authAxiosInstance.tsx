@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 // Normalize base URL and ensure /auth suffix
-const defaultApiUrl = 'http://192.168.100.12:8000/scrubimail/api/v1/';
+const defaultApiUrl = 'import.meta.env.VITE_API_URL';
 const rawBaseUrl: string = (import.meta as any)?.env?.VITE_API_URL || defaultApiUrl;
 const normalizedBaseUrl = rawBaseUrl.endsWith('/') ? rawBaseUrl : `${rawBaseUrl}/`;
 export const authApiUrl = `${normalizedBaseUrl}auth`;
