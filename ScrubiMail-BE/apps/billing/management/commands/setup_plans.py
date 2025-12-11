@@ -277,4 +277,3 @@ class Command(BaseCommand):
         self.stdout.write('  - Professional: Growing teams ($29/mo, 50k credits) ⭐ MOST POPULAR')
         self.stdout.write('  - Business: Established businesses ($49/mo, 150k credits) 🏆 BEST VALUE')
         self.stdout.write('  - Enterprise: Large scale ($99/mo, 500k+ credits)\n')
-        )
