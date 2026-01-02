@@ -85,7 +85,7 @@ const PricingSection: React.FC = () => {
             const monthlyPrice = Number(plan.price ?? 0);
             const yearlyPriceValue = plan.yearly_price != null ? Number(plan.yearly_price) : (monthlyPrice * 10); // Default to 10 months if not set
             const currentPrice = billingCycle === 'yearly' ? yearlyPriceValue : monthlyPrice;
-            const isCustom = currentPrice === 0 || plan.name?.toLowerCase().includes('enterprise');
+            const isCustom = plan.name?.toLowerCase().includes('enterprise');
             const formattedPrice = isCustom ? 'Custom' : `$${Number(currentPrice).toFixed(0)}`;
             const period = isCustom ? '' : (billingCycle === 'yearly' ? '/year' : '/month');
             

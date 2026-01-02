@@ -73,17 +73,34 @@ const AdminUsers: React.FC = () => {
             const userData = Array.isArray(response.data) ? response.data : [];
             
             // Normalize user data to ensure all required fields exist
-            const normalizedUsers: User[] = userData.map(user => ({
-                id: user.id || '',
-                name: user.name || user.first_name || user.username || 'Unknown',
-                email: user.email || '',
-                role: user.role || user.user_type || 'User',
-                status: user.is_active ? 'active' as const : 'inactive' as const,
-                joinDate: user.date_joined || user.created_at || new Date().toISOString(),
-                lastActive: user.last_login || user.updated_at || new Date().toISOString(),
-                plan: user.plan || user.subscription_plan || 'Free',
-                avatar: user.avatar || user.profile_picture || undefined
-            }));
+            const normalizedUsers: User[] = userData.map(user => {
+                // Combine first_name and last_name to create full name
+                let displayName = 'Unknown';
+                if (user.name) {
+                    displayName = user.name;
+                } else if (user.first_name || user.last_name) {
+                    const firstName = (user.first_name || '').trim();
+                    const lastName = (user.last_name || '').trim();
+                    displayName = [firstName, lastName].filter(Boolean).join(' ');
+                } else if (user.username) {
+                    displayName = user.username;
+                } else if (user.email) {
+                    displayName = user.email.split('@')[0];
+                }
+
+                return {
+                    id: user.id || '',
+                    name: displayName,
+                    email: user.email || '',
+                    role: user.role || user.user_type || 'User',
+                    status: user.account_status === 'active' ? 'active' as const : 
+                            user.account_status === 'suspended' ? 'suspended' as const : 'inactive' as const,
+                    joinDate: user.date_joined || user.created_at || new Date().toISOString(),
+                    lastActive: user.last_active || user.last_login || user.updated_at || new Date().toISOString(),
+                    plan: user.plan || user.subscription_plan || 'Free',
+                    avatar: user.avatar || user.profile_picture || undefined
+                };
+            });
             
             setUsers(normalizedUsers);
             

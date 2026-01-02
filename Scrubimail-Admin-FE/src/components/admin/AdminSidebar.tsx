@@ -104,7 +104,7 @@ const AdminSidebar: React.FC<AdminSidebarProps> = ({
                         <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
                             <span className="text-white font-bold text-lg">A</span>
                         </div>
-                        <span className="text-xl font-bold text-gray-800 dark:text-white">Admin Panel</span>
+                        <span className="text-xl font-bold text-gray-800 dark:text-white">Sc Admin</span>
                     </Link>
                     <button
                         onClick={onCloseMobileMenu}
@@ -145,7 +145,7 @@ const AdminSidebar: React.FC<AdminSidebarProps> = ({
 
                 <div className="p-4 border-t dark:border-gray-700 flex-shrink-0">
                     <div className="flex items-center space-x-3">
-                        <div className="w-10 h-10 bg-gray-300 dark:bg-gray-600 rounded-full flex items-center justify-center">
+                        <div className="w-10 h-10 flex items-center justify-center">
                             {user?.avatar ? (
                                 <img src={user.avatar} alt="Avatar" className="w-full h-full rounded-full" />
                             ) : (

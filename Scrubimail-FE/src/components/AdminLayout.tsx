@@ -117,7 +117,7 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
                         <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
                             <span className="text-white font-bold text-lg">A</span>
                         </div>
-                        <span className="text-xl font-bold text-gray-800 dark:text-white">Admin Panel</span>
+                        <span className="text-xl font-bold text-gray-800 dark:text-white">Sc Admin</span>
                     </Link>
                     <button
                         onClick={() => setIsMobileMenuOpen(false)}
