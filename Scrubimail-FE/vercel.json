@@ -1,13 +1,13 @@
 {
   "rewrites": [
     {
-      "source": "/(.*)",
+      "source": "/:path*",
       "destination": "/index.html"
     }
   ],
   "headers": [
     {
-      "source": "/(.*)",
+      "source": "/:path*",
       "headers": [
         {
           "key": "X-Robots-Tag",
@@ -44,7 +44,7 @@
       ]
     },
     {
-      "source": "/dashboard(.*)",
+      "source": "/dashboard/:path*",
       "headers": [
         {
           "key": "X-Robots-Tag",
@@ -57,7 +57,7 @@
       ]
     },
     {
-      "source": "/login|/register|/reset-password|/verify-email|/profile|/settings|/account",
+      "source": "/:page(login|register|reset-password|verify-email|profile|settings|account)",
       "headers": [
         {
           "key": "X-Robots-Tag",
@@ -70,7 +70,7 @@
       ]
     },
     {
-      "source": "/assets/(.*)",
+      "source": "/assets/:path*",
       "headers": [
         {
           "key": "Cache-Control",
@@ -88,7 +88,7 @@
       ]
     },
     {
-      "source": "/.*\\.(woff|woff2|ttf|eot)$",
+      "source": "/:match(.*\\.(woff|woff2|ttf|eot))",
       "headers": [
         {
           "key": "Cache-Control",
@@ -97,7 +97,7 @@
       ]
     },
     {
-      "source": "/sitemap.xml|/robots.txt|/llms.txt|/ai-info.json",
+      "source": "/:file(sitemap\\.xml|robots\\.txt|llms\\.txt|ai-info\\.json)",
       "headers": [
         {
           "key": "Cache-Control",
