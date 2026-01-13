@@ -23,6 +23,7 @@ const FlexibleLayout = ({ children }: PropsWithChildren) => {
     const themeConfig = useSelector((state: IRootState) => state.themeConfig);
     const dispatch = useDispatch();
     const isAuthenticated = useIsAuthenticated();
+    console.log('isAuthenticated:', isAuthenticated);
     const authUser = useAuthUser() as AuthUser | null;
 
     const [showLoader, setShowLoader] = useState(true);

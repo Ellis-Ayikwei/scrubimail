@@ -91,7 +91,7 @@ All endpoints require either JWT token or API key authentication.
 
 ### Single Email Validation
 
-#### POST `/api/validation/validate/`
+#### POST `/scrubimail/api/v1/validate/`
 Validate a single email address.
 
 **Request:**
@@ -126,7 +126,7 @@ Validate a single email address.
 
 ### Bulk Email Validation
 
-#### POST `/api/validation/validate-bulk/`
+#### POST `/scrubimail/api/v1/validate-bulk/`
 Submit multiple emails for bulk validation.
 
 **Request:**
@@ -146,7 +146,7 @@ Submit multiple emails for bulk validation.
 }
 ```
 
-#### GET `/api/validation/bulk-status/{job_id}/`
+#### GET `/scrubimail/api/v1/bulk-status/{job_id}/`
 Get bulk job status and progress.
 
 **Response:**
@@ -170,7 +170,7 @@ Get bulk job status and progress.
 
 ### Validation History
 
-#### GET `/api/validation/history/`
+#### GET `/scrubimail/api/v1/history/`
 Get validation history with filtering options.
 
 **Query Parameters:**
@@ -197,7 +197,7 @@ Get validation history with filtering options.
 
 ### Analytics
 
-#### GET `/api/validation/analytics/`
+#### GET `/scrubimail/api/v1/analytics/`
 Get validation analytics and statistics.
 
 **Query Parameters:**
@@ -224,7 +224,7 @@ Get validation analytics and statistics.
 
 ### Domain Reputation
 
-#### GET `/api/validation/domain-reputation/{domain}/`
+#### GET `/scrubimail/api/v1/domain-reputation/{domain}/`
 Get domain reputation information.
 
 **Response:**

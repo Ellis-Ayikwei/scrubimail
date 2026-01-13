@@ -1,239 +1,96 @@
-# ScrubiMail - Email Validation SaaS Platform
+# Scrubimail
 
-![ScrubiMail](https://scrubimail.com/og-image.jpg)
+Scrubimail is an email validation SaaS (API + dashboards) for validating single emails in real time and processing bulk lists.
 
-**ScrubiMail** is a powerful email validation and verification SaaS platform that helps developers and businesses verify email addresses in real-time, reduce bounce rates, and improve email deliverability.
+This repository is a monorepo containing:
 
-🌐 **Website**: [scrubimail.com](https://scrubimail.com)  
-📧 **Contact**: support@scrubimail.com  
-📱 **Phone**: +233-24-813-8722
+```
+ScrubiMail-BE/          Django backend (REST API)
+Scrubimail-FE/          User dashboard (React + Vite)
+Scrubimail-Admin-FE/    Admin dashboard (React + Vite)
+```
 
----
+## Local development
 
-## 🚀 What is ScrubiMail?
+### 1) Backend (Django)
 
-ScrubiMail provides enterprise-grade email validation through a simple REST API. Validate single emails in real-time or clean entire lists with bulk validation.
+Prereqs: Python 3, PostgreSQL, Redis (optional unless you run Celery jobs).
 
-### Key Features
+```bash
+cd ScrubiMail-BE
+cp .env.example .env
+python -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
 
-- ✅ **Real-time Email Validation** - Validate emails as users type
-- ✅ **Bulk List Validation** - Clean thousands of emails at once
-- ✅ **Syntax Verification** - RFC 5322 compliant checking
-- ✅ **DNS/MX Record Validation** - Verify domain and mail server
-- ✅ **SMTP Verification** - Check if mailbox actually exists
-- ✅ **Disposable Email Detection** - Block temporary email services
-- ✅ **Role-based Email Detection** - Identify admin@, info@, etc.
-- ✅ **Catch-all Detection** - Detect catch-all mail servers
-- ✅ **Free Provider Detection** - Identify Gmail, Yahoo, etc.
-- ✅ **Typo Suggestions** - "Did you mean gmail.com?"
+# If you use DATABASE_URL in .env, Django will use it automatically on Heroku.
+# For local dev, make sure your database exists and credentials are correct.
+python manage.py migrate
+python manage.py runserver 0.0.0.0:8000
+```
 
----
+API base URL (local): `http://localhost:8000/scrubimail/api/v1/`
 
-## 📦 Quick Start
+### 2) User frontend
 
-### 1. Sign Up
-Create a free account at [scrubimail.com/register](https://scrubimail.com/register)
+```bash
+cd Scrubimail-FE
+npm install
 
-### 2. Get Your API Key
-Get your API key from the dashboard
+# optional
+echo "VITE_API_URL=http://localhost:8000/scrubimail/api/v1" > .env.local
 
-### 3. Validate an Email
+npm run dev
+```
 
-#### Python
+### 3) Admin frontend
+
+```bash
+cd Scrubimail-Admin-FE
+npm install
+
+# optional
+echo "VITE_API_URL=http://localhost:8000/scrubimail/api/v1" > .env.local
+
+npm run dev
+```
+
+## API authentication
+
+The backend supports authenticating requests either by JWT (for the dashboards) or by API key (for external API consumers).
+
+Supported API key headers:
+
+- `X-API-Key: <your-api-key>`
+- `Authorization: ApiKey <your-api-key>`
+
+## Validate a single email
+
+Endpoint:
+
+- `POST /scrubimail/api/v1/validate/`
+
+Example (curl):
+
+```bash
+curl -X POST http://localhost:8000/scrubimail/api/v1/validate/ \
+  -H "Content-Type: application/json" \
+  -H "X-API-Key: sk_test_1234567890abcdef" \
+  -d '{"email":"test@example.com","real_time":true}'
+```
+
+Example (Python):
+
 ```python
 import requests
 
-response = requests.post(
-    'https://api.scrubimail.com/validate',
-    headers={'Authorization': 'Bearer YOUR_API_KEY'},
-    json={'email': 'user@example.com'}
-)
+url = "http://localhost:8000/scrubimail/api/v1/validate/"
+headers = {"X-API-Key": "sk_test_1234567890abcdef"}
+payload = {"email": "test@example.com", "real_time": True}
 
-result = response.json()
-print(f"Valid: {result['is_valid']}")
-print(f"Score: {result['quality_score']}")
+print(requests.post(url, json=payload, headers=headers).json())
 ```
 
-#### JavaScript/Node.js
-```javascript
-const response = await fetch('https://api.scrubimail.com/validate', {
-  method: 'POST',
-  headers: {
-    'Authorization': 'Bearer YOUR_API_KEY',
-    'Content-Type': 'application/json'
-  },
-  body: JSON.stringify({ email: 'user@example.com' })
-});
+## License
 
-const result = await response.json();
-console.log('Valid:', result.is_valid);
-```
-
-#### cURL
-```bash
-curl -X POST https://api.scrubimail.com/validate \
-  -H 'Authorization: Bearer YOUR_API_KEY' \
-  -H 'Content-Type: application/json' \
-  -d '{"email": "user@example.com"}'
-```
-
----
-
-## 🏗️ Project Structure
-
-This is a monorepo containing:
-
-```
-/ScrubiMail-BE/          # Django/Python backend API
-/Scrubimail-FE/          # React/TypeScript user frontend
-/Scrubimail-Admin-FE/    # React/TypeScript admin dashboard
-```
-
-### Backend (Django REST Framework)
-- Email validation engine
-- User authentication & billing
-- API key management
-- Usage analytics
-- Stripe payment integration
-
-### Frontend (React + Vite)
-- User dashboard
-- Email validation interface
-- Billing & subscription management
-- API documentation
-- Usage statistics
-
----
-
-## 💡 Use Cases
-
-### 1. User Registration
-Validate emails during signup to prevent fake accounts:
-```javascript
-app.post('/register', async (req, res) => {
-  const validation = await scrubimail.validate(req.body.email);
-  
-  if (!validation.is_valid || validation.checks.disposable) {
-    return res.status(400).json({ error: 'Invalid email' });
-  }
-  
-  // Create user...
-});
-```
-
-### 2. Email List Cleaning
-Clean your marketing lists before campaigns:
-```python
-import pandas as pd
-
-emails = pd.read_csv('email_list.csv')
-valid_emails = []
-
-for email in emails['email']:
-    result = scrubimail.validate(email)
-    if result['is_valid'] and result['quality_score'] > 70:
-        valid_emails.append(email)
-
-pd.DataFrame(valid_emails).to_csv('cleaned_list.csv')
-```
-
-### 3. Form Validation
-Real-time validation in web forms:
-```javascript
-const validateEmail = async (email) => {
-  const result = await scrubimail.validate(email);
-  if (!result.is_valid) {
-    showError('Please enter a valid email');
-  }
-};
-```
-
----
-
-## 🛠️ Technology Stack
-
-**Backend:**
-- Django 4.x
-- Django REST Framework
-- PostgreSQL
-- Celery (async tasks)
-- Redis (caching)
-- Stripe (payments)
-
-**Frontend:**
-- React 18
-- TypeScript
-- Vite
-- TailwindCSS
-- Redux Toolkit
-- React Router
-
-**Infrastructure:**
-- Docker
-- Vercel (frontend hosting)
-- AWS/Heroku (backend)
-
----
-
-## 📊 API Response Format
-
-```json
-{
-  "email": "user@example.com",
-  "is_valid": true,
-  "quality_score": 95,
-  "email_type": "personal",
-  "checks": {
-    "syntax": "valid",
-    "dns": "valid",
-    "smtp": "valid",
-    "disposable": false,
-    "role_based": false,
-    "catch_all": false,
-    "free_provider": false
-  },
-  "provider": "example.com",
-  "suggestion": null,
-  "processed_at": "2025-12-10T12:00:00Z"
-}
-```
-
----
-
-## 💰 Pricing
-
-- **Free Tier** - Get started with free credits
-- **Starter** - $19/month - 10,000 validations
-- **Professional** - $49/month - 50,000 validations
-- **Business** - $99/month - 150,000 validations
-- **Enterprise** - Custom pricing for high volume
-
-View full pricing: [scrubimail.com/pricing](https://scrubimail.com/pricing)
-
----
-
-## 🔗 Links
-
-- **Website**: [scrubimail.com](https://scrubimail.com)
-- **Documentation**: [scrubimail.com/docs](https://scrubimail.com/docs)
-- **API Docs**: [scrubimail.com/api-docs](https://scrubimail.com/api-docs)
-- **Pricing**: [scrubimail.com/pricing](https://scrubimail.com/pricing)
-- **Support**: support@scrubimail.com
-
----
-
-## 📝 License
-
-Copyright © 2024-2025 ScrubiMail. All rights reserved.
-
----
-
-## 🤝 Support
-
-- **Email**: support@scrubimail.com
-- **Phone**: +233-24-813-8722
-- **Help Center**: [scrubimail.com/help](https://scrubimail.com/help)
-
----
-
-**Made with ❤️ by the ScrubiMail Team**
+MIT — see [LICENSE](LICENSE).
