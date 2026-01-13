@@ -25,6 +25,8 @@ const FlexibleLayout = ({ children }: PropsWithChildren) => {
     const isAuthenticated = useIsAuthenticated();
     console.log('isAuthenticated:', isAuthenticated);
     const authUser = useAuthUser() as AuthUser | null;
+    console.log("the auth user", authUser?.user);
+    console.log("the auth user", authUser);
 
     const [showLoader, setShowLoader] = useState(true);
     const [showTopButton, setShowTopButton] = useState(false);
@@ -68,7 +70,7 @@ const FlexibleLayout = ({ children }: PropsWithChildren) => {
     }, []);
 
     // If user is authenticated, show the full layout with sidebar
-    if (isAuthenticated && authUser?.user) {
+    if (isAuthenticated && authUser) {
         return (
             <App>
                 {/* BEGIN MAIN CONTAINER */}

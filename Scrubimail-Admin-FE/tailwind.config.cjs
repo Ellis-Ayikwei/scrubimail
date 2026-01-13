@@ -10,19 +10,19 @@ module.exports = {
             colors: {
                 // Core brand colors with standard Tailwind scale
                 primary: {
-                    50: '#f3f2fc', // Lightest tint
-                    100: '#e8eaf6', // Very light
-                    200: '#d1d4ed', // Light
-                    300: '#a3a9d9', // Medium light
-                    400: '#7575c0', // Medium
-                    500: '#2E2787', // DEFAULT - Deep indigo
-                    600: '#252060', // Darker
-                    700: '#1c1849', // Dark
-                    800: '#131132', // Very dark
-                    900: '#0a091b', // Darkest
-                    DEFAULT: '#2E2787',
-                    light: '#e8eaf6',
-                    'dark-light': 'rgba(46, 39, 135, 0.15)',
+                    50: '#f7f7f8',
+                    100: '#efeff1',
+                    200: '#d9d9dd',
+                    300: '#b3b3ba',
+                    400: '#7a7a86',
+                    500: '#2d2d33',
+                    600: '#1f1f24',
+                    700: '#16161a',
+                    800: '#101013',
+                    900: '#0b0b0f',
+                    DEFAULT: '#0b0b0f',
+                    light: '#efeff1',
+                    'dark-light': 'rgba(11, 11, 15, 0.15)',
                 },
                 secondary: {
                     50: '#fff5f2', // Lightest tint
@@ -42,19 +42,19 @@ module.exports = {
 
                 // Semantic colors with full scales
                 success: {
-                    50: '#f3f2fc',
-                    100: '#e8eaf6',
-                    200: '#d1d4ed',
-                    300: '#a3a9d9',
-                    400: '#7575c0',
-                    500: '#2E2787', // Using primary for trust
-                    600: '#252060',
-                    700: '#1c1849',
-                    800: '#131132',
-                    900: '#0a091b',
-                    DEFAULT: '#2E2787',
-                    light: '#e8eaf6',
-                    'dark-light': 'rgba(46, 39, 135, 0.15)',
+                    50: '#f7f7f8',
+                    100: '#efeff1',
+                    200: '#d9d9dd',
+                    300: '#b3b3ba',
+                    400: '#7a7a86',
+                    500: '#0b0b0f',
+                    600: '#1f1f24',
+                    700: '#16161a',
+                    800: '#101013',
+                    900: '#0b0b0f',
+                    DEFAULT: '#0b0b0f',
+                    light: '#efeff1',
+                    'dark-light': 'rgba(11, 11, 15, 0.15)',
                 },
                 danger: {
                     50: '#fef2f2',
