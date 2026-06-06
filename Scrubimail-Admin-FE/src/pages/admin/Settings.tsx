@@ -455,7 +455,7 @@ const AdminSettings: React.FC = () => {
                                     name="paystack_public_key"
                                     label="Paystack Public Key"
                                 >
-                                    <Input.Password placeholder="pk_test_..." />
+                                    <Input.Password placeholder="Enter Paystack public key" />
                                 </Form.Item>
                             </Col>
                             <Col xs={24} md={12}>
@@ -463,7 +463,7 @@ const AdminSettings: React.FC = () => {
                                     name="paystack_secret_key"
                                     label="Paystack Secret Key"
                                 >
-                                    <Input.Password placeholder="sk_test_..." />
+                                    <Input.Password placeholder="Enter Paystack secret key" />
                                 </Form.Item>
                             </Col>
                         </Row>
@@ -476,7 +476,7 @@ const AdminSettings: React.FC = () => {
                                     name="stripe_public_key"
                                     label="Stripe Public Key"
                                 >
-                                    <Input.Password placeholder="pk_test_..." />
+                                    <Input.Password placeholder="Enter Stripe public key" />
                                 </Form.Item>
                             </Col>
                             <Col xs={24} md={12}>
@@ -484,7 +484,7 @@ const AdminSettings: React.FC = () => {
                                     name="stripe_secret_key"
                                     label="Stripe Secret Key"
                                 >
-                                    <Input.Password placeholder="sk_test_..." />
+                                    <Input.Password placeholder="Enter Stripe secret key" />
                                 </Form.Item>
                             </Col>
                         </Row>

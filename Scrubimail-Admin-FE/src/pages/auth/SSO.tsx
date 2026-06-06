@@ -100,7 +100,7 @@ const SSO: React.FC = () => {
 
   const handleApiKeyGenerate = () => {
     // TODO: Implement API key generation
-    const generatedKey = 'sk_' + Math.random().toString(36).substr(2, 9) + '_' + Date.now().toString(36);
+    const generatedKey = 'sm_' + Math.random().toString(36).substr(2, 9) + '_' + Date.now().toString(36);
     setApiKey(generatedKey);
   };
 

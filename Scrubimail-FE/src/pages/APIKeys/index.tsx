@@ -113,7 +113,7 @@ const ApiKeys: React.FC = () => {
                     )
                   : apiKeys.map(key => {
                       const isVisible = visibleKeys.has(key.id);
-                      const masked = key.key ? `${key.key.slice(0, 8)}${'•'.repeat(12)}${key.key.slice(-4)}` : 'sk_•••••••••••••••••••••';
+                      const masked = key.key ? `${key.key.slice(0, 8)}${'•'.repeat(12)}${key.key.slice(-4)}` : '•••••••••••••••••••••';
                       const displayKey = isVisible ? key.key : masked;
                       const isCopied = copiedId === key.id;
                       return (

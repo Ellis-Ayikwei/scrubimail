@@ -39,7 +39,7 @@ export const CreateApiKeyModal: React.FC<CreateApiKeyModalProps> = ({
   const [expirationDate, setExpirationDate] = useState<string>('');
   const [ipWhitelist, setIpWhitelist] = useState<string>('');
   const [rateLimit, setRateLimit] = useState<number>(1000);
-  const [keyPrefix, setKeyPrefix] = useState<string>('sk_');
+  const [keyPrefix, setKeyPrefix] = useState<string>('');
   const [keyLength, setKeyLength] = useState<number>(32);
   const [notifyOnUsage, setNotifyOnUsage] = useState<boolean>(false);
   const [autoRotate, setAutoRotate] = useState<boolean>(false);
@@ -52,7 +52,7 @@ export const CreateApiKeyModal: React.FC<CreateApiKeyModalProps> = ({
     setExpirationDate('');
     setIpWhitelist('');
     setRateLimit(1000);
-    setKeyPrefix('sk_');
+    setKeyPrefix('');
     setKeyLength(32);
     setNotifyOnUsage(false);
     setAutoRotate(false);
@@ -150,7 +150,7 @@ export const CreateApiKeyModal: React.FC<CreateApiKeyModalProps> = ({
                   Key Prefix
                 </label>
                 <Input
-                  placeholder="sk_"
+                  placeholder="Optional key prefix"
                   value={keyPrefix}
                   onChange={(e) => setKeyPrefix(e.target.value)}
                   size="middle"

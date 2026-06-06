@@ -75,7 +75,7 @@ Example (curl):
 ```bash
 curl -X POST http://localhost:8000/scrubimail/api/v1/validate/ \
   -H "Content-Type: application/json" \
-  -H "X-API-Key: sk_test_1234567890abcdef" \
+  -H "X-API-Key: your_scrubimail_api_key" \
   -d '{"email":"test@example.com","real_time":true}'
 ```
 
@@ -85,7 +85,7 @@ Example (Python):
 import requests
 
 url = "http://localhost:8000/scrubimail/api/v1/validate/"
-headers = {"X-API-Key": "sk_test_1234567890abcdef"}
+headers = {"X-API-Key": "your_scrubimail_api_key"}
 payload = {"email": "test@example.com", "real_time": True}
 
 print(requests.post(url, json=payload, headers=headers).json())

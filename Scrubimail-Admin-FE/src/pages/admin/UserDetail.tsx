@@ -112,8 +112,8 @@ const UserDetail: React.FC = () => {
           { id: 2, email: 'invalid@test.com', status: 'invalid', date: '2023-12-14' }
         ],
         apiKeys: [
-          { id: 1, name: 'Production API', key: 'sk_****1234', status: 'active' },
-          { id: 2, name: 'Development API', key: 'sk_****5678', status: 'active' }
+          { id: 1, name: 'Production API', key: '****1234', status: 'active' },
+          { id: 2, name: 'Development API', key: '****5678', status: 'active' }
         ]
       });
     } finally {

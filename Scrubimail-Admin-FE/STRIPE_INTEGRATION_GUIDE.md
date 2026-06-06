@@ -148,9 +148,9 @@ Make sure your backend has:
 1. **Environment Variables**:
 
 ```bash
-STRIPE_PUBLISHABLE_KEY=pk_test_...
-STRIPE_SECRET_KEY=sk_test_...
-STRIPE_WEBHOOK_SECRET=whsec_...
+STRIPE_PUBLISHABLE_KEY=your_stripe_publishable_key
+STRIPE_SECRET_KEY=your_stripe_secret_key
+STRIPE_WEBHOOK_SECRET=your_stripe_webhook_secret
 PAYMENT_SUCCESS_URL=http://localhost:3000/payment/success
 PAYMENT_CANCEL_URL=http://localhost:3000/payment/cancel
 ```
