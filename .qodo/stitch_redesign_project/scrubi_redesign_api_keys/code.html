@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Scrubi | API Keys Management</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Epilogue:wght@400;600;700;900&amp;family=Inter:wght@400;500;600&amp;family=Space+Grotesk:wght@400;500;700&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            colors: {
+              "surface-container-highest": "#31353a",
+              "surface-container-lowest": "#0a0f13",
+              "on-tertiary": "#2f3131",
+              "primary-fixed-dim": "#00e29e",
+              "on-background": "#e0e3e8",
+              "on-tertiary-container": "#535455",
+              "inverse-surface": "#e0e3e8",
+              "error-container": "#93000a",
+              "secondary": "#c2c7d0",
+              "on-tertiary-fixed-variant": "#454747",
+              "primary": "#6effc0",
+              "outline": "#84958a",
+              "surface-bright": "#353a3e",
+              "tertiary-fixed-dim": "#c6c6c7",
+              "surface-tint": "#00e29e",
+              "on-surface-variant": "#bacbbf",
+              "surface-container-low": "#181c20",
+              "background": "#101418",
+              "on-tertiary-fixed": "#1a1c1c",
+              "inverse-on-surface": "#2d3135",
+              "on-primary-fixed": "#002114",
+              "on-error-container": "#ffdad6",
+              "on-primary": "#003824",
+              "on-surface": "#e0e3e8",
+              "on-primary-container": "#006141",
+              "surface": "#101418",
+              "inverse-primary": "#006c49",
+              "tertiary": "#e5e5e5",
+              "primary-container": "#00e5a0",
+              "on-secondary-container": "#b1b5bf",
+              "on-secondary-fixed": "#171c23",
+              "on-primary-fixed-variant": "#005236",
+              "surface-container": "#1c2024",
+              "secondary-fixed-dim": "#c2c7d0",
+              "secondary-fixed": "#dee2ec",
+              "error": "#ffb4ab",
+              "secondary-container": "#42474f",
+              "surface-container-high": "#262a2f",
+              "outline-variant": "#3b4a41",
+              "primary-fixed": "#47ffb8",
+              "surface-variant": "#31353a",
+              "on-error": "#690005",
+              "surface-dim": "#101418",
+              "tertiary-container": "#c9c9c9",
+              "on-secondary-fixed-variant": "#42474f",
+              "on-secondary": "#2c3138",
+              "tertiary-fixed": "#e2e2e2"
+            },
+            fontFamily: {
+              "headline": ["Epilogue"],
+              "body": ["Inter"],
+              "label": ["Space Grotesk"],
+              "mono": ["JetBrains Mono", "monospace"]
+            },
+            borderRadius: {"DEFAULT": "0.125rem", "lg": "0.25rem", "xl": "0.5rem", "full": "0.75rem"},
+          },
+        },
+      }
+    </script>
+<style>
+      .material-symbols-outlined {
+        font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        vertical-align: middle;
+      }
+      .mono-data { font-family: 'JetBrains Mono', monospace; }
+      .editorial-grid {
+        display: grid;
+        grid-template-columns: repeat(12, 1fr);
+        gap: 1.5rem;
+      }
+    </style>
+</head>
+<body class="bg-[#080C10] text-on-surface font-body selection:bg-primary/30">
+<!-- SideNavBar Shell -->
+<aside class="fixed left-0 top-0 h-full flex flex-col py-6 px-4 bg-[#0D1117] w-64 border-r border-transparent z-50">
+<div class="mb-10 px-4">
+<h1 class="text-xl font-black text-[#00E5A0] tracking-tighter font-headline">SCRUBI</h1>
+<p class="text-[10px] font-mono uppercase tracking-[0.2em] text-outline mt-1">Technical Editorial</p>
+</div>
+<nav class="flex-1 space-y-1">
+<a class="flex items-center gap-3 px-4 py-3 text-slate-500 hover:bg-[#181c20] hover:text-[#00E5A0] transition-all duration-150 ease-in-out group" href="#">
+<span class="material-symbols-outlined text-xl" data-icon="person">person</span>
+<span class="font-headline tracking-tight text-sm">Profile</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 text-[#00E5A0] border-l-2 border-[#00E5A0] bg-[#181c20] font-bold transition-all duration-150 ease-in-out group" href="#">
+<span class="material-symbols-outlined text-xl" data-icon="key">key</span>
+<span class="font-headline tracking-tight text-sm">API Keys</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 text-slate-500 hover:bg-[#181c20] hover:text-[#00E5A0] transition-all duration-150 ease-in-out group" href="#">
+<span class="material-symbols-outlined text-xl" data-icon="menu_book">menu_book</span>
+<span class="font-headline tracking-tight text-sm">Documentation</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 text-slate-500 hover:bg-[#181c20] hover:text-[#00E5A0] transition-all duration-150 ease-in-out group" href="#">
+<span class="material-symbols-outlined text-xl" data-icon="payments">payments</span>
+<span class="font-headline tracking-tight text-sm">Billing</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 text-slate-500 hover:bg-[#181c20] hover:text-[#00E5A0] transition-all duration-150 ease-in-out group" href="#">
+<span class="material-symbols-outlined text-xl" data-icon="history">history</span>
+<span class="font-headline tracking-tight text-sm">History</span>
+</a>
+</nav>
+<div class="mt-auto px-4 space-y-4">
+<button class="w-full bg-primary-container text-on-primary font-headline font-bold py-3 text-sm tracking-tight rounded-sm hover:brightness-110 transition-all shadow-lg shadow-primary/10">
+                New Validation
+            </button>
+<div class="pt-6 space-y-1">
+<a class="flex items-center gap-3 py-2 text-slate-500 hover:text-slate-200 transition-colors" href="#">
+<span class="material-symbols-outlined text-lg" data-icon="help_outline">help_outline</span>
+<span class="text-xs font-headline">Support</span>
+</a>
+<a class="flex items-center gap-3 py-2 text-slate-500 hover:text-slate-200 transition-colors" href="#">
+<span class="material-symbols-outlined text-lg" data-icon="settings">settings</span>
+<span class="text-xs font-headline">Settings</span>
+</a>
+</div>
+</div>
+</aside>
+<!-- TopNavBar Shell -->
+<header class="fixed top-0 left-0 w-full h-16 flex justify-between items-center pl-72 pr-8 bg-[#080C10]/70 backdrop-blur-xl border-b border-[#3b4a41]/15 z-40">
+<div class="flex items-center gap-4 w-96">
+<div class="relative w-full">
+<span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-outline text-sm" data-icon="search">search</span>
+<input class="w-full bg-surface-container-highest border-none text-xs py-2 pl-10 pr-4 focus:ring-1 focus:ring-primary rounded-sm text-on-surface placeholder:text-outline/50" placeholder="Search keys or logs..." type="text"/>
+</div>
+</div>
+<div class="flex items-center gap-6">
+<div class="flex items-center gap-4 text-slate-400">
+<button class="hover:text-[#00E5A0] transition-colors"><span class="material-symbols-outlined" data-icon="account_balance_wallet">account_balance_wallet</span></button>
+<button class="hover:text-[#00E5A0] transition-colors"><span class="material-symbols-outlined" data-icon="terminal">terminal</span></button>
+<button class="hover:text-[#00E5A0] transition-colors relative">
+<span class="material-symbols-outlined" data-icon="notifications">notifications</span>
+<span class="absolute top-0 right-0 w-1.5 h-1.5 bg-primary rounded-full"></span>
+</button>
+</div>
+<div class="h-6 w-[1px] bg-outline-variant/30"></div>
+<button class="bg-primary/10 border border-primary/20 text-primary font-headline text-xs px-4 py-2 hover:bg-primary/20 transition-all">
+                Scrub Now
+            </button>
+<div class="w-8 h-8 rounded-full overflow-hidden border border-outline-variant">
+<img alt="User profile" data-alt="close-up portrait of a professional male software engineer in a dark studio setting with soft cyan ambient light" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDe5nO4169jx3LPQOjRajMaZ10MGdW5wqSb-u-QkugM-A806jfXCdwnC5Y6Fyqf4N9HWiabNyy6RqAZsS3WtQhj_OLa4bw26BmT0G922afHnIEinq-JV7jDGL-XP-wQRSYJ_D7BikBYbVPMPtCCa0mJZgD3TSDSTlQGgBrkjNSNwAWsjNcEs7bS_NoQKBBwWBe3zz2PIIsJYWO0dCqS_Xb_ZIzM_nX5PkYaMdXAtFU2cNVg1qRq7cBxOABHCxqxqS78x8OohSHTUnfw"/>
+</div>
+</div>
+</header>
+<!-- Main Canvas -->
+<main class="ml-64 pt-24 p-8 min-h-screen">
+<div class="max-w-6xl mx-auto">
+<!-- Page Header -->
+<div class="flex justify-between items-end mb-12">
+<div>
+<span class="font-label text-[10px] uppercase tracking-[0.3em] text-primary mb-2 block">Authentication Protocol</span>
+<h2 class="text-4xl font-black font-headline tracking-tighter text-on-surface">API Keys</h2>
+<p class="text-outline mt-2 max-w-md text-sm leading-relaxed">Manage your secure access tokens. Keys are restricted to the environments they were provisioned for.</p>
+</div>
+<button class="flex items-center gap-2 bg-primary text-on-primary font-headline font-bold px-6 py-3 rounded-sm hover:shadow-[0_0_15px_rgba(0,229,160,0.4)] transition-all">
+<span class="material-symbols-outlined" data-icon="add">add</span>
+                    Create New Key
+                </button>
+</div>
+<!-- Dashboard Grid -->
+<div class="editorial-grid">
+<!-- Stats Overview -->
+<div class="col-span-12 lg:col-span-4 space-y-6">
+<div class="bg-surface-container-low p-6 border-l-4 border-primary">
+<p class="font-label text-[10px] uppercase tracking-widest text-outline mb-4">Total API Calls (24h)</p>
+<div class="flex items-baseline gap-2">
+<span class="text-4xl font-headline font-black">124.8k</span>
+<span class="text-primary text-xs font-mono">+12.4%</span>
+</div>
+<div class="mt-6 h-1 w-full bg-surface-container-highest rounded-full overflow-hidden">
+<div class="h-full bg-primary w-[72%]"></div>
+</div>
+</div>
+<div class="bg-surface-container-low p-6 border-l-4 border-outline-variant">
+<p class="font-label text-[10px] uppercase tracking-widest text-outline mb-4">Security Status</p>
+<div class="flex items-center gap-3 text-primary">
+<span class="material-symbols-outlined text-3xl" data-icon="verified_user" style="font-variation-settings: 'FILL' 1;">verified_user</span>
+<div>
+<p class="font-headline font-bold text-on-surface">Optimal</p>
+<p class="text-[10px] font-mono text-outline uppercase">No leaks detected</p>
+</div>
+</div>
+</div>
+</div>
+<!-- API Key Table/List -->
+<div class="col-span-12 lg:col-span-8 bg-surface-container-low overflow-hidden">
+<div class="p-6 border-b border-outline-variant/10 flex justify-between items-center">
+<h3 class="font-headline font-bold text-sm tracking-tight">Active Access Tokens</h3>
+<div class="flex gap-2">
+<button class="p-2 hover:bg-surface-container-highest transition-colors text-outline">
+<span class="material-symbols-outlined text-sm" data-icon="filter_list">filter_list</span>
+</button>
+<button class="p-2 hover:bg-surface-container-highest transition-colors text-outline">
+<span class="material-symbols-outlined text-sm" data-icon="more_vert">more_vert</span>
+</button>
+</div>
+</div>
+<!-- Table Header -->
+<div class="grid grid-cols-12 px-6 py-3 bg-surface-container-lowest border-b border-outline-variant/5">
+<div class="col-span-5 font-label text-[10px] text-outline uppercase tracking-widest">Token Label / Key</div>
+<div class="col-span-2 font-label text-[10px] text-outline uppercase tracking-widest">Status</div>
+<div class="col-span-3 font-label text-[10px] text-outline uppercase tracking-widest">Last Used</div>
+<div class="col-span-2 font-label text-[10px] text-outline uppercase tracking-widest text-right">Actions</div>
+</div>
+<!-- Key Row 1 -->
+<div class="grid grid-cols-12 px-6 py-6 border-b border-outline-variant/10 hover:bg-surface-container-high transition-colors group">
+<div class="col-span-5">
+<p class="font-headline font-bold text-sm mb-1">Production_Main_Scrubber</p>
+<code class="font-mono text-xs text-primary/70 tracking-tighter bg-primary/5 px-2 py-0.5 rounded-sm">••••••••••••x901</code>
+</div>
+<div class="col-span-2 flex items-center">
+<span class="flex items-center gap-1.5 px-2 py-1 bg-primary/10 text-primary text-[10px] font-bold rounded-sm border border-primary/20">
+<span class="w-1.5 h-1.5 bg-primary rounded-full"></span>
+                                ACTIVE
+                            </span>
+</div>
+<div class="col-span-3 flex flex-col justify-center">
+<p class="text-xs font-mono text-on-surface">2023-10-24 14:32</p>
+<p class="text-[10px] text-outline">3,421 calls / 24h</p>
+</div>
+<div class="col-span-2 flex justify-end items-center gap-3 opacity-0 group-hover:opacity-100 transition-opacity">
+<button class="text-outline hover:text-primary transition-colors">
+<span class="material-symbols-outlined text-lg" data-icon="content_copy">content_copy</span>
+</button>
+<button class="text-outline hover:text-error transition-colors">
+<span class="material-symbols-outlined text-lg" data-icon="delete_forever">delete_forever</span>
+</button>
+</div>
+</div>
+<!-- Key Row 2 -->
+<div class="grid grid-cols-12 px-6 py-6 border-b border-outline-variant/10 hover:bg-surface-container-high transition-colors group">
+<div class="col-span-5">
+<p class="font-headline font-bold text-sm mb-1">Staging_Environment_Testing</p>
+<code class="font-mono text-xs text-outline tracking-tighter bg-surface-container-highest px-2 py-0.5 rounded-sm">sk_test_••••••••••••w210</code>
+</div>
+<div class="col-span-2 flex items-center">
+<span class="flex items-center gap-1.5 px-2 py-1 bg-surface-container-highest text-outline text-[10px] font-bold rounded-sm border border-outline-variant/20">
+<span class="w-1.5 h-1.5 bg-outline rounded-full"></span>
+                                INACTIVE
+                            </span>
+</div>
+<div class="col-span-3 flex flex-col justify-center">
+<p class="text-xs font-mono text-outline">Never Used</p>
+<p class="text-[10px] text-outline/50">Provisioned 2d ago</p>
+</div>
+<div class="col-span-2 flex justify-end items-center gap-3 opacity-0 group-hover:opacity-100 transition-opacity">
+<button class="text-outline hover:text-primary transition-colors">
+<span class="material-symbols-outlined text-lg" data-icon="content_copy">content_copy</span>
+</button>
+<button class="text-outline hover:text-error transition-colors">
+<span class="material-symbols-outlined text-lg" data-icon="delete_forever">delete_forever</span>
+</button>
+</div>
+</div>
+<!-- Key Row 3 -->
+<div class="grid grid-cols-12 px-6 py-6 hover:bg-surface-container-high transition-colors group">
+<div class="col-span-5">
+<p class="font-headline font-bold text-sm mb-1">CI_CD_Automation_Node</p>
+<code class="font-mono text-xs text-primary/70 tracking-tighter bg-primary/5 px-2 py-0.5 rounded-sm">••••••••••••k552</code>
+</div>
+<div class="col-span-2 flex items-center">
+<span class="flex items-center gap-1.5 px-2 py-1 bg-primary/10 text-primary text-[10px] font-bold rounded-sm border border-primary/20">
+<span class="w-1.5 h-1.5 bg-primary rounded-full"></span>
+                                ACTIVE
+                            </span>
+</div>
+<div class="col-span-3 flex flex-col justify-center">
+<p class="text-xs font-mono text-on-surface">2023-10-25 09:11</p>
+<p class="text-[10px] text-outline">128 calls / 24h</p>
+</div>
+<div class="col-span-2 flex justify-end items-center gap-3 opacity-0 group-hover:opacity-100 transition-opacity">
+<button class="text-outline hover:text-primary transition-colors">
+<span class="material-symbols-outlined text-lg" data-icon="content_copy">content_copy</span>
+</button>
+<button class="text-outline hover:text-error transition-colors">
+<span class="material-symbols-outlined text-lg" data-icon="delete_forever">delete_forever</span>
+</button>
+</div>
+</div>
+</div>
+<!-- Footer/Secondary Area: Permissions Visualizer -->
+<div class="col-span-12 mt-4">
+<div class="bg-surface-container-low p-8 border border-outline-variant/10 relative overflow-hidden">
+<div class="absolute right-0 top-0 w-1/3 h-full opacity-10 pointer-events-none">
+<img class="w-full h-full object-cover" data-alt="close-up of clean dark software code with syntax highlighting in a professional code editor with shallow depth of field" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAT_fHHVI3C9GsugBPB69oV9cFnc9V6qDKKF5Wuvj2OX-4znuFrq-tetKf93D0Mwab8dE6KxGbJfLSGWBFXjtWaaz4beowiMaMDM-04x5ieh3AinBu-qLDWHgRIOBx1Et_LTegnaNSPktKzsglHHzPMhbg_CBR0rJB7-HpSLhp4XBNZFNSfufPvtLZyDSet2rzWCbL0IWafRwc_Bo1jqIK3Vi7t75X9M6eBh1-YnIdJHoh-jgnjkLqYi3lI0fYo3d92FPpMiRzwb-Xw"/>
+</div>
+<div class="relative z-10">
+<h4 class="font-headline font-bold text-xl mb-4">RBAC Permissions Matrix</h4>
+<div class="grid grid-cols-1 md:grid-cols-4 gap-6">
+<div class="bg-surface-container-highest/40 p-4 rounded-sm backdrop-blur-sm">
+<div class="flex items-center gap-2 mb-3">
+<span class="material-symbols-outlined text-primary text-sm" data-icon="rule">rule</span>
+<p class="font-label text-[10px] uppercase font-bold tracking-widest">Read</p>
+</div>
+<p class="text-xs text-outline leading-relaxed">Permission to fetch validation results and history logs.</p>
+</div>
+<div class="bg-surface-container-highest/40 p-4 rounded-sm backdrop-blur-sm">
+<div class="flex items-center gap-2 mb-3">
+<span class="material-symbols-outlined text-primary text-sm" data-icon="edit">edit</span>
+<p class="font-label text-[10px] uppercase font-bold tracking-widest">Write</p>
+</div>
+<p class="text-xs text-outline leading-relaxed">Permission to initiate new scrubbing tasks and bulk uploads.</p>
+</div>
+<div class="bg-surface-container-highest/40 p-4 rounded-sm backdrop-blur-sm">
+<div class="flex items-center gap-2 mb-3">
+<span class="material-symbols-outlined text-primary text-sm" data-icon="admin_panel_settings">admin_panel_settings</span>
+<p class="font-label text-[10px] uppercase font-bold tracking-widest">Admin</p>
+</div>
+<p class="text-xs text-outline leading-relaxed">Full control including billing management and key rotation.</p>
+</div>
+<div class="flex flex-col justify-center p-4 border border-dashed border-outline-variant/30 rounded-sm">
+<p class="text-xs font-headline font-bold text-on-surface text-center mb-2">Need custom scopes?</p>
+<button class="text-[10px] font-mono text-primary uppercase tracking-widest hover:underline">Contact Sales</button>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</main>
+</body></html>

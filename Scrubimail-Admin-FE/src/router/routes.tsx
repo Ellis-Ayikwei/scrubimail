@@ -27,13 +27,16 @@ const ManageValidations = lazy(() => import('../pages/admin/ManageValidations'))
 const BillingManagement = lazy(() => import('../pages/admin/BillingManagement'));
 const ValidationsManagement = lazy(() => import('../pages/admin/ValidationsManagement'));
 const PlansManagement = lazy(() => import('../pages/admin/PlansManagement'));
-const UserDetail = lazy(() => import('../pages/admin/UserDetail'));
+const UserDetail = lazy(() => import('../pages/admin/users/index'));
 
 // New Billing Management pages
 const CreditPackagesManagement = lazy(() => import('../pages/admin/CreditPackagesManagement'));
-const PromoCodesManagement = lazy(() => import('../pages/admin/PromoCodesManagement'));
+const PromoCodesManagement = lazy(() => import('../pages/admin/promo-codes/PromoCodesManagement'));
 const InvoicesManagement = lazy(() => import('../pages/admin/InvoicesManagement'));
 const UsageAlertsDashboard = lazy(() => import('../pages/admin/UsageAlertsDashboard'));
+
+const ChangelogManagement = lazy(() => import('../pages/admin/ChangelogManagement'));
+const GroupsPermissionsManagement = lazy(() => import('../pages/admin/GroupsPermissionsManagement'));
 
 // Auth pages
 const Login = lazy(() => import('../pages/auth/Login'));
@@ -310,6 +313,25 @@ const routes = [
         element: (
             <ProtectedRoute>
                 <UsageAlertsDashboard />
+            </ProtectedRoute>
+        ),
+        layout: 'admin',
+    },
+
+    {
+        path: '/admin/changelog',
+        element: (
+            <ProtectedRoute>
+                <ChangelogManagement />
+            </ProtectedRoute>
+        ),
+        layout: 'admin',
+    },
+    {
+        path: '/admin/groups-permissions',
+        element: (
+            <ProtectedRoute>
+                <GroupsPermissionsManagement />
             </ProtectedRoute>
         ),
         layout: 'admin',

@@ -1,24 +1,14 @@
 import React, { useState } from 'react';
-import { 
-  Code, 
-  Copy, 
-  Check, 
-  Play, 
-  Download, 
-  Shield, 
-  Zap, 
-  Database, 
-  Globe, 
-  Mail,
-  Clock,
-  BarChart3,
-  Users,
-  Key,
-  AlertCircle,
-  CheckCircle,
-  XCircle,
-  Info
-} from 'lucide-react';
+import { Copy, Check } from 'lucide-react';
+
+const panel =
+  'bg-white/95 dark:bg-[#1c2024] border border-gray-200 dark:border-[#3b4a41]/40 rounded-sm shadow-sm dark:shadow-none';
+const panelHeaderBorder = 'border-b border-gray-200 dark:border-[#3b4a41]/30';
+const codeShell =
+  'bg-slate-900 border border-slate-700/80 dark:border-[#3b4a41]/40 rounded-sm font-mono text-xs text-emerald-400 dark:text-[#6effc0] overflow-x-auto';
+const labelMuted =
+  "font-['Space_Grotesk',sans-serif] uppercase tracking-[0.1em] text-[9px] text-gray-500 dark:text-[#3b4a41]";
+const bodyMutedSoft = 'font-mono text-[10px] text-gray-500 dark:text-[#bacbbf]/60';
 
 const ApiDocs: React.FC = () => {
   const [copiedEndpoint, setCopiedEndpoint] = useState<string | null>(null);
@@ -91,7 +81,7 @@ const ApiDocs: React.FC = () => {
           valid_emails: 1,
           invalid_emails: 0,
           risky_emails: 0,
-          avg_score: 85.0
+          avg_score: 85
         }
       }
     },
@@ -126,7 +116,7 @@ const ApiDocs: React.FC = () => {
         overview: {
           total_validations: 1000,
           completed_validations: 950,
-          success_rate: 95.0,
+          success_rate: 95,
           avg_score: 82.5
         },
         daily_stats: [],
@@ -151,323 +141,170 @@ const ApiDocs: React.FC = () => {
     }
   ];
 
-  const features = [
-    {
-      icon: <Code className="w-6 h-6" />,
-      title: 'RFC Compliance',
-      description: 'Full RFC 5322 + 6531 compliance with IDN support and real-time suggestions'
-    },
-    {
-      icon: <Globe className="w-6 h-6" />,
-      title: 'DNS & MX Validation',
-      description: 'Comprehensive DNS checks including A/AAAA records, MX validation, and DNSSEC awareness'
-    },
-    {
-      icon: <Mail className="w-6 h-6" />,
-      title: 'SMTP Handshake',
-      description: 'Real SMTP testing with EHLO, MAIL FROM, RCPT TO pipeline and catch-all detection'
-    },
-    {
-      icon: <Shield className="w-6 h-6" />,
-      title: 'Domain Reputation',
-      description: 'Advanced reputation scoring with disposable domain detection and spam trap identification'
-    },
-    {
-      icon: <Users className="w-6 h-6" />,
-      title: 'Role Detection',
-      description: 'Smart detection of role-based emails and aliases with custom regex rules'
-    },
-    {
-      icon: <BarChart3 className="w-6 h-6" />,
-      title: 'Risk Scoring',
-      description: 'ML-driven 0-100 risk scoring with detailed breakdowns and confidence levels'
-    }
-  ];
-
-  const codeExamples = {
-    curl: `curl -X POST "https://api.scrubimail.com/scrubimail/api/v1/validate/" \\
-  -H "Authorization: Bearer YOUR_API_KEY" \\
-  -H "Content-Type: application/json" \\
-  -d '{
-    "email": "user@example.com",
-    "real_time": true
-  }'`,
-    
-    javascript: `const response = await fetch('https://api.scrubimail.com/scrubimail/api/v1/validate/', {
-  method: 'POST',
-  headers: {
-    'Authorization': 'Bearer YOUR_API_KEY',
-    'Content-Type': 'application/json'
-  },
-  body: JSON.stringify({
-    email: 'user@example.com',
-    real_time: true
-  })
-});
-
-const result = await response.json();
-console.log(result);`,
-    
-    python: `import requests
-
-url = "https://api.scrubimail.com/scrubimail/api/v1/validate/"
-headers = {
-    "Authorization": "Bearer YOUR_API_KEY",
-    "Content-Type": "application/json"
-}
-data = {
-    "email": "user@example.com",
-    "real_time": True
-}
-
-response = requests.post(url, headers=headers, json=data)
-result = response.json()
-print(result)`,
-    
-    php: `<?php
-$url = 'https://api.scrubimail.com/scrubimail/api/v1/validate/';
-$data = [
-    'email' => 'user@example.com',
-    'real_time' => true
-];
-
-$ch = curl_init();
-curl_setopt($ch, CURLOPT_URL, $url);
-curl_setopt($ch, CURLOPT_POST, true);
-curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($data));
-curl_setopt($ch, CURLOPT_HTTPHEADER, [
-    'Authorization: Bearer YOUR_API_KEY',
-    'Content-Type: application/json'
-]);
-curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-
-$response = curl_exec($ch);
-$result = json_decode($response, true);
-curl_close($ch);
-
-print_r($result);
-?>`
-  };
-
   return (
-    <div className="min-h-screen bg-[#F8FAFC] dark:bg-gray-900">
-      {/* Header */}
-      <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          <div className="text-center">
-            <h1 className="text-4xl font-bold text-[#333333] dark:text-white mb-4">
-              API Documentation
-            </h1>
-            <p className="text-xl text-[#333333]/70 dark:text-gray-400 max-w-3xl mx-auto">
-              Comprehensive email validation API with advanced features, real-time processing, and detailed analytics
-            </p>
-          </div>
+    <div className="app-bg min-h-screen bg-white dark:bg-transparent" style={{ fontFamily: 'Inter, sans-serif' }}>
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
+        {/* Header */}
+        <div>
+          <p className="font-['Space_Grotesk',sans-serif] uppercase tracking-[0.2em] text-[9px] text-emerald-600 dark:text-[#6effc0] mb-0.5">
+            Developer Reference
+          </p>
+          <h1 className="font-['Epilogue',sans-serif] font-black text-gray-900 dark:text-[#e0e3e8] text-3xl tracking-tight">
+            API Documentation
+          </h1>
+          <p className="font-['Space_Grotesk',sans-serif] uppercase tracking-[0.1em] text-[10px] text-gray-600 dark:text-[#bacbbf] mt-1">
+            REST API v1 · Base URL: api.scrubimail.com
+          </p>
         </div>
-      </div>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Navigation Tabs */}
-        <div className="flex space-x-1 bg-white dark:bg-gray-800 rounded-lg p-1 mb-8 shadow-sm">
-          {[
-            { id: 'overview', label: 'Overview', icon: <Info className="w-4 h-4" /> },
-            { id: 'endpoints', label: 'Endpoints', icon: <Code className="w-4 h-4" /> },
-            { id: 'examples', label: 'Code Examples', icon: <Play className="w-4 h-4" /> },
-            { id: 'features', label: 'Features', icon: <Zap className="w-4 h-4" /> }
-          ].map((tab) => (
+        {/* Tab bar */}
+        <div className="border-b border-gray-200 dark:border-[#3b4a41]/30 flex gap-0 flex-wrap">
+          {['overview', 'authentication', 'endpoints', 'errors', 'sdks'].map((tab) => (
             <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
-              className={`flex items-center space-x-2 px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-                activeTab === tab.id
-                  ? 'bg-[#2ED8A3] text-white'
-                  : 'text-[#333333] dark:text-gray-400 hover:text-[#2ED8A3]'
+              key={tab}
+              type="button"
+              onClick={() => setActiveTab(tab)}
+              className={`px-5 py-2.5 font-['Space_Grotesk',sans-serif] uppercase tracking-[0.1em] text-[10px] border-b-2 transition-colors -mb-px ${
+                activeTab === tab
+                  ? 'border-emerald-600 text-emerald-700 dark:border-[#6effc0] dark:text-[#6effc0]'
+                  : 'border-transparent text-gray-400 hover:text-gray-700 dark:text-[#bacbbf]/50 dark:hover:text-[#bacbbf]'
               }`}
             >
-              {tab.icon}
-              <span>{tab.label}</span>
+              {tab}
             </button>
           ))}
         </div>
 
-        {/* Overview Tab */}
+        {/* Overview */}
         {activeTab === 'overview' && (
-          <div className="space-y-8">
-            {/* Quick Start */}
-            <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-200 dark:border-gray-700">
-              <h2 className="text-2xl font-semibold text-[#333333] dark:text-white mb-4 flex items-center">
-                <Zap className="w-6 h-6 mr-2 text-[#2ED8A3]" />
+          <div className="space-y-5">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {[
+                { label: 'Base URL', value: 'api.scrubimail.com/scrubimail/api/v1' },
+                { label: 'Auth Method', value: 'Bearer Token / API Key' },
+                { label: 'Response Format', value: 'JSON' },
+              ].map(({ label, value }) => (
+                <div key={label} className={`${panel} p-4`}>
+                  <p className={`${labelMuted} mb-1`}>{label}</p>
+                  <p className="font-['JetBrains_Mono',monospace] text-xs text-emerald-600 dark:text-[#6effc0]">{value}</p>
+                </div>
+              ))}
+            </div>
+
+            <div className={`${panel} p-5`}>
+              <p className="font-['Space_Grotesk',sans-serif] uppercase tracking-[0.1em] text-[10px] text-gray-600 dark:text-[#bacbbf] mb-3">
                 Quick Start
-              </h2>
-              <div className="grid md:grid-cols-3 gap-6">
-                <div className="text-center">
-                  <div className="w-12 h-12 bg-[#2ED8A3] rounded-lg flex items-center justify-center mx-auto mb-3">
-                    <Key className="w-6 h-6 text-white" />
-                  </div>
-                  <h3 className="font-semibold text-[#333333] dark:text-white mb-2">1. Get API Key</h3>
-                  <p className="text-sm text-[#333333]/70 dark:text-gray-400">
-                    Sign up and generate your API key from the dashboard
-                  </p>
-                </div>
-                <div className="text-center">
-                  <div className="w-12 h-12 bg-[#2ED8A3] rounded-lg flex items-center justify-center mx-auto mb-3">
-                    <Code className="w-6 h-6 text-white" />
-                  </div>
-                  <h3 className="font-semibold text-[#333333] dark:text-white mb-2">2. Make Request</h3>
-                  <p className="text-sm text-[#333333]/70 dark:text-gray-400">
-                    Use our REST API to validate emails in real-time
-                  </p>
-                </div>
-                <div className="text-center">
-                  <div className="w-12 h-12 bg-[#2ED8A3] rounded-lg flex items-center justify-center mx-auto mb-3">
-                    <CheckCircle className="w-6 h-6 text-white" />
-                  </div>
-                  <h3 className="font-semibold text-[#333333] dark:text-white mb-2">3. Get Results</h3>
-                  <p className="text-sm text-[#333333]/70 dark:text-gray-400">
-                    Receive comprehensive validation results with risk scoring
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            {/* Stats */}
-            <div className="grid md:grid-cols-4 gap-6">
-              <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-200 dark:border-gray-700 text-center">
-                <div className="text-3xl font-bold text-[#2ED8A3] mb-2">≤300ms</div>
-                <div className="text-sm text-[#333333]/70 dark:text-gray-400">P99 Response Time</div>
-              </div>
-              <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-200 dark:border-gray-700 text-center">
-                <div className="text-3xl font-bold text-[#2ED8A3] mb-2">99.9%</div>
-                <div className="text-sm text-[#333333]/70 dark:text-gray-400">Uptime SLA</div>
-              </div>
-              <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-200 dark:border-gray-700 text-center">
-                <div className="text-3xl font-bold text-[#2ED8A3] mb-2">50M+</div>
-                <div className="text-sm text-[#333333]/70 dark:text-gray-400">Emails Validated</div>
-              </div>
-              <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-200 dark:border-gray-700 text-center">
-                <div className="text-3xl font-bold text-[#2ED8A3] mb-2">1000+</div>
-                <div className="text-sm text-[#333333]/70 dark:text-gray-400">Active Customers</div>
-              </div>
-            </div>
-
-            {/* Authentication */}
-            <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-200 dark:border-gray-700">
-              <h2 className="text-2xl font-semibold text-[#333333] dark:text-white mb-4 flex items-center">
-                <Shield className="w-6 h-6 mr-2 text-[#2ED8A3]" />
-                Authentication
-              </h2>
-              <p className="text-[#333333]/70 dark:text-gray-400 mb-4">
-                All API requests require authentication using either JWT tokens or API keys.
               </p>
-              <div className="bg-[#F4F5F7] dark:bg-gray-700 rounded-lg p-4">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-sm font-medium text-[#333333] dark:text-white">API Key Header</span>
-                  <button
-                    onClick={() => copyToClipboard('Authorization: Bearer YOUR_API_KEY', 'auth')}
-                    className="flex items-center space-x-1 text-[#2ED8A3] hover:text-[#00C48C] transition-colors"
-                  >
-                    {copiedEndpoint === 'auth' ? (
-                      <Check className="w-4 h-4" />
-                    ) : (
-                      <Copy className="w-4 h-4" />
-                    )}
-                    <span className="text-sm">Copy</span>
-                  </button>
-                </div>
-                <code className="text-sm text-[#333333] dark:text-white">
-                  Authorization: Bearer YOUR_API_KEY
-                </code>
+              <div className={`${codeShell} p-4`}>
+                <span className="text-slate-500"># Install and validate</span>
+                {'\n'}
+                <span className="text-slate-300">curl -X POST https://api.scrubimail.com/scrubimail/api/v1/validate/ \</span>
+                {'\n'}
+                {'  '}
+                <span className="text-slate-300">-H "Authorization: Bearer YOUR_TOKEN" \</span>
+                {'\n'}
+                {'  '}
+                <span className="text-slate-300">-H "Content-Type: application/json" \</span>
+                {'\n'}
+                {'  '}
+                <span className="text-slate-300">-d </span>
+                <span className="text-emerald-400 dark:text-[#6effc0]">'{`{"email":"user@example.com"}`}'</span>
+              </div>
+            </div>
+
+            <div className={panel}>
+              <div className={`px-4 py-3 ${panelHeaderBorder}`}>
+                <p className="font-['Space_Grotesk',sans-serif] uppercase tracking-[0.1em] text-[10px] text-gray-600 dark:text-[#bacbbf]">
+                  API Capabilities
+                </p>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 divide-y md:divide-y-0 md:divide-x divide-gray-200 dark:divide-[#3b4a41]/20">
+                {[
+                  { title: 'Single Validation', desc: 'Real-time email verification with SMTP handshake, DNS/MX lookup, and syntax analysis in <300ms.' },
+                  { title: 'Bulk Processing', desc: 'Async processing of up to 100,000 addresses per batch via background Celery workers.' },
+                  { title: 'Score & Verdict', desc: 'Each email returns a 0-100 confidence score and DELIVERABLE/BOUNCED/RISKY verdict.' },
+                  { title: 'Detailed Breakdown', desc: 'Optional deep analysis: syntax, DNS, SMTP, reputation, role-based and catch-all detection.' },
+                ].map(({ title, desc }) => (
+                  <div key={title} className="p-4">
+                    <p className="font-['Space_Grotesk',sans-serif] uppercase tracking-[0.1em] text-[10px] text-emerald-600 dark:text-[#6effc0] font-bold mb-1">
+                      {title}
+                    </p>
+                    <p className="font-mono text-[10px] text-gray-600 dark:text-[#bacbbf]/80 leading-relaxed">{desc}</p>
+                  </div>
+                ))}
               </div>
             </div>
           </div>
         )}
 
-        {/* Endpoints Tab */}
-        {activeTab === 'endpoints' && (
-          <div className="space-y-6">
-            {endpoints.map((endpoint, index) => (
-              <div key={index} className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
-                <div className="p-6 border-b border-gray-200 dark:border-gray-700">
-                  <div className="flex items-center justify-between mb-2">
-                    <h3 className="text-xl font-semibold text-[#333333] dark:text-white">
-                      {endpoint.name}
-                    </h3>
-                    <span className={`px-3 py-1 rounded-full text-sm font-medium ${
-                      endpoint.method === 'GET' 
-                        ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
-                        : 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200'
-                    }`}>
-                      {endpoint.method}
-                    </span>
-                  </div>
-                  <p className="text-[#333333]/70 dark:text-gray-400 mb-3">
-                    {endpoint.description}
-                  </p>
-                  <div className="flex items-center justify-between">
-                    <code className="text-sm bg-[#F4F5F7] dark:bg-gray-700 px-3 py-1 rounded text-[#333333] dark:text-white">
-                      {endpoint.path}
-                    </code>
-                    <button
-                      onClick={() => copyToClipboard(endpoint.path, `endpoint-${index}`)}
-                      className="flex items-center space-x-1 text-[#2ED8A3] hover:text-[#00C48C] transition-colors"
-                    >
-                      {copiedEndpoint === `endpoint-${index}` ? (
-                        <Check className="w-4 h-4" />
-                      ) : (
-                        <Copy className="w-4 h-4" />
-                      )}
-                      <span className="text-sm">Copy</span>
-                    </button>
-                  </div>
-                </div>
+        {/* Authentication */}
+        {activeTab === 'authentication' && (
+          <div className="space-y-4">
+            <div className={`${panel} p-5`}>
+              <p className="font-['Space_Grotesk',sans-serif] uppercase tracking-[0.1em] text-[10px] text-gray-600 dark:text-[#bacbbf] mb-3">
+                Bearer Token (JWT)
+              </p>
+              <div className={`${codeShell} p-4`}>{`Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...`}</div>
+              <p className={`${bodyMutedSoft} mt-3`}>
+                JWT tokens are obtained via the /auth/login/ endpoint. Tokens expire after 24 hours.
+              </p>
+            </div>
+            <div className={`${panel} p-5`}>
+              <p className="font-['Space_Grotesk',sans-serif] uppercase tracking-[0.1em] text-[10px] text-gray-600 dark:text-[#bacbbf] mb-3">
+                API Key
+              </p>
+              <div className={`${codeShell} p-4`}>{`X-API-Key: your_scrubimail_api_key`}</div>
+              <p className={`${bodyMutedSoft} mt-3`}>
+                API keys can be generated in the dashboard. Use for server-to-server integrations.
+              </p>
+            </div>
+          </div>
+        )}
 
-                <div className="p-6 space-y-4">
-                  {/* Request */}
-                  {endpoint.request && (
+        {/* Endpoints */}
+        {activeTab === 'endpoints' && (
+          <div className="space-y-4">
+            {endpoints.map((ep) => (
+              <div key={ep.path} className={`${panel} overflow-hidden`}>
+                <div className={`flex items-center gap-3 px-4 py-3 ${panelHeaderBorder}`}>
+                  <span
+                    className={`font-mono text-[10px] font-bold uppercase tracking-[0.1em] px-2 py-0.5 rounded-sm border ${
+                      ep.method === 'POST'
+                        ? 'bg-emerald-100 text-emerald-800 border-emerald-300 dark:bg-[#6effc0]/15 dark:text-[#6effc0] dark:border-[#6effc0]/20'
+                        : 'bg-blue-100 text-blue-800 border-blue-300 dark:bg-[#60a5fa]/15 dark:text-[#60a5fa] dark:border-[#60a5fa]/20'
+                    }`}
+                  >
+                    {ep.method}
+                  </span>
+                  <code className="font-['JetBrains_Mono',monospace] text-xs text-gray-900 dark:text-[#e0e3e8] flex-1 break-all">
+                    {ep.path}
+                  </code>
+                  <button
+                    type="button"
+                    onClick={() => copyToClipboard(ep.path, ep.path)}
+                    className="text-gray-400 hover:text-emerald-600 dark:text-[#3b4a41] dark:hover:text-[#6effc0] transition-colors"
+                  >
+                    {copiedEndpoint === ep.path ? (
+                      <Check className="w-3.5 h-3.5 text-emerald-600 dark:text-[#6effc0]" />
+                    ) : (
+                      <Copy className="w-3.5 h-3.5" />
+                    )}
+                  </button>
+                </div>
+                <div className="p-4">
+                  <p className="font-mono text-[10px] text-gray-600 dark:text-[#bacbbf]/70 mb-4">{ep.description}</p>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
-                      <h4 className="text-sm font-semibold text-[#333333] dark:text-white mb-2">Request Body</h4>
-                      <div className="bg-[#F4F5F7] dark:bg-gray-700 rounded-lg p-4">
-                        <div className="flex items-center justify-between mb-2">
-                          <span className="text-xs text-[#333333]/50 dark:text-gray-400">JSON</span>
-                          <button
-                            onClick={() => copyToClipboard(JSON.stringify(endpoint.request, null, 2), `request-${index}`)}
-                            className="flex items-center space-x-1 text-[#2ED8A3] hover:text-[#00C48C] transition-colors"
-                          >
-                            {copiedEndpoint === `request-${index}` ? (
-                              <Check className="w-3 h-3" />
-                            ) : (
-                              <Copy className="w-3 h-3" />
-                            )}
-                            <span className="text-xs">Copy</span>
-                          </button>
-                        </div>
-                        <pre className="text-sm text-[#333333] dark:text-white overflow-x-auto">
-                          {JSON.stringify(endpoint.request, null, 2)}
-                        </pre>
+                      <p className={`${labelMuted} mb-2`}>Request Body</p>
+                      <div className={`${codeShell} p-3 text-[10px]`}>
+                        <pre>{JSON.stringify(ep.request, null, 2)}</pre>
                       </div>
                     </div>
-                  )}
-
-                  {/* Response */}
-                  <div>
-                    <h4 className="text-sm font-semibold text-[#333333] dark:text-white mb-2">Response</h4>
-                    <div className="bg-[#F4F5F7] dark:bg-gray-700 rounded-lg p-4">
-                      <div className="flex items-center justify-between mb-2">
-                        <span className="text-xs text-[#333333]/50 dark:text-gray-400">JSON</span>
-                        <button
-                          onClick={() => copyToClipboard(JSON.stringify(endpoint.response, null, 2), `response-${index}`)}
-                          className="flex items-center space-x-1 text-[#2ED8A3] hover:text-[#00C48C] transition-colors"
-                        >
-                          {copiedEndpoint === `response-${index}` ? (
-                            <Check className="w-3 h-3" />
-                          ) : (
-                            <Copy className="w-3 h-3" />
-                          )}
-                          <span className="text-xs">Copy</span>
-                        </button>
+                    <div>
+                      <p className={`${labelMuted} mb-2`}>Response</p>
+                      <div className={`${codeShell} p-3 text-[10px] max-h-48`}>
+                        <pre>{JSON.stringify(ep.response, null, 2)}</pre>
                       </div>
-                      <pre className="text-sm text-[#333333] dark:text-white overflow-x-auto">
-                        {JSON.stringify(endpoint.response, null, 2)}
-                      </pre>
                     </div>
                   </div>
                 </div>
@@ -476,160 +313,83 @@ print_r($result);
           </div>
         )}
 
-        {/* Code Examples Tab */}
-        {activeTab === 'examples' && (
-          <div className="space-y-6">
-            <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-200 dark:border-gray-700">
-              <h2 className="text-2xl font-semibold text-[#333333] dark:text-white mb-6 flex items-center">
-                <Code className="w-6 h-6 mr-2 text-[#2ED8A3]" />
-                Code Examples
-              </h2>
-              
-              <div className="grid md:grid-cols-2 gap-6">
-                {Object.entries(codeExamples).map(([language, code]) => (
-                  <div key={language} className="space-y-3">
-                    <div className="flex items-center justify-between">
-                      <h3 className="text-lg font-semibold text-[#333333] dark:text-white capitalize">
-                        {language}
-                      </h3>
-                      <button
-                        onClick={() => copyToClipboard(code, language)}
-                        className="flex items-center space-x-1 text-[#2ED8A3] hover:text-[#00C48C] transition-colors"
-                      >
-                        {copiedEndpoint === language ? (
-                          <Check className="w-4 h-4" />
-                        ) : (
-                          <Copy className="w-4 h-4" />
-                        )}
-                        <span className="text-sm">Copy</span>
-                      </button>
-                    </div>
-                    <div className="bg-[#F4F5F7] dark:bg-gray-700 rounded-lg p-4">
-                      <pre className="text-sm text-[#333333] dark:text-white overflow-x-auto">
-                        {code}
-                      </pre>
-                    </div>
-                  </div>
-                ))}
-              </div>
+        {/* Errors */}
+        {activeTab === 'errors' && (
+          <div className={`${panel} overflow-hidden`}>
+            <div className={`px-4 py-3 ${panelHeaderBorder}`}>
+              <p className="font-['Space_Grotesk',sans-serif] uppercase tracking-[0.1em] text-[10px] text-gray-600 dark:text-[#bacbbf]">
+                HTTP Status Codes
+              </p>
+            </div>
+            <div className="divide-y divide-gray-200 dark:divide-[#3b4a41]/20">
+              {[
+                { code: '200', label: 'OK', desc: 'Request successful', color: '#6effc0' },
+                { code: '201', label: 'Created', desc: 'Resource created successfully', color: '#6effc0' },
+                { code: '400', label: 'Bad Request', desc: 'Invalid request body or parameters', color: '#f59e0b' },
+                { code: '401', label: 'Unauthorized', desc: 'Missing or invalid authentication token', color: '#ff4c4c' },
+                { code: '403', label: 'Forbidden', desc: 'Insufficient permissions for this resource', color: '#ff4c4c' },
+                { code: '404', label: 'Not Found', desc: 'The requested resource does not exist', color: '#ff4c4c' },
+                { code: '429', label: 'Too Many Requests', desc: 'Rate limit exceeded. See X-RateLimit headers', color: '#f59e0b' },
+                { code: '500', label: 'Internal Server Error', desc: 'An unexpected server error occurred', color: '#ff4c4c' },
+              ].map(({ code, label, desc, color }) => (
+                <div
+                  key={code}
+                  className="flex items-center gap-4 px-4 py-3 hover:bg-gray-50 dark:hover:bg-[#262a2f] transition-colors"
+                >
+                  <span
+                    className="font-['JetBrains_Mono',monospace] text-sm font-bold w-12 flex-shrink-0"
+                    style={{ color }}
+                  >
+                    {code}
+                  </span>
+                  <span className="font-mono text-xs text-gray-900 dark:text-[#e0e3e8] w-36 flex-shrink-0">{label}</span>
+                  <span className={bodyMutedSoft}>{desc}</span>
+                </div>
+              ))}
             </div>
           </div>
         )}
 
-        {/* Features Tab */}
-        {activeTab === 'features' && (
-          <div className="space-y-8">
-            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {features.map((feature, index) => (
-                <div key={index} className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-200 dark:border-gray-700">
-                  <div className="w-12 h-12 bg-[#2ED8A3] rounded-lg flex items-center justify-center mb-4">
-                    {feature.icon}
-                  </div>
-                  <h3 className="text-lg font-semibold text-[#333333] dark:text-white mb-2">
-                    {feature.title}
-                  </h3>
-                  <p className="text-[#333333]/70 dark:text-gray-400 text-sm">
-                    {feature.description}
+        {/* SDKs */}
+        {activeTab === 'sdks' && (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {[
+              { lang: 'JavaScript / Node.js', install: 'npm install scrubimail-js', status: 'Stable' },
+              { lang: 'Python', install: 'pip install scrubimail', status: 'Stable' },
+              { lang: 'Go', install: 'go get github.com/scrubimail/go-sdk', status: 'Beta' },
+              { lang: 'PHP', install: 'composer require scrubimail/php-sdk', status: 'Beta' },
+            ].map(({ lang, install, status }) => (
+              <div key={lang} className={`${panel} p-5`}>
+                <div className="flex items-center justify-between mb-3">
+                  <p className="font-['Epilogue',sans-serif] font-bold text-gray-900 dark:text-[#e0e3e8] text-sm tracking-tight">
+                    {lang}
                   </p>
+                  <span
+                    className={`font-mono uppercase tracking-[0.08em] text-[9px] px-2 py-0.5 rounded-sm border ${
+                      status === 'Stable'
+                        ? 'bg-emerald-100 text-emerald-800 border-emerald-300 dark:bg-[#6effc0]/10 dark:text-[#6effc0] dark:border-[#6effc0]/20'
+                        : 'bg-amber-100 text-amber-900 border-amber-300 dark:bg-[#f59e0b]/10 dark:text-[#f59e0b] dark:border-[#f59e0b]/20'
+                    }`}
+                  >
+                    {status}
+                  </span>
                 </div>
-              ))}
-            </div>
-
-            {/* Validation Process */}
-            <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-200 dark:border-gray-700">
-              <h2 className="text-2xl font-semibold text-[#333333] dark:text-white mb-6 flex items-center">
-                <Database className="w-6 h-6 mr-2 text-[#2ED8A3]" />
-                Validation Process
-              </h2>
-              <div className="grid md:grid-cols-4 gap-6">
-                <div className="text-center">
-                  <div className="w-16 h-16 bg-[#2ED8A3] rounded-full flex items-center justify-center mx-auto mb-3">
-                    <span className="text-white font-bold">1</span>
-                  </div>
-                  <h3 className="font-semibold text-[#333333] dark:text-white mb-2">Syntax Check</h3>
-                  <p className="text-sm text-[#333333]/70 dark:text-gray-400">
-                    RFC 5322 + 6531 compliance with IDN support
-                  </p>
-                </div>
-                <div className="text-center">
-                  <div className="w-16 h-16 bg-[#2ED8A3] rounded-full flex items-center justify-center mx-auto mb-3">
-                    <span className="text-white font-bold">2</span>
-                  </div>
-                  <h3 className="font-semibold text-[#333333] dark:text-white mb-2">DNS Validation</h3>
-                  <p className="text-sm text-[#333333]/70 dark:text-gray-400">
-                    MX, A/AAAA records with DNSSEC awareness
-                  </p>
-                </div>
-                <div className="text-center">
-                  <div className="w-16 h-16 bg-[#2ED8A3] rounded-full flex items-center justify-center mx-auto mb-3">
-                    <span className="text-white font-bold">3</span>
-                  </div>
-                  <h3 className="font-semibold text-[#333333] dark:text-white mb-2">SMTP Test</h3>
-                  <p className="text-sm text-[#333333]/70 dark:text-gray-400">
-                    Real SMTP handshake with catch-all detection
-                  </p>
-                </div>
-                <div className="text-center">
-                  <div className="w-16 h-16 bg-[#2ED8A3] rounded-full flex items-center justify-center mx-auto mb-3">
-                    <span className="text-white font-bold">4</span>
-                  </div>
-                  <h3 className="font-semibold text-[#333333] dark:text-white mb-2">Risk Analysis</h3>
-                  <p className="text-sm text-[#333333]/70 dark:text-gray-400">
-                    Reputation scoring and ML-driven analysis
-                  </p>
+                <div className={`${codeShell} px-3 py-2 flex items-center justify-between`}>
+                  <code>{install}</code>
+                  <button
+                    type="button"
+                    onClick={() => copyToClipboard(install, lang)}
+                    className="text-gray-400 hover:text-emerald-600 dark:text-[#3b4a41] dark:hover:text-[#6effc0] ml-3 flex-shrink-0"
+                  >
+                    {copiedEndpoint === lang ? (
+                      <Check className="w-3 h-3 text-emerald-600 dark:text-[#6effc0]" />
+                    ) : (
+                      <Copy className="w-3 h-3" />
+                    )}
+                  </button>
                 </div>
               </div>
-            </div>
-
-            {/* Response Codes */}
-            <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-200 dark:border-gray-700">
-              <h2 className="text-2xl font-semibold text-[#333333] dark:text-white mb-6 flex items-center">
-                <AlertCircle className="w-6 h-6 mr-2 text-[#2ED8A3]" />
-                Response Codes
-              </h2>
-              <div className="grid md:grid-cols-2 gap-6">
-                <div>
-                  <h3 className="text-lg font-semibold text-[#333333] dark:text-white mb-4">Success Codes</h3>
-                  <div className="space-y-3">
-                    <div className="flex items-center space-x-3">
-                      <div className="w-8 h-8 bg-green-100 rounded flex items-center justify-center">
-                        <span className="text-green-800 text-sm font-bold">200</span>
-                      </div>
-                      <span className="text-[#333333] dark:text-white">OK - Request successful</span>
-                    </div>
-                    <div className="flex items-center space-x-3">
-                      <div className="w-8 h-8 bg-green-100 rounded flex items-center justify-center">
-                        <span className="text-green-800 text-sm font-bold">201</span>
-                      </div>
-                      <span className="text-[#333333] dark:text-white">Created - Resource created</span>
-                    </div>
-                  </div>
-                </div>
-                <div>
-                  <h3 className="text-lg font-semibold text-[#333333] dark:text-white mb-4">Error Codes</h3>
-                  <div className="space-y-3">
-                    <div className="flex items-center space-x-3">
-                      <div className="w-8 h-8 bg-red-100 rounded flex items-center justify-center">
-                        <span className="text-red-800 text-sm font-bold">400</span>
-                      </div>
-                      <span className="text-[#333333] dark:text-white">Bad Request - Invalid input</span>
-                    </div>
-                    <div className="flex items-center space-x-3">
-                      <div className="w-8 h-8 bg-red-100 rounded flex items-center justify-center">
-                        <span className="text-red-800 text-sm font-bold">401</span>
-                      </div>
-                      <span className="text-[#333333] dark:text-white">Unauthorized - Invalid API key</span>
-                    </div>
-                    <div className="flex items-center space-x-3">
-                      <div className="w-8 h-8 bg-red-100 rounded flex items-center justify-center">
-                        <span className="text-red-800 text-sm font-bold">429</span>
-                      </div>
-                      <span className="text-[#333333] dark:text-white">Rate Limited - Too many requests</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
+            ))}
           </div>
         )}
       </div>

@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<link href="https://fonts.googleapis.com/css2?family=Epilogue:wght@700;800;900&amp;family=Inter:wght@400;500;600&amp;family=Space+Grotesk:wght@400;500;700&amp;family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+    tailwind.config = {
+      darkMode: "class",
+      theme: {
+        extend: {
+          "colors": {
+            "surface-container-low": "#181c20",
+            "outline-variant": "#3b4a41",
+            "surface-container-lowest": "#0a0f13",
+            "tertiary-fixed": "#e2e2e2",
+            "on-secondary": "#2c3138",
+            "on-tertiary-fixed": "#1a1c1c",
+            "tertiary-container": "#c9c9c9",
+            "inverse-primary": "#006c49",
+            "tertiary-fixed-dim": "#c6c6c7",
+            "secondary": "#c2c7d0",
+            "inverse-on-surface": "#2d3135",
+            "on-error": "#690005",
+            "primary-fixed-dim": "#00e29e",
+            "on-secondary-fixed": "#171c23",
+            "on-secondary-fixed-variant": "#42474f",
+            "error-container": "#93000a",
+            "surface-tint": "#00e29e",
+            "surface-variant": "#31353a",
+            "on-primary": "#003824",
+            "on-error-container": "#ffdad6",
+            "secondary-fixed": "#dee2ec",
+            "on-primary-fixed": "#002114",
+            "secondary-container": "#42474f",
+            "on-surface-variant": "#bacbbf",
+            "surface-container-highest": "#31353a",
+            "error": "#ffb4ab",
+            "surface-dim": "#101418",
+            "on-background": "#e0e3e8",
+            "on-tertiary-container": "#535455",
+            "surface": "#101418",
+            "on-surface": "#e0e3e8",
+            "on-primary-container": "#006141",
+            "primary": "#6effc0",
+            "on-primary-fixed-variant": "#005236",
+            "outline": "#84958a",
+            "on-tertiary-fixed-variant": "#454747",
+            "surface-container": "#1c2024",
+            "background": "#101418",
+            "secondary-fixed-dim": "#c2c7d0",
+            "on-tertiary": "#2f3131",
+            "surface-container-high": "#262a2f",
+            "primary-container": "#00e5a0",
+            "primary-fixed": "#47ffb8",
+            "inverse-surface": "#e0e3e8",
+            "on-secondary-container": "#b1b5bf",
+            "surface-bright": "#353a3e",
+            "tertiary": "#e5e5e5"
+          },
+          "borderRadius": {
+            "DEFAULT": "0.125rem",
+            "lg": "0.25rem",
+            "xl": "0.5rem",
+            "full": "0.75rem"
+          },
+          "fontFamily": {
+            "headline": ["Epilogue"],
+            "body": ["Inter"],
+            "label": ["Space Grotesk"]
+          }
+        },
+      },
+    }
+  </script>
+<style>
+    .material-symbols-outlined {
+      font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+    }
+    .grid-background {
+      background-image: 
+        linear-gradient(to right, rgba(110, 255, 192, 0.05) 1px, transparent 1px),
+        linear-gradient(to bottom, rgba(110, 255, 192, 0.05) 1px, transparent 1px);
+      background-size: 40px 40px;
+    }
+    .mint-glow {
+      background: radial-gradient(circle at center, rgba(0, 229, 160, 0.15) 0%, transparent 70%);
+    }
+    .input-focus-glow:focus {
+      box-shadow: 0 0 8px rgba(0, 229, 160, 0.3);
+      outline: none;
+      border-color: #6effc0;
+    }
+  </style>
+</head>
+<body class="bg-background text-on-background font-body min-h-screen selection:bg-primary/30">
+<!-- Shell Suppressed: Page is Transactional Login -->
+<main class="relative min-h-screen flex items-center justify-center p-6 overflow-hidden">
+<!-- Background Layers -->
+<div class="absolute inset-0 grid-background"></div>
+<div class="absolute inset-0 mint-glow"></div>
+<!-- Centered Login Card -->
+<div class="relative z-10 w-full max-w-md">
+<!-- Logo/Brand Header -->
+<div class="mb-10 text-center">
+<div class="inline-flex items-center justify-center space-x-2 mb-4">
+<span class="text-3xl font-black tracking-tighter text-primary font-headline">Scrubi</span>
+<div class="w-2 h-2 bg-primary rounded-full animate-pulse"></div>
+</div>
+<h1 class="text-3xl font-bold font-headline tracking-tight text-on-surface">Sign in to your account</h1>
+<p class="mt-2 text-sm font-label uppercase tracking-widest text-outline">Terminal Session Access</p>
+</div>
+<!-- Main Surface -->
+<div class="bg-surface-container-low border border-outline-variant/20 rounded-xl p-8 shadow-2xl backdrop-blur-sm">
+<!-- Social Auth -->
+<div class="grid grid-cols-2 gap-4 mb-8">
+<button class="flex items-center justify-center px-4 py-3 bg-surface-container-highest border border-outline-variant/10 rounded-lg hover:border-primary/50 transition-all duration-200 group">
+<span class="material-symbols-outlined text-on-surface-variant group-hover:text-primary mr-2" data-icon="terminal">terminal</span>
+<span class="text-sm font-label font-medium">GitHub</span>
+</button>
+<button class="flex items-center justify-center px-4 py-3 bg-surface-container-highest border border-outline-variant/10 rounded-lg hover:border-primary/50 transition-all duration-200 group">
+<span class="material-symbols-outlined text-on-surface-variant group-hover:text-primary mr-2" data-icon="cloud">cloud</span>
+<span class="text-sm font-label font-medium">Google</span>
+</button>
+</div>
+<!-- Separator -->
+<div class="relative mb-8">
+<div aria-hidden="true" class="absolute inset-0 flex items-center">
+<div class="w-full border-t border-outline-variant/20"></div>
+</div>
+<div class="relative flex justify-center text-xs uppercase tracking-widest font-label bg-surface-container-low px-2 text-outline">
+            Or continue with email
+          </div>
+</div>
+<!-- Form -->
+<form action="#" class="space-y-6">
+<div>
+<label class="block text-xs font-label uppercase tracking-widest text-outline mb-2" for="email">Email Address</label>
+<div class="relative">
+<input class="w-full bg-surface-container-highest border border-outline-variant/30 rounded-lg py-3 px-4 text-on-surface font-label placeholder:text-outline-variant input-focus-glow transition-all" id="email" name="email" placeholder="dev@scrubi.io" type="email"/>
+</div>
+</div>
+<div>
+<div class="flex items-center justify-between mb-2">
+<label class="block text-xs font-label uppercase tracking-widest text-outline" for="password">Password</label>
+<a class="text-xs font-label uppercase tracking-widest text-primary hover:text-primary-container transition-colors" href="#">Forgot your password?</a>
+</div>
+<div class="relative">
+<input class="w-full bg-surface-container-highest border border-outline-variant/30 rounded-lg py-3 px-4 text-on-surface font-label placeholder:text-outline-variant input-focus-glow transition-all" id="password" name="password" placeholder="••••••••" type="password"/>
+</div>
+</div>
+<div class="flex items-center">
+<input class="h-4 w-4 rounded border-outline-variant bg-surface-container-highest text-primary focus:ring-primary focus:ring-offset-background" id="remember-me" name="remember-me" type="checkbox"/>
+<label class="ml-2 block text-xs font-label uppercase tracking-widest text-outline" for="remember-me">Keep session alive</label>
+</div>
+<button class="w-full bg-primary-container text-on-primary font-bold font-headline py-4 rounded-lg hover:bg-primary transition-all duration-200 active:scale-[0.98] shadow-lg shadow-primary/10" type="submit">
+            Sign In
+          </button>
+</form>
+<!-- Footer Links -->
+<div class="mt-8 pt-8 border-t border-outline-variant/20 text-center">
+<p class="text-sm font-label text-outline">
+            New to the terminal? 
+            <a class="text-primary hover:underline underline-offset-4 decoration-primary/30 ml-1" href="#">Create an account</a>
+</p>
+</div>
+</div>
+<!-- Technical Status Hint -->
+<div class="mt-8 flex items-center justify-center space-x-6 text-[10px] font-label uppercase tracking-[0.2em] text-outline/50">
+<div class="flex items-center">
+<span class="w-1.5 h-1.5 bg-primary rounded-full mr-2"></span>
+          Auth Service: Active
+        </div>
+<div class="flex items-center">
+<span class="w-1.5 h-1.5 bg-primary rounded-full mr-2"></span>
+          SSL: Encrypted
+        </div>
+<div class="flex items-center">
+<span class="w-1.5 h-1.5 bg-primary rounded-full mr-2"></span>
+          Region: US-EAST-1
+        </div>
+</div>
+</div>
+</main>
+<!-- Decoration: Floating Code Snippets (Asymmetric) -->
+<div class="fixed bottom-10 left-10 opacity-10 pointer-events-none hidden lg:block">
+<pre class="font-label text-[10px] text-primary">{
+  "scrub_action": "sanitize",
+  "priority": "high",
+  "status": "waiting_auth..."
+}
+    </pre>
+</div>
+<div class="fixed top-24 right-12 opacity-10 pointer-events-none hidden lg:block">
+<pre class="font-label text-[10px] text-primary">$ sc-auth --verify
+Connecting to scrubi-terminal-1...
+[OK] Protocol v2.4.1
+    </pre>
+</div>
+</body></html>

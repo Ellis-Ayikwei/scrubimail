@@ -24,7 +24,7 @@ const Login = () => {
   const [error, setError] = useState<string | null>(null);
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const from = searchParams.get('from') || '/dashboard';
+  const from = searchParams.get('from') || '/';
   
   const dispatch = useDispatch();
   const signIn = useSignIn();

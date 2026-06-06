@@ -1,14 +1,24 @@
 import React from 'react';
-import { 
-  CheckCircle, 
-  XCircle, 
-  AlertTriangle, 
+import {
+  CheckCircle,
+  XCircle,
+  AlertTriangle,
   Eye,
   EyeOff,
   Mail,
   TrendingUp,
-  BarChart3
+  BarChart3,
+  Shield,
+  Server
 } from 'lucide-react';
+import {
+  VAL_CARD,
+  VAL_CHROME_BETWEEN,
+  VAL_CHROME_TITLE,
+  VAL_INSET,
+  VAL_ROW_BORDER,
+  VAL_CODE,
+} from './validationTheme';
 
 interface ValidationResultsProps {
   result: any;
@@ -23,96 +33,110 @@ const ValidationResults: React.FC<ValidationResultsProps> = ({
   setShowDetails,
   includeDetails
 }) => {
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case 'completed':
-        return <CheckCircle className="w-4 h-4 sm:w-5 sm:h-5 text-green-600" />;
-      case 'failed':
-        return <XCircle className="w-4 h-4 sm:w-5 sm:h-5 text-red-600" />;
-      case 'pending':
-        return <AlertTriangle className="w-4 h-4 sm:w-5 sm:h-5 text-yellow-600" />;
-      default:
-        return <AlertTriangle className="w-4 h-4 sm:w-5 sm:h-5 text-gray-600" />;
-    }
-  };
+  const isValid = result.is_valid;
+  const verdict = result.verdict || (isValid ? 'Valid' : 'Invalid');
+  const score = typeof result.score === 'number' ? result.score : null;
+
+  const scoreClass =
+    score === null
+      ? 'text-gray-500 dark:text-[#bacbbf]'
+      : score >= 80
+        ? 'text-emerald-600 dark:text-[#6effc0]'
+        : score >= 50
+          ? 'text-amber-600 dark:text-[#f59e0b]'
+          : 'text-red-600 dark:text-[#ff4c4c]';
+
+  const Row: React.FC<{ label: string; value: React.ReactNode; mono?: boolean }> = ({ label, value, mono = true }) => (
+    <div className={`flex items-center justify-between py-1.5 ${VAL_ROW_BORDER}`}>
+      <span className="font-['Space_Grotesk',sans-serif] uppercase tracking-[0.1em] text-[9px] text-gray-400 dark:text-[#bacbbf]/50">
+        {label}
+      </span>
+      <span className={`${mono ? 'font-mono' : ''} text-[10px] text-gray-900 dark:text-[#e0e3e8]`}>{value}</span>
+    </div>
+  );
+
+  const CheckRow: React.FC<{ label: string; valid: boolean }> = ({ label, valid }) => (
+    <div className={`flex items-center justify-between py-1.5 ${VAL_ROW_BORDER}`}>
+      <span className="font-['Space_Grotesk',sans-serif] uppercase tracking-[0.1em] text-[9px] text-gray-400 dark:text-[#bacbbf]/50">
+        {label}
+      </span>
+      <span
+        className={`flex items-center gap-1 font-mono text-[9px] ${
+          valid ? 'text-emerald-600 dark:text-[#6effc0]' : 'text-red-600 dark:text-[#ff4c4c]'
+        }`}
+      >
+        {valid ? <CheckCircle className="w-3 h-3" /> : <XCircle className="w-3 h-3" />}
+        {valid ? 'PASS' : 'FAIL'}
+      </span>
+    </div>
+  );
 
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-4 sm:p-6">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-4 gap-3 sm:gap-0">
-        <div className="flex items-center space-x-3">
-          <h2 className="text-lg sm:text-xl font-semibold text-[#333333] dark:text-white flex items-center">
-            <CheckCircle className="w-4 h-4 sm:w-5 sm:h-5 mr-2 text-[#2ED8A3]" />
-            Validation Result
-          </h2>
-          {includeDetails && (
-            <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-[#2ED8A3]/10 text-[#2ED8A3]">
-              <span className="w-3 h-3 mr-1">👁️</span>
-              Detailed
-            </span>
-          )}
+    <div className={VAL_CARD}>
+      {/* Terminal chrome */}
+      <div className={VAL_CHROME_BETWEEN}>
+        <div className="flex items-center gap-1.5">
+          <span className="w-2 h-2 rounded-full bg-[#ff4c4c]/60" />
+          <span className="w-2 h-2 rounded-full bg-[#f59e0b]/60" />
+          <span className="w-2 h-2 rounded-full bg-emerald-500/60 dark:bg-[#6effc0]/60" />
+          <span className={VAL_CHROME_TITLE}>validation_result.json</span>
         </div>
         <button
+          type="button"
           onClick={() => setShowDetails(!showDetails)}
-          className="text-[#2ED8A3] hover:text-[#00C48C] transition-colors flex items-center space-x-1 text-sm"
-          title={showDetails ? 'Hide detailed breakdown' : 'Show detailed breakdown'}
+          className="flex items-center gap-1 font-mono text-[9px] text-gray-400 hover:text-emerald-700 transition-colors uppercase tracking-[0.1em] dark:text-[#bacbbf]/40 dark:hover:text-[#6effc0]"
         >
-          {showDetails ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-          <span className="text-xs">{showDetails ? 'Hide' : 'Show'} Details</span>
+          {showDetails ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
+          {showDetails ? 'Hide' : 'Show'} Raw
         </button>
       </div>
 
-      <div className="space-y-4">
-        {/* Email */}
-        <div className="flex items-center space-x-2">
-          <Mail className="w-4 h-4 text-[#333333]/50" />
-          <span className="font-medium text-[#333333] dark:text-white text-sm sm:text-base truncate">{result.email}</span>
+      <div className="p-5 space-y-4">
+        {/* Header verdict */}
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            {isValid ? (
+              <CheckCircle className="w-4 h-4 text-emerald-600 dark:text-[#6effc0]" />
+            ) : (
+              <XCircle className="w-4 h-4 text-red-600 dark:text-[#ff4c4c]" />
+            )}
+            <span className="font-['Epilogue',sans-serif] font-bold text-gray-900 dark:text-[#e0e3e8] text-sm">
+              {verdict}
+            </span>
+            {includeDetails && (
+              <span className="font-mono text-[9px] px-2 py-0.5 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-sm uppercase tracking-[0.1em] dark:bg-[#6effc0]/10 dark:border-[#6effc0]/20 dark:text-[#6effc0]">
+                Detailed
+              </span>
+            )}
+          </div>
+          {score !== null && (
+            <span className={`font-['JetBrains_Mono',monospace] font-bold text-xl ${scoreClass}`}>{score}</span>
+          )}
         </div>
 
-        {/* Summary Cards */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3">
-          {/* Status */}
-          <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-2 sm:p-3 text-center">
-            <div className="flex items-center justify-center mb-1">
-              {getStatusIcon(result.status)}
-            </div>
-            <div className="text-xs text-[#333333]/70 dark:text-gray-400">Status</div>
-            <div className="text-xs sm:text-sm font-medium text-[#333333] dark:text-white capitalize">
-              {result.status}
-            </div>
-          </div>
-
-          {/* Score */}
-          <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-2 sm:p-3 text-center">
-            <div className="text-sm sm:text-lg font-bold text-[#333333] dark:text-white mb-1">
-              {result.score}
-            </div>
-            <div className="text-xs text-[#333333]/70 dark:text-gray-400">Score</div>
-          </div>
-
-          {/* Verdict */}
-          <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-2 sm:p-3 text-center">
-            <div className={`text-xs sm:text-sm font-medium mb-1 ${result.is_valid ? 'text-green-600' : 'text-red-600'}`}>
-              {result.verdict || (result.is_valid ? 'Valid' : 'Invalid')}
-            </div>
-            <div className="text-xs text-[#333333]/70 dark:text-gray-400">Verdict</div>
-          </div>
-
-          {/* Validation Time */}
-          <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-2 sm:p-3 text-center">
-            <div className="text-xs sm:text-sm font-medium text-[#333333] dark:text-white mb-1">
-              {result.validation_time ? `${result.validation_time.toFixed(0)}ms` : 'N/A'}
-            </div>
-            <div className="text-xs text-[#333333]/70 dark:text-gray-400">Time</div>
-          </div>
+        {/* Summary rows */}
+        <div className={`${VAL_INSET} rounded-sm px-4 py-2`}>
+          <Row label="Email" value={<span className="truncate max-w-[200px] block">{result.email}</span>} />
+          <Row label="Status" value={result.status} />
+          {score !== null && (
+            <Row label="Score" value={<span className={scoreClass}>{score} / 100</span>} />
+          )}
+          {result.validation_time && (
+            <Row label="Response Time" value={`${result.validation_time.toFixed(0)} ms`} />
+          )}
         </div>
 
         {/* Warnings */}
         {result.warnings && result.warnings.length > 0 && (
-          <div className="bg-yellow-50 dark:bg-yellow-900/20 rounded-lg p-3">
-            <h4 className="text-sm font-medium text-[#333333] dark:text-white mb-2">Warnings</h4>
-            <ul className="text-xs space-y-1">
-              {result.warnings.map((warning: string, i: number) => (
-                <li key={i} className="text-[#333333]/70 dark:text-gray-400">• {warning}</li>
+          <div className="bg-amber-50 border border-amber-200 rounded-sm p-3 dark:bg-[#f59e0b]/5 dark:border-[#f59e0b]/20">
+            <p className="font-['Space_Grotesk',sans-serif] uppercase tracking-[0.15em] text-[9px] text-amber-800 dark:text-[#f59e0b] mb-2">
+              Warnings
+            </p>
+            <ul className="space-y-1">
+              {result.warnings.map((w: string, i: number) => (
+                <li key={i} className="font-mono text-[10px] text-amber-900/80 dark:text-[#bacbbf]/70">
+                  → {w}
+                </li>
               ))}
             </ul>
           </div>
@@ -120,157 +144,119 @@ const ValidationResults: React.FC<ValidationResultsProps> = ({
 
         {/* Suggestions */}
         {result.suggestions && result.suggestions.length > 0 && (
-          <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-3">
-            <h4 className="text-sm font-medium text-[#333333] dark:text-white mb-2">Suggestions</h4>
-            <ul className="text-xs space-y-1">
-              {result.suggestions.map((suggestion: string, i: number) => (
-                <li key={i} className="text-[#333333]/70 dark:text-gray-400">• {suggestion}</li>
+          <div className="bg-blue-50 border border-blue-200 rounded-sm p-3 dark:bg-[#60a5fa]/5 dark:border-[#60a5fa]/20">
+            <p className="font-['Space_Grotesk',sans-serif] uppercase tracking-[0.15em] text-[9px] text-blue-800 dark:text-[#60a5fa] mb-2">
+              Suggestions
+            </p>
+            <ul className="space-y-1">
+              {result.suggestions.map((s: string, i: number) => (
+                <li key={i} className="font-mono text-[10px] text-blue-900/80 dark:text-[#bacbbf]/70">
+                  → {s}
+                </li>
               ))}
             </ul>
           </div>
         )}
 
-        {/* Detailed Breakdown */}
+        {/* Detailed breakdown */}
         {showDetails && result.breakdown && (
-          <div className="border-t border-gray-200 dark:border-gray-700 pt-4">
-            <h4 className="text-sm font-medium text-[#333333] dark:text-white mb-3">Detailed Breakdown</h4>
-            
-            {/* Syntax Check */}
+          <div className="space-y-3 border-t border-gray-200 pt-4 dark:border-[#3b4a41]/30">
+            <p className="font-['Space_Grotesk',sans-serif] uppercase tracking-[0.15em] text-[9px] text-gray-400 dark:text-[#bacbbf]/50">
+              Breakdown
+            </p>
+
             {result.breakdown.syntax && (
-              <div className="mb-4">
-                <h5 className="text-xs font-medium text-[#333333] dark:text-white mb-2 flex items-center">
-                  <CheckCircle className={`w-3 h-3 mr-1 ${result.breakdown.syntax.valid ? 'text-green-500' : 'text-red-500'}`} />
-                  Syntax Check
-                </h5>
-                <div className="bg-gray-50 dark:bg-gray-700 rounded p-2 text-xs">
-                  <div className="flex justify-between">
-                    <span>Valid Format:</span>
-                    <span className={result.breakdown.syntax.valid ? 'text-green-600' : 'text-red-600'}>
-                      {result.breakdown.syntax.valid ? 'Yes' : 'No'}
-                    </span>
-                  </div>
-                </div>
+              <div className={`${VAL_INSET} rounded-sm px-4 py-2`}>
+                <p className="font-['Space_Grotesk',sans-serif] uppercase tracking-[0.1em] text-[9px] text-gray-400 dark:text-[#bacbbf]/40 mb-1.5 flex items-center gap-1">
+                  <Mail className="w-3 h-3" /> Syntax
+                </p>
+                <CheckRow label="Valid Format" valid={result.breakdown.syntax.valid} />
               </div>
             )}
 
-            {/* DNS Check */}
             {result.breakdown.dns && (
-              <div className="mb-4">
-                <h5 className="text-xs font-medium text-[#333333] dark:text-white mb-2 flex items-center">
-                  <CheckCircle className={`w-3 h-3 mr-1 ${result.breakdown.dns.valid ? 'text-green-500' : 'text-red-500'}`} />
-                  DNS Check
-                </h5>
-                <div className="bg-gray-50 dark:bg-gray-700 rounded p-2 text-xs space-y-1">
-                  <div className="flex justify-between">
-                    <span>Domain Exists:</span>
-                    <span className={result.breakdown.dns.valid ? 'text-green-600' : 'text-red-600'}>
-                      {result.breakdown.dns.valid ? 'Yes' : 'No'}
-                    </span>
-                  </div>
-                  {result.breakdown.dns.score && (
-                    <div className="flex justify-between">
-                      <span>DNS Score:</span>
-                      <span className="text-blue-600">{result.breakdown.dns.score}</span>
-                    </div>
-                  )}
-                </div>
+              <div className={`${VAL_INSET} rounded-sm px-4 py-2`}>
+                <p className="font-['Space_Grotesk',sans-serif] uppercase tracking-[0.1em] text-[9px] text-gray-400 dark:text-[#bacbbf]/40 mb-1.5 flex items-center gap-1">
+                  <Server className="w-3 h-3" /> DNS
+                </p>
+                <CheckRow label="Domain Exists" valid={result.breakdown.dns.valid} />
+                {result.breakdown.dns.score !== undefined && (
+                  <Row label="DNS Score" value={result.breakdown.dns.score} />
+                )}
               </div>
             )}
 
-            {/* SMTP Check */}
             {result.breakdown.smtp && (
-              <div className="mb-4">
-                <h5 className="text-xs font-medium text-[#333333] dark:text-white mb-2 flex items-center">
-                  <CheckCircle className={`w-3 h-3 mr-1 ${result.breakdown.smtp.valid ? 'text-green-500' : 'text-red-500'}`} />
-                  SMTP Check
-                </h5>
-                <div className="bg-gray-50 dark:bg-gray-700 rounded p-2 text-xs space-y-1">
-                  <div className="flex justify-between">
-                    <span>Mailbox Exists:</span>
-                    <span className={result.breakdown.smtp.valid ? 'text-green-600' : 'text-red-600'}>
-                      {result.breakdown.smtp.valid ? 'Yes' : 'No'}
+              <div className={`${VAL_INSET} rounded-sm px-4 py-2`}>
+                <p className="font-['Space_Grotesk',sans-serif] uppercase tracking-[0.1em] text-[9px] text-gray-400 dark:text-[#bacbbf]/40 mb-1.5 flex items-center gap-1">
+                  <Shield className="w-3 h-3" /> SMTP
+                </p>
+                <CheckRow label="Mailbox Exists" valid={result.breakdown.smtp.valid} />
+                <Row
+                  label="Catch-All"
+                  value={
+                    <span
+                      className={
+                        result.breakdown.smtp.catch_all
+                          ? 'text-amber-600 dark:text-[#f59e0b]'
+                          : 'text-emerald-600 dark:text-[#6effc0]'
+                      }
+                    >
+                      {result.breakdown.smtp.catch_all ? 'YES' : 'NO'}
                     </span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span>Catch-All:</span>
-                    <span className={result.breakdown.smtp.catch_all ? 'text-yellow-600' : 'text-green-600'}>
-                      {result.breakdown.smtp.catch_all ? 'Yes' : 'No'}
-                    </span>
-                  </div>
-                </div>
+                  }
+                />
               </div>
             )}
 
-            {/* Reputation Check */}
             {result.breakdown.reputation && (
-              <div className="mb-4">
-                <h5 className="text-xs font-medium text-[#333333] dark:text-white mb-2 flex items-center">
-                  <TrendingUp className="w-3 h-3 mr-1 text-blue-500" />
-                  Reputation Check
-                </h5>
-                <div className="bg-gray-50 dark:bg-gray-700 rounded p-2 text-xs">
-                  <div className="flex justify-between">
-                    <span>Reputation Score:</span>
-                    <span className="text-blue-600">{result.breakdown.reputation.reputation_score || 'N/A'}</span>
-                  </div>
-                </div>
+              <div className={`${VAL_INSET} rounded-sm px-4 py-2`}>
+                <p className="font-['Space_Grotesk',sans-serif] uppercase tracking-[0.1em] text-[9px] text-gray-400 dark:text-[#bacbbf]/40 mb-1.5 flex items-center gap-1">
+                  <TrendingUp className="w-3 h-3" /> Reputation
+                </p>
+                <Row label="Score" value={result.breakdown.reputation.reputation_score ?? 'N/A'} />
               </div>
             )}
 
-            {/* Role-Based Check */}
             {result.breakdown.role_based && (
-              <div className="mb-4">
-                <h5 className="text-xs font-medium text-[#333333] dark:text-white mb-2 flex items-center">
-                  <AlertTriangle className={`w-3 h-3 mr-1 ${result.breakdown.role_based.is_role_based ? 'text-yellow-500' : 'text-green-500'}`} />
-                  Role-Based Check
-                </h5>
-                <div className="bg-gray-50 dark:bg-gray-700 rounded p-2 text-xs">
-                  <div className="flex justify-between">
-                    <span>Is Role-Based:</span>
-                    <span className={result.breakdown.role_based.is_role_based ? 'text-yellow-600' : 'text-green-600'}>
-                      {result.breakdown.role_based.is_role_based ? 'Yes' : 'No'}
+              <div className={`${VAL_INSET} rounded-sm px-4 py-2`}>
+                <p className="font-['Space_Grotesk',sans-serif] uppercase tracking-[0.1em] text-[9px] text-gray-400 dark:text-[#bacbbf]/40 mb-1.5 flex items-center gap-1">
+                  <AlertTriangle className="w-3 h-3" /> Role-Based
+                </p>
+                <Row
+                  label="Is Role Address"
+                  value={
+                    <span
+                      className={
+                        result.breakdown.role_based.is_role_based
+                          ? 'text-amber-600 dark:text-[#f59e0b]'
+                          : 'text-emerald-600 dark:text-[#6effc0]'
+                      }
+                    >
+                      {result.breakdown.role_based.is_role_based ? 'YES' : 'NO'}
                     </span>
-                  </div>
-                </div>
+                  }
+                />
               </div>
             )}
 
-            {/* Risk Score */}
             {result.breakdown.risk_score && (
-              <div className="mb-4">
-                <h5 className="text-xs font-medium text-[#333333] dark:text-white mb-2 flex items-center">
-                  <BarChart3 className="w-3 h-3 mr-1 text-purple-500" />
-                  Risk Assessment
-                </h5>
-                <div className="bg-gray-50 dark:bg-gray-700 rounded p-2 text-xs space-y-1">
-                  <div className="flex justify-between">
-                    <span>Risk Score:</span>
-                    <span className="text-purple-600">{result.breakdown.risk_score.score || result.score}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span>Verdict:</span>
-                    <span className={result.breakdown.risk_score.is_valid ? 'text-green-600' : 'text-red-600'}>
-                      {result.breakdown.risk_score.verdict || result.verdict}
-                    </span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span>Is Valid:</span>
-                    <span className={result.breakdown.risk_score.is_valid ? 'text-green-600' : 'text-red-600'}>
-                      {result.breakdown.risk_score.is_valid ? 'Yes' : 'No'}
-                    </span>
-                  </div>
-                </div>
+              <div className={`${VAL_INSET} rounded-sm px-4 py-2`}>
+                <p className="font-['Space_Grotesk',sans-serif] uppercase tracking-[0.1em] text-[9px] text-gray-400 dark:text-[#bacbbf]/40 mb-1.5 flex items-center gap-1">
+                  <BarChart3 className="w-3 h-3" /> Risk Assessment
+                </p>
+                <Row label="Risk Score" value={result.breakdown.risk_score.score ?? result.score} />
+                <Row label="Verdict" value={result.breakdown.risk_score.verdict ?? result.verdict} />
+                <CheckRow label="Valid" valid={result.breakdown.risk_score.is_valid} />
               </div>
             )}
 
-            {/* Raw Breakdown (for debugging) */}
-            <div className="mt-4">
-              <h5 className="text-xs font-medium text-[#333333] dark:text-white mb-2">Raw Data</h5>
-              <div className="bg-[#F4F5F7] dark:bg-gray-700 rounded-lg p-3">
-                <pre className="text-xs text-[#333333] dark:text-white overflow-x-auto">
-                  {JSON.stringify(result.breakdown, null, 2)}
-                </pre>
-              </div>
+            {/* Raw JSON */}
+            <div>
+              <p className="font-['Space_Grotesk',sans-serif] uppercase tracking-[0.15em] text-[9px] text-gray-400 dark:text-[#bacbbf]/40 mb-1.5">
+                Raw Data
+              </p>
+              <pre className={VAL_CODE}>{JSON.stringify(result.breakdown, null, 2)}</pre>
             </div>
           </div>
         )}

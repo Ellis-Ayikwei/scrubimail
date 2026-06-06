@@ -120,6 +120,57 @@ class UserSerializer(serializers.ModelSerializer):
             "groups",
             "user_permissions",
             "roles",
+            "is_active",
+        )
+        read_only_fields = (
+            "last_active",
+            "date_joined",
+            "groups",
+            "user_permissions",
+            "roles",
+            "is_active",
+        )
+
+    def get_roles(self, obj):
+        return [group.name for group in obj.groups.all()]
+
+    def get_user_permissions(self, obj):
+        # Get all effective permissions (direct + group)
+        perms = obj.get_user_permissions() | obj.get_group_permissions()
+        # Get Permission objects for all these codenames
+        from django.contrib.auth.models import Permission
+
+        permissions = Permission.objects.filter(
+            codename__in=[p.split(".")[-1] for p in perms]
+        )
+        return PermissionSerializer(permissions, many=True).data
+
+
+class AdminUserSerializer(serializers.ModelSerializer):
+    """Full admin serializer — all fields writable for admin panel PATCH."""
+    groups = GroupSerializer(many=True, read_only=True)
+    user_permissions = serializers.SerializerMethodField(read_only=True)
+    roles = serializers.SerializerMethodField(read_only=True)
+
+    class Meta:
+        model = User
+        fields = (
+            "id",
+            "email",
+            "first_name",
+            "last_name",
+            "phone_number",
+            "profile_picture",
+            "user_type",
+            "account_status",
+            "last_active",
+            "date_joined",
+            "is_active",
+            "is_staff",
+            "is_superuser",
+            "groups",
+            "user_permissions",
+            "roles",
         )
         read_only_fields = (
             "last_active",
@@ -148,11 +199,8 @@ class UserSerializer(serializers.ModelSerializer):
         return [group.name for group in obj.groups.all()]
 
     def get_user_permissions(self, obj):
-        # Get all effective permissions (direct + group)
         perms = obj.get_user_permissions() | obj.get_group_permissions()
-        # Get Permission objects for all these codenames
         from django.contrib.auth.models import Permission
-
         permissions = Permission.objects.filter(
             codename__in=[p.split(".")[-1] for p in perms]
         )

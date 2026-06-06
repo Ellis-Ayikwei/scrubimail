@@ -25,6 +25,8 @@ from rest_framework_simplejwt.exceptions import (
 from django.core.cache import cache
 from django.utils import timezone
 from django.contrib.auth import authenticate
+from datetime import timedelta
+import hashlib
 import logging
 
 from .serializer import (
@@ -40,7 +42,7 @@ from .serializer import (
     BackupCodeSerializer,
     LoginWithTOTPSerializer,
 )
-from .models import TOTPDevice
+from .models import TOTPDevice, TrustedDevice
 
 logger = logging.getLogger(__name__)
 
@@ -56,10 +58,64 @@ class UserViewSet(viewsets.ModelViewSet):
         return Response(serializer.data)
 
 
+def _flatten_serializer_errors(errors):
+    """Human-readable strings from DRF serializer.errors (nested dict/list safe)."""
+    messages = []
+
+    def walk(node):
+        if isinstance(node, dict):
+            for v in node.values():
+                walk(v)
+        elif isinstance(node, list):
+            for item in node:
+                if isinstance(item, (dict, list)):
+                    walk(item)
+                elif item is not None and str(item).strip():
+                    messages.append(str(item))
+
+    walk(errors)
+    return messages
+
+
+def registration_error_response(serializer_errors):
+    msgs = _flatten_serializer_errors(dict(serializer_errors))
+    detail = (
+        msgs[0]
+        if msgs
+        else "Registration could not be completed. Please check your input."
+    )
+    return Response(
+        {"detail": detail, "errors": serializer_errors},
+        status=status.HTTP_400_BAD_REQUEST,
+    )
+
+
+def normalize_register_payload(request_data):
+    """Align client payloads with RegisterSerializer (e.g. confirm_password → password2)."""
+    data = request_data.copy() if hasattr(request_data, "copy") else dict(request_data)
+    if data.get("confirm_password") and not data.get("password2"):
+        data["password2"] = data.get("confirm_password")
+    return data
+
+
 class RegisterView(generics.CreateAPIView):
     queryset = User.objects.all()
     serializer_class = RegisterSerializer
     permission_classes = [permissions.AllowAny]
+
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=normalize_register_payload(request.data))
+        if not serializer.is_valid():
+            return registration_error_response(serializer.errors)
+        self.perform_create(serializer)
+        headers = self.get_success_headers(serializer.data)
+        return Response(
+            {
+                "message": "User created successfully. Please check your email for verification.",
+            },
+            status=status.HTTP_201_CREATED,
+            headers=headers,
+        )
 
 
 class LoginView(APIView):
@@ -135,7 +191,7 @@ class MyProfileView(APIView):
                             else 0
                         ),
                         "credits": (
-                            billing_profile.current_plan.credits
+                            billing_profile.current_plan.credits_per_month
                             if billing_profile.current_plan
                             else 100
                         ),
@@ -210,17 +266,16 @@ class RegisterAPIView(APIView):
     permission_classes = [permissions.AllowAny]
 
     def post(self, request):
-        serializer = RegisterSerializer(data=request.data)
+        serializer = RegisterSerializer(data=normalize_register_payload(request.data))
         if serializer.is_valid():
-            user = serializer.save()
-            # Send verification email here
+            serializer.save()
             return Response(
                 {
                     "message": "User created successfully. Please check your email for verification."
                 },
                 status=status.HTTP_201_CREATED,
             )
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        return registration_error_response(serializer.errors)
 
 
 class LoginAPIView(APIView):
@@ -233,23 +288,33 @@ class LoginAPIView(APIView):
         # request._authenticator = None
 
         serializer = LoginSerializer(data=request.data, context={"request": request})
-        print("the reqeust", request.data)
 
         try:
-            serializer.is_valid(raise_exception=False)
             if not serializer.is_valid():
-                # Log failed login attempt but return generic error
+                errors = serializer.errors
                 ip = get_client_ip(request)
                 email = request.data.get("email", "unknown")
+                # Field-level errors (missing/invalid format) → 400
+                if "email" in errors or "password" in errors:
+                    return Response(errors, status=status.HTTP_400_BAD_REQUEST)
+                # Wrong credentials (non_field_errors from validate()) → 401
                 logger.warning(f"Failed login attempt for {email} from IP {ip}")
-                # Increment failed login counter in cache
                 increment_failed_logins(email, ip)
                 return Response(
-                    {"detail": "Invalid credentials"},
+                    {"detail": "Invalid email or password"},
                     status=status.HTTP_401_UNAUTHORIZED,
                 )
 
             user = serializer.validated_data["user"]
+
+            # Suspended check (belt-and-suspenders — LoginSerializer also checks)
+            if not user.is_active:
+                return Response(
+                    {
+                        "detail": "Your account has been suspended. Please contact support."
+                    },
+                    status=status.HTTP_403_FORBIDDEN,
+                )
 
             # Check if account requires further verification
             if hasattr(user, "requires_verification") and user.requires_verification:
@@ -372,6 +437,68 @@ def is_account_locked(email):
 def reset_failed_logins(email):
     cache_key = f"login_attempts:{email}"
     cache.delete(cache_key)
+
+
+def hash_device_fingerprint(raw_fingerprint):
+    """Server-side hash for storing/comparing client fingerprint strings."""
+    if raw_fingerprint is None:
+        return ""
+    return hashlib.sha256(
+        (settings.SECRET_KEY + str(raw_fingerprint)).encode()
+    ).hexdigest()
+
+
+def find_active_trusted_device(user, request_data):
+    logger.info(f"Finding active trusted device for user {user.id} ")
+    device_id = (request_data.get("device_id") or "").strip()
+    raw = request_data.get("fingerprint") or request_data.get("device_fingerprint")
+    if not device_id or not raw:
+        logger.info(f"No device id or fingerprint found for user {user.id}")
+        return None
+    fp_hash = hash_device_fingerprint(raw)
+    logger.info(f"Hashed fingerprint: {fp_hash} for user {user.id}")
+    return TrustedDevice.objects.filter(
+        user=user,
+        device_id=device_id,
+        device_fingerprint_hash=fp_hash,
+        is_active=True,
+        expires_at__gte=timezone.now(),
+    ).first()
+
+
+def remember_trusted_device(user, request_data, refresh_token):
+    """Create or refresh a trusted device row after successful 2FA + remember flag."""
+    want = (
+        request_data.get("trust_device")
+        or request_data.get("remember_device")
+        or request_data.get("remember_me")
+    )
+    if not want:
+        return
+    device_id = (request_data.get("device_id") or "").strip()
+    raw = request_data.get("fingerprint") or request_data.get("device_fingerprint")
+    if not device_id or not raw:
+        return
+    fp_hash = hash_device_fingerprint(raw)
+    device_name = (request_data.get("device_name") or "").strip() or None
+    info = request_data.get("device_info")
+    device_info = info if isinstance(info, dict) else {}
+    days = int(getattr(settings, "TRUSTED_DEVICE_DAYS", 30))
+    refresh_hash = (
+        hashlib.sha256(refresh_token.encode()).hexdigest() if refresh_token else ""
+    )
+    TrustedDevice.objects.update_or_create(
+        user=user,
+        device_id=device_id,
+        defaults={
+            "device_fingerprint_hash": fp_hash,
+            "device_name": device_name,
+            "device_info": device_info,
+            "refresh_token_hash": refresh_hash or None,
+            "expires_at": timezone.now() + timedelta(days=days),
+            "is_active": True,
+        },
+    )
 
 
 class LogoutAPIView(APIView):
@@ -958,8 +1085,6 @@ class LoginWithTOTPView(APIView):
 
     def post(self, request):
         # First, authenticate the user with email and password
-        from django.contrib.auth import authenticate
-
         print("request data", request.data)
 
         email = request.data.get("email")
@@ -970,6 +1095,21 @@ class LoginWithTOTPView(APIView):
                 {"detail": "Email and password are required"},
                 status=status.HTTP_400_BAD_REQUEST,
             )
+
+        # Check suspension before authenticate() so we give a clear message
+        try:
+            from apps.User.models import User as UserModel
+
+            candidate = UserModel.objects.get(email__iexact=email)
+            if not candidate.is_active:
+                return Response(
+                    {
+                        "detail": "Your account has been suspended. Please contact support."
+                    },
+                    status=status.HTTP_403_FORBIDDEN,
+                )
+        except Exception:
+            pass
 
         # Authenticate user
         user = authenticate(email=email, password=password)
@@ -990,18 +1130,16 @@ class LoginWithTOTPView(APIView):
         except TOTPDevice.DoesNotExist:
             has_2fa = False
 
+        if is_account_locked(user.email):
+            return Response(
+                {
+                    "detail": "Account temporarily locked. Try again later or reset your password."
+                },
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
         # If 2FA is not enabled, proceed with normal login
         if not has_2fa:
-            # Use the same logic as LoginAPIView for users without 2FA
-            # Check if account is locked
-            if is_account_locked(user.email):
-                return Response(
-                    {
-                        "detail": "Account temporarily locked. Try again later or reset your password."
-                    },
-                    status=status.HTTP_403_FORBIDDEN,
-                )
-
             # Record successful login
             ip = get_client_ip(request)
             logger.info(f"Successful login for user {user.id} from IP {ip}")
@@ -1056,16 +1194,62 @@ class LoginWithTOTPView(APIView):
 
             return response
 
+        # Trusted device: same fingerprint + device_id as a non-expired trusted row → skip TOTP
+        trusted = find_active_trusted_device(user, request.data)
+
+        if trusted:
+            ip = get_client_ip(request)
+            logger.info(
+                f"Trusted device login (2FA skipped) for user {user.id} from IP {ip}"
+            )
+            reset_failed_logins(user.email)
+            user.last_login = timezone.now()
+            user.save(update_fields=["last_login"])
+            try:
+                refresh = RefreshToken.for_user(user)
+                access_token = str(refresh.access_token)
+                refresh_token = str(refresh)
+            except Exception as e:
+                logger.error(f"Token generation failed: {str(e)}")
+                return Response(
+                    {"detail": "Token generation failed"},
+                    status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                )
+            try:
+                user_data = MinimalUserSerializer(user).data
+            except Exception as e:
+                logger.error(f"User serialization failed: {str(e)}")
+                return Response(
+                    {"detail": "User serialization failed"},
+                    status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                )
+            response = Response(
+                {
+                    "user": user_data,
+                    "requires_2fa": False,
+                    "trusted_device": True,
+                    "device_name": trusted.device_name or trusted.device_id,
+                },
+                status=status.HTTP_200_OK,
+            )
+            response["Authorization"] = f"Bearer {access_token}"
+            response["X-Refresh-Token"] = refresh_token
+            response["Access-Control-Expose-Headers"] = "Authorization, X-Refresh-Token"
+            return response
+
         # If 2FA is enabled, validate TOTP token or backup code
         # Check if TOTP token or backup code is provided
         totp_token = request.data.get("totp_token")
         backup_code = request.data.get("backup_code")
 
         if not totp_token and not backup_code:
+            logger.info(f"No TOTP token or backup code provided for user {user.id}")
             return Response(
                 {
                     "detail": "TOTP token or backup code is required for 2FA",
                     "requires_2fa": True,
+                    "user_id": str(user.id),
+                    "status": "2FA_REQUIRED",
                 },
                 status=status.HTTP_200_OK,
             )
@@ -1115,6 +1299,8 @@ class LoginWithTOTPView(APIView):
                     {"detail": "Token generation failed"},
                     status=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 )
+
+            remember_trusted_device(user, request.data, refresh_token)
 
             # Serialize user data
             try:

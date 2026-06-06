@@ -86,21 +86,15 @@ export const LoginUser = createAsyncThunk('auth/LoginUser', async ({ email, pass
         return user;
     } catch (error: any) {
         console.error('Login error:', error);
-        
-        if (error.response && error.response.data) {
-            try {
-                const parser = new DOMParser();
-                const errorData = error.response.data;
-                const doc = parser.parseFromString(errorData, 'text/html');
-                const errorMess = doc.querySelector('body')?.innerText ?? 'An error occurred';
-                const errorMessage = errorMess.split('\n')[1];
-                return rejectWithValue(errorMessage);
-            } catch (parseError) {
-                return rejectWithValue(error.response.data?.message || 'Login failed');
-            }
-        }
-        
-        return rejectWithValue(error.message || 'Login failed');
+        const serverData = error.response?.data;
+        const message =
+            serverData?.detail ||
+            serverData?.message ||
+            serverData?.error ||
+            (typeof serverData === 'string' ? serverData : null) ||
+            error.message ||
+            'Login failed. Please try again.';
+        return rejectWithValue(message);
     }
 });
 
@@ -125,10 +119,14 @@ export const RegisterUser = createAsyncThunk(
     async ({ userOrEmail, password, confirm_password }: { userOrEmail: { email?: string; username?: string }; password: string; confirm_password: string }) => {
         const payload = { ...userOrEmail, password, confirm_password };
         try {
-            const response = await axiosInstance.post('/register/', payload);
+            const response = await authAxiosInstance.post('/register/', payload);
             return response.data;
         } catch (error: any) {
-            throw new Error(error.response?.data?.message || ERROR_MESSAGES.REGISTER_FAILED);
+            const serverData = error.response?.data;
+            const msg = serverData?.detail || serverData?.message || serverData?.error
+                || (typeof serverData === 'string' ? serverData : null)
+                || error.message || ERROR_MESSAGES.REGISTER_FAILED;
+            throw new Error(msg);
         }
     }
 );
@@ -138,7 +136,11 @@ export const ForgetPassword = createAsyncThunk('auth/ForgetPassword', async ({ e
         const response = await authAxiosInstance.post('/forget_password/', { email });
         return response.data;
     } catch (error: any) {
-        throw new Error(error.response?.data?.message || ERROR_MESSAGES.FORGOT_PASSWORD_FAILED);
+        const serverData = error.response?.data;
+        const msg = serverData?.detail || serverData?.message || serverData?.error
+            || (typeof serverData === 'string' ? serverData : null)
+            || error.message || ERROR_MESSAGES.FORGOT_PASSWORD_FAILED;
+        throw new Error(msg);
     }
 });
 
@@ -147,7 +149,11 @@ export const ResetPassword = createAsyncThunk('auth/ResetPassword', async ({ new
         const response = await axiosInstance.post('/reset_password/', { newPassword, confirmNewPassword, token });
         return response.data;
     } catch (error: any) {
-        throw new Error(error.response?.data?.message || ERROR_MESSAGES.RESET_PASSWORD_FAILED);
+        const serverData = error.response?.data;
+        const msg = serverData?.detail || serverData?.message || serverData?.error
+            || (typeof serverData === 'string' ? serverData : null)
+            || error.message || ERROR_MESSAGES.RESET_PASSWORD_FAILED;
+        throw new Error(msg);
     }
 });
 
@@ -178,7 +184,7 @@ const authSlice = createSlice({
             })
             .addCase(LoginUser.rejected, (state, action) => {
                 state.loading = false;
-                state.error = action.error.message ?? ERROR_MESSAGES.LOGIN_FAILED;
+                state.error = (action.payload as string) ?? action.error.message ?? ERROR_MESSAGES.LOGIN_FAILED;
                 state.message = null;
             })
             .addCase(LogoutUser.pending, (state) => {

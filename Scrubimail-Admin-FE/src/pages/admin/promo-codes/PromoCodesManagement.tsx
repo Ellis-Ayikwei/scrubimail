@@ -8,20 +8,11 @@ import {
   Button,
   Space,
   Tag,
-  Modal,
-  Form,
-  Input,
-  InputNumber,
-  Switch,
   message,
   Typography,
   Tooltip,
   Popconfirm,
   Badge,
-  DatePicker,
-  Select,
-  Steps,
-  Divider
 } from 'antd';
 import {
   Ticket,
@@ -31,28 +22,21 @@ import {
   TrendingUp,
   Users,
   DollarSign,
-  Calendar,
   RefreshCw,
-  Eye,
-  CheckCircle,
-  XCircle
 } from 'lucide-react';
 import type { ColumnsType } from 'antd/es/table';
-import { billingService, PromoCode, PromoCodeRedemption } from '../../services/billingService';
+import { billingService, PromoCode, PromoCodeRedemption } from '../../../services/billingService';
 import dayjs from 'dayjs';
+import PromoCodeFormModal from './PromoCodeFormModal';
 
 const { Title, Text } = Typography;
-const { TextArea } = Input;
-const { RangePicker } = DatePicker;
 
 const PromoCodesManagement: React.FC = () => {
   const [promoCodes, setPromoCodes] = useState<PromoCode[]>([]);
   const [redemptions, setRedemptions] = useState<PromoCodeRedemption[]>([]);
   const [loading, setLoading] = useState(false);
   const [modalVisible, setModalVisible] = useState(false);
-  const [wizardStep, setWizardStep] = useState(0);
   const [editingCode, setEditingCode] = useState<PromoCode | null>(null);
-  const [form] = Form.useForm();
   const [stats, setStats] = useState({
     activeCodes: 0,
     totalRedemptions: 0,
@@ -116,20 +100,17 @@ const PromoCodesManagement: React.FC = () => {
 
   const handleCreate = () => {
     setEditingCode(null);
-    setWizardStep(0);
-    form.resetFields();
     setModalVisible(true);
   };
 
   const handleEdit = (code: PromoCode) => {
     setEditingCode(code);
-    setWizardStep(0);
-    form.setFieldsValue({
-      ...code,
-      valid_from: code.valid_from ? dayjs(code.valid_from) : undefined,
-      valid_until: code.valid_until ? dayjs(code.valid_until) : undefined,
-    });
     setModalVisible(true);
+  };
+
+  const handleFormModalClose = () => {
+    setModalVisible(false);
+    setEditingCode(null);
   };
 
   const handleDelete = async (id: string) => {
@@ -139,44 +120,6 @@ const PromoCodesManagement: React.FC = () => {
       fetchPromoCodes();
     } catch (error: any) {
       message.error(error.message || 'Failed to deactivate promo code');
-    }
-  };
-
-  const handleSubmit = async (values: any) => {
-    try {
-      // Get all form values to ensure we have data from all steps
-      const allValues = form.getFieldsValue();
-      const submitData = {
-        ...allValues,
-        ...values, // Override with any passed values
-        valid_from: (allValues.valid_from || values.valid_from) 
-          ? (allValues.valid_from || values.valid_from).toISOString() 
-          : undefined,
-        valid_until: (allValues.valid_until || values.valid_until) 
-          ? (allValues.valid_until || values.valid_until).toISOString() 
-          : undefined,
-      };
-
-      // Remove undefined values
-      Object.keys(submitData).forEach(key => {
-        if (submitData[key] === undefined) {
-          delete submitData[key];
-        }
-      });
-
-      if (editingCode) {
-        await billingService.updatePromoCode(editingCode.id, submitData);
-        message.success('Promo code updated successfully');
-      } else {
-        await billingService.createPromoCode(submitData);
-        message.success('Promo code created successfully');
-      }
-      setModalVisible(false);
-      setWizardStep(0);
-      form.resetFields();
-      fetchPromoCodes();
-    } catch (error: any) {
-      message.error(error.message || 'Failed to save promo code');
     }
   };
 
@@ -330,13 +273,6 @@ const PromoCodesManagement: React.FC = () => {
     },
   ];
 
-  const steps = [
-    { title: 'Basic Info' },
-    { title: 'Validity & Limits' },
-    { title: 'Applicability' },
-    { title: 'Review' }
-  ];
-
   return (
     <div className="p-6">
       <div className="mb-6">
@@ -430,205 +366,12 @@ const PromoCodesManagement: React.FC = () => {
         />
       </Card>
 
-      {/* Create/Edit Modal with Wizard */}
-      <Modal
-        title={editingCode ? 'Edit Promo Code' : 'Create Promo Code'}
+      <PromoCodeFormModal
         open={modalVisible}
-        onCancel={() => {
-          setModalVisible(false);
-          setWizardStep(0);
-          form.resetFields();
-        }}
-        onOk={async () => {
-          if (wizardStep < 3) {
-            // Validate current step before moving to next
-            try {
-              const fields = wizardStep === 0 
-                ? ['code', 'description', 'discount_type', 'discount_value']
-                : wizardStep === 1
-                ? ['valid_from', 'valid_until', 'max_uses', 'max_uses_per_user', 'min_purchase_amount', 'first_purchase_only']
-                : ['applicable_plans', 'applicable_packages'];
-              
-              await form.validateFields(fields);
-              setWizardStep(wizardStep + 1);
-            } catch (error) {
-              // Validation failed, don't proceed
-              console.error('Validation failed:', error);
-            }
-          } else {
-            // Final step - validate all fields and submit
-            try {
-              await form.validateFields();
-              const values = form.getFieldsValue();
-              await handleSubmit(values);
-            } catch (error) {
-              console.error('Validation failed:', error);
-            }
-          }
-        }}
-        width={700}
-        okText={wizardStep < 3 ? 'Next' : 'Save'}
-        cancelText={wizardStep > 0 ? 'Back' : 'Cancel'}
-      >
-        <Steps current={wizardStep} className="mb-6">
-          {steps.map(step => (
-            <Steps.Step key={step.title} title={step.title} />
-          ))}
-        </Steps>
-
-        <Form
-          form={form}
-          layout="vertical"
-          onFinish={handleSubmit}
-        >
-          {wizardStep === 0 && (
-            <>
-              <Form.Item
-                name="code"
-                label="Promo Code"
-                rules={[
-                  { required: true, message: 'Please enter promo code' },
-                  { pattern: /^[A-Z0-9]+$/, message: 'Only uppercase letters and numbers allowed' }
-                ]}
-              >
-                <Input placeholder="SAVE20" className="font-mono" />
-              </Form.Item>
-
-              <Form.Item
-                name="description"
-                label="Description"
-              >
-                <TextArea rows={2} placeholder="Promo code description" />
-              </Form.Item>
-
-              <Form.Item
-                name="discount_type"
-                label="Discount Type"
-                rules={[{ required: true, message: 'Please select discount type' }]}
-              >
-                <Select>
-                  <Select.Option value="percentage">Percentage</Select.Option>
-                  <Select.Option value="fixed_amount">Fixed Amount</Select.Option>
-                  <Select.Option value="free_credits">Free Credits</Select.Option>
-                </Select>
-              </Form.Item>
-
-              <Form.Item
-                name="discount_value"
-                label="Discount Value"
-                rules={[{ required: true, message: 'Please enter discount value' }]}
-              >
-                <InputNumber
-                  min={0}
-                  className="w-full"
-                  placeholder="20"
-                />
-              </Form.Item>
-            </>
-          )}
-
-          {wizardStep === 1 && (
-            <>
-              <Form.Item
-                name="valid_from"
-                label="Valid From"
-                rules={[{ required: true, message: 'Please select start date' }]}
-              >
-                <DatePicker className="w-full" />
-              </Form.Item>
-
-              <Form.Item
-                name="valid_until"
-                label="Valid Until"
-                rules={[{ required: true, message: 'Please select end date' }]}
-              >
-                <DatePicker className="w-full" />
-              </Form.Item>
-
-              <Form.Item
-                name="max_uses"
-                label="Max Uses (Total)"
-              >
-                <InputNumber
-                  min={1}
-                  className="w-full"
-                  placeholder="Leave empty for unlimited"
-                />
-              </Form.Item>
-
-              <Form.Item
-                name="max_uses_per_user"
-                label="Max Uses Per User"
-                rules={[{ required: true, message: 'Please enter max uses per user' }]}
-              >
-                <InputNumber
-                  min={1}
-                  className="w-full"
-                  placeholder="1"
-                />
-              </Form.Item>
-
-              <Form.Item
-                name="min_purchase_amount"
-                label="Minimum Purchase Amount"
-              >
-                <InputNumber
-                  min={0}
-                  step={0.01}
-                  className="w-full"
-                  placeholder="0.00"
-                />
-              </Form.Item>
-
-              <Form.Item
-                name="first_purchase_only"
-                valuePropName="checked"
-                label="First Purchase Only"
-              >
-                <Switch />
-              </Form.Item>
-            </>
-          )}
-
-          {wizardStep === 2 && (
-            <>
-              <Form.Item
-                name="applicable_plans"
-                label="Applicable Plans (Leave empty for all)"
-              >
-                <Select mode="multiple" placeholder="Select plans">
-                  {/* Plans would be loaded from API */}
-                </Select>
-              </Form.Item>
-
-              <Form.Item
-                name="applicable_packages"
-                label="Applicable Packages (Leave empty for all)"
-              >
-                <Select mode="multiple" placeholder="Select packages">
-                  {/* Packages would be loaded from API */}
-                </Select>
-              </Form.Item>
-
-              <Form.Item
-                name="is_active"
-                valuePropName="checked"
-                initialValue={true}
-                label="Active"
-              >
-                <Switch />
-              </Form.Item>
-            </>
-          )}
-
-          {wizardStep === 3 && (
-            <div>
-              <Text>Review your promo code settings before creating.</Text>
-              {/* Review summary would go here */}
-            </div>
-          )}
-        </Form>
-      </Modal>
+        editingCode={editingCode}
+        onClose={handleFormModalClose}
+        onSaved={fetchPromoCodes}
+      />
     </div>
   );
 };

@@ -1,4 +1,4 @@
-import { ColorSchemeScript, MantineProvider } from '@mantine/core';
+import { ColorSchemeScript } from '@mantine/core';
 import '@mantine/core/styles.layer.css';
 import { DatesProvider } from '@mantine/dates';
 import '@mantine/dates/styles.css';
@@ -23,6 +23,7 @@ import './i18n';
 // Router
 import { RouterProvider } from 'react-router-dom';
 import router from './router/index';
+import { THEME_STORAGE_KEY } from './utils/themeStorage';
 
 // Redux
 import AuthProvider from 'react-auth-kit';
@@ -31,8 +32,7 @@ import { Provider } from 'react-redux';
 import store from './store/index';
 import IconLoader from './components/Icon/IconLoader';
 import authAxiosInstance from './services/authAxiosInstance';
-
-
+import MantineReduxRoot from './components/MantineReduxRoot';
 
 // Dynamic imports for non-critical paths
 const i18n = import('./i18n');
@@ -90,20 +90,20 @@ const authStore = createStore({
 ReactDOM.createRoot(document.getElementById('root') as HTMLElement).render(
     <React.StrictMode>
         <Suspense fallback={<div className='flex justify-center items-center h-screen'><IconLoader /></div>}>
-            <ColorSchemeScript defaultColorScheme="dark" />
-            <MantineProvider withGlobalClasses>
-                <ContextMenuProvider zIndex={5000} shadow="md" borderRadius="md">
-                    <DatesProvider settings={{ locale: 'en' }}>
-                        <Provider store={store}>
+            <ColorSchemeScript defaultColorScheme="dark" localStorageKey={THEME_STORAGE_KEY} />
+            <Provider store={store}>
+                <MantineReduxRoot>
+                    <ContextMenuProvider zIndex={5000} shadow="md" borderRadius="md">
+                        <DatesProvider settings={{ locale: 'en' }}>
                             <AuthProvider store={authStore}>
                                 {/* <PersistGate loading={null} persistor={persistor}> */}
                                 <RouterProvider router={router} />
                                 {/* </PersistGate> */}
                             </AuthProvider>
-                        </Provider>
-                    </DatesProvider>
-                </ContextMenuProvider>
-            </MantineProvider>
+                        </DatesProvider>
+                    </ContextMenuProvider>
+                </MantineReduxRoot>
+            </Provider>
         </Suspense>
     </React.StrictMode>
 );

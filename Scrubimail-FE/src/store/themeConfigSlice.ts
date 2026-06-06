@@ -1,4 +1,5 @@
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
+import { readStoredTheme } from '../utils/themeStorage';
 
 export interface ThemeConfigState {
     isDarkMode?: boolean;
@@ -13,10 +14,12 @@ export interface ThemeConfigState {
     semidark?: boolean;
 }
 
+const bootTheme = readStoredTheme();
+
 const initialState: ThemeConfigState = {
-    isDarkMode: true,
+    isDarkMode: bootTheme === 'dark',
     sidebar: true,
-    theme: 'dark',
+    theme: bootTheme,
     menu: 'vertical',
     layout: 'full',
     rtlClass: 'ltr',

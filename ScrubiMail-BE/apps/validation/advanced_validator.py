@@ -1,14 +1,82 @@
+import os
 import re
 import dns.resolver
 import smtplib
 import socket
 import time
-import hashlib
+import logging
 from typing import Dict, List, Any, Optional
 from dataclasses import dataclass
-import logging
+from concurrent.futures import ThreadPoolExecutor
+
+try:
+    import idna  # internationalized domain name handling
+except Exception:  # pragma: no cover - idna is a declared dependency
+    idna = None
+
+try:
+    from django.conf import settings as _django_settings
+except Exception:  # pragma: no cover - allow use outside Django
+    _django_settings = None
 
 logger = logging.getLogger(__name__)
+
+
+def _conf(name: str, default: Any) -> Any:
+    """Read a validation setting from Django settings with a safe fallback."""
+    if _django_settings is not None:
+        return getattr(_django_settings, name, default)
+    return default
+
+
+# Module-level DNS resolver with short timeouts
+_dns_resolver = dns.resolver.Resolver()
+_dns_resolver.timeout = 3        # per-query timeout
+_dns_resolver.lifetime = 5       # total resolution lifetime
+
+# Simple TTL cache for domain DNS/reputation results
+_domain_cache: Dict[str, Dict[str, Any]] = {}
+_cache_ttl = 300  # 5 minutes
+
+# Disposable-domain blocklist, loaded once from the bundled baseline plus an
+# optional external feed (VALIDATION_DISPOSABLE_DOMAINS_FILE).
+_DISPOSABLE_BASELINE = os.path.join(
+    os.path.dirname(__file__), "data", "disposable_domains.txt"
+)
+_disposable_domains: Optional[set] = None
+
+
+def _load_domain_file(path: str) -> set:
+    domains: set = set()
+    try:
+        with open(path, "r", encoding="utf-8") as fh:
+            for line in fh:
+                line = line.strip().lower()
+                if not line or line.startswith("#"):
+                    continue
+                domains.add(line)
+    except FileNotFoundError:
+        logger.warning("Disposable-domain file not found: %s", path)
+    except Exception as exc:  # pragma: no cover - defensive
+        logger.error("Failed reading disposable-domain file %s: %s", path, exc)
+    return domains
+
+
+def load_disposable_domains(force: bool = False) -> set:
+    """Load and cache the disposable-domain set (baseline + optional feed)."""
+    global _disposable_domains
+    if _disposable_domains is not None and not force:
+        return _disposable_domains
+
+    domains = _load_domain_file(_DISPOSABLE_BASELINE)
+
+    external = _conf("VALIDATION_DISPOSABLE_DOMAINS_FILE", None)
+    if external:
+        domains |= _load_domain_file(external)
+
+    _disposable_domains = domains
+    logger.info("Loaded %d disposable domains", len(domains))
+    return domains
 
 
 @dataclass
@@ -28,7 +96,7 @@ class AdvancedEmailValidator:
     """Production-grade email validation with comprehensive checks"""
 
     def __init__(self):
-        # RFC 5322 + 6531 compliant regex
+        # RFC 5322 + 6531 compliant regex (run against the punycode/ASCII form)
         self.rfc_regex = re.compile(
             r"""^(?=.{1,254}$)(?=.{1,64}@)[A-Za-z0-9!#$%&'*+/=?^_`{|}~-]+(?:\.[A-Za-z0-9!#$%&'*+/=?^_`{|}~-]+)*@(?:[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?\.)+[A-Za-z]{2,}$"""
         )
@@ -45,71 +113,111 @@ class AdvancedEmailValidator:
             "test": r"^(test|testing|demo|example|sample|fake|dummy)$",
         }
 
-        # Disposable domains
-        self.disposable_domains = {
-            "mailinator.com",
-            "10minutemail.com",
-            "guerrillamail.com",
-            "trashmail.com",
-            "tempmail.org",
-            "throwaway.email",
-            "maildrop.cc",
-            "yopmail.com",
-            "getairmail.com",
-            "mailnesia.com",
-            "sharklasers.com",
-            "grr.la",
-            "pokemail.net",
-            "spam4.me",
-            "bccto.me",
-            "chacuo.net",
-            "dispostable.com",
-        }
+        # Disposable domains (loaded from data file + optional external feed)
+        self.disposable_domains = load_disposable_domains()
 
         # High-risk TLDs
         self.risky_tlds = {".tk", ".ml", ".ga", ".cf", ".gq", ".xyz", ".top"}
 
-        # Corporate providers
-        self.corporate_providers = {
+        # Major mailbox providers (free consumer providers). These are
+        # legitimate, high-deliverability domains — not "corporate", but we
+        # keep the `is_corporate` output key for backward compatibility.
+        self.free_providers = {
             "google.com",
             "gmail.com",
+            "googlemail.com",
             "outlook.com",
             "hotmail.com",
             "yahoo.com",
+            "ymail.com",
             "protonmail.com",
+            "proton.me",
             "icloud.com",
+            "me.com",
             "aol.com",
             "live.com",
+            "gmx.com",
+            "zoho.com",
         }
 
-        # Spam trap patterns
+        # Spam-trap indicators. Matched as whole words (\b...\b) against the
+        # domain so substrings like "test" inside "greatest" do NOT match.
         self.spam_trap_patterns = [
-            r"spam",
-            r"trap",
-            r"honeypot",
-            r"test",
-            r"fake",
-            r"dummy",
-            r"example",
-            r"sample",
-            r"demo",
-            r"verify",
-            r"confirm",
-            r"validate",
-            r"check",
+            "spam",
+            "trap",
+            "spamtrap",
+            "honeypot",
+            "mailtrap",
         ]
+        self._spam_trap_regex = re.compile(
+            r"\b(" + "|".join(self.spam_trap_patterns) + r")\b"
+        )
+
+        # SMTP probe configuration (override in settings for production).
+        self.smtp_enabled = bool(_conf("VALIDATION_SMTP_ENABLED", True))
+        self.smtp_timeout = int(_conf("VALIDATION_SMTP_TIMEOUT", 3))
+        self.smtp_helo_host = _conf("VALIDATION_SMTP_HELO_HOST", "scrubimail.com")
+        self.smtp_mail_from = _conf(
+            "VALIDATION_SMTP_MAIL_FROM", "verify@scrubimail.com"
+        )
+        self.smtp_use_starttls = bool(_conf("VALIDATION_SMTP_STARTTLS", True))
+
+    # ------------------------------------------------------------------ cache
+    def _get_cached(self, key: str) -> Optional[Any]:
+        entry = _domain_cache.get(key)
+        if entry and time.time() - entry["ts"] < _cache_ttl:
+            return entry["val"]
+        return None
+
+    def _set_cached(self, key: str, value: Any) -> None:
+        _domain_cache[key] = {"val": value, "ts": time.time()}
+
+    # ----------------------------------------------------------------- syntax
+    def _to_ascii_domain(self, domain: str) -> str:
+        """Convert an internationalized (Unicode) domain to ASCII punycode.
+
+        Returns the original string if it is already ASCII or cannot be
+        encoded, so the regex check can reject genuinely invalid input.
+        """
+        try:
+            domain.encode("ascii")
+            return domain  # already ASCII, nothing to do
+        except UnicodeEncodeError:
+            pass
+
+        if idna is not None:
+            try:
+                return idna.encode(domain, uts46=True).decode("ascii")
+            except Exception:
+                pass
+        try:
+            return domain.encode("idna").decode("ascii")
+        except Exception:
+            return domain
 
     def validate_syntax(self, email: str) -> Dict[str, Any]:
-        """RFC 5322 + 6531 syntax validation"""
+        """RFC 5322 + 6531 syntax validation with IDN/punycode support."""
         try:
-            if not self.rfc_regex.match(email):
+            email = email.strip()
+            if email.count("@") < 1:
                 return {
                     "valid": False,
                     "error": "Invalid email format",
                     "suggestions": [],
                 }
 
-            local, domain = email.split("@", 1)
+            local, domain = email.rsplit("@", 1)
+
+            # Internationalized domain -> punycode before regex/DNS checks.
+            ascii_domain = self._to_ascii_domain(domain)
+            normalized = f"{local}@{ascii_domain}"
+
+            if not self.rfc_regex.match(normalized):
+                return {
+                    "valid": False,
+                    "error": "Invalid email format",
+                    "suggestions": self._generate_suggestions(email),
+                }
 
             # Length checks
             if len(local) > 64:
@@ -119,21 +227,19 @@ class AdvancedEmailValidator:
                     "suggestions": [],
                 }
 
-            if len(domain) > 253:
+            if len(ascii_domain) > 253:
                 return {
                     "valid": False,
                     "error": "Domain exceeds 253 characters",
                     "suggestions": [],
                 }
 
-            # Generate suggestions
-            suggestions = self._generate_suggestions(email)
-
             return {
                 "valid": True,
                 "local_part": local,
-                "domain": domain,
-                "suggestions": suggestions,
+                "domain": ascii_domain,
+                "unicode_domain": domain if ascii_domain != domain else None,
+                "suggestions": self._generate_suggestions(email),
             }
 
         except Exception as e:
@@ -146,13 +252,15 @@ class AdvancedEmailValidator:
     def _generate_suggestions(self, email: str) -> List[str]:
         """Generate email suggestions for common typos"""
         suggestions = []
-        local, domain = email.split("@", 1)
+        if "@" not in email:
+            return suggestions
+        local, domain = email.rsplit("@", 1)
 
-        # Common domain typos
         domain_suggestions = {
             "gmai.com": "gmail.com",
             "gmal.com": "gmail.com",
             "gamil.com": "gmail.com",
+            "gmial.com": "gmail.com",
             "hotmai.com": "hotmail.com",
             "hotmal.com": "hotmail.com",
             "outlok.com": "outlook.com",
@@ -163,66 +271,81 @@ class AdvancedEmailValidator:
         if domain in domain_suggestions:
             suggestions.append(f"{local}@{domain_suggestions[domain]}")
 
-        # Common TLD suggestions
-        if domain.endswith(".con"):
-            suggestions.append(f"{local}@{domain[:-4]}.com")
-        elif domain.endswith(".cmo"):
+        if domain.endswith(".con") or domain.endswith(".cmo"):
             suggestions.append(f"{local}@{domain[:-4]}.com")
 
         return suggestions
 
+    # -------------------------------------------------------------- DNS / MX
     def check_dns_mx(self, domain: str) -> Dict[str, Any]:
-        """Comprehensive DNS and MX validation"""
+        """DNS and MX validation with parallel lookups and caching."""
+        cache_key = f"dns:{domain}"
+        cached = self._get_cached(cache_key)
+        if cached is not None:
+            return cached
+
         try:
-            # A/AAAA records
-            a_records = []
-            aaaa_records = []
-            try:
-                a_records = [str(r) for r in dns.resolver.resolve(domain, "A")]
-            except Exception:
-                pass
+            resolver = _dns_resolver
 
-            try:
-                aaaa_records = [str(r) for r in dns.resolver.resolve(domain, "AAAA")]
-            except Exception:
-                pass
+            def resolve_a():
+                try:
+                    return [str(r) for r in resolver.resolve(domain, "A")]
+                except Exception:
+                    return []
 
-            # MX records with preference scoring
-            mx_records = []
-            try:
-                mx_response = dns.resolver.resolve(domain, "MX")
-                mx_records = [
-                    {
-                        "host": str(mx.exchange),
-                        "preference": mx.preference,
-                        "score": self._calculate_mx_score(str(mx.exchange)),
-                    }
-                    for mx in mx_response
-                ]
-                mx_records.sort(key=lambda x: x["preference"])
-            except Exception:
-                pass
+            def resolve_aaaa():
+                try:
+                    return [str(r) for r in resolver.resolve(domain, "AAAA")]
+                except Exception:
+                    return []
 
-            # CNAME fallback
-            cname_record = None
-            try:
-                cname_response = dns.resolver.resolve(domain, "CNAME")
-                cname_record = str(cname_response[0])
-            except Exception:
-                pass
+            def resolve_mx():
+                try:
+                    mx_response = resolver.resolve(domain, "MX")
+                    records = [
+                        {
+                            "host": str(mx.exchange).rstrip("."),
+                            "preference": mx.preference,
+                            "score": self._calculate_mx_score(str(mx.exchange)),
+                        }
+                        for mx in mx_response
+                    ]
+                    records.sort(key=lambda x: x["preference"])
+                    return records
+                except Exception:
+                    return []
 
-            # DNSSEC validation
-            dnssec_valid = False
-            try:
-                dns.resolver.resolve(domain, "A", want_dnssec=True)
-                dnssec_valid = True
-            except Exception:
-                pass
+            def resolve_cname():
+                try:
+                    cname_response = resolver.resolve(domain, "CNAME")
+                    return str(cname_response[0])
+                except Exception:
+                    return None
 
-            # Calculate DNS score
+            def resolve_dnssec():
+                # Presence of RRSIG records indicates the zone is DNSSEC-signed.
+                try:
+                    resolver.resolve(domain, "RRSIG")
+                    return True
+                except Exception:
+                    return False
+
+            with ThreadPoolExecutor(max_workers=5) as executor:
+                fut_a = executor.submit(resolve_a)
+                fut_aaaa = executor.submit(resolve_aaaa)
+                fut_mx = executor.submit(resolve_mx)
+                fut_cname = executor.submit(resolve_cname)
+                fut_dnssec = executor.submit(resolve_dnssec)
+
+                a_records = fut_a.result()
+                aaaa_records = fut_aaaa.result()
+                mx_records = fut_mx.result()
+                cname_record = fut_cname.result()
+                dnssec_valid = fut_dnssec.result()
+
             dns_score = self._calculate_dns_score(mx_records, a_records, dnssec_valid)
 
-            return {
+            result = {
                 "valid": len(mx_records) > 0 or len(a_records) > 0,
                 "a_records": a_records,
                 "aaaa_records": aaaa_records,
@@ -232,26 +355,20 @@ class AdvancedEmailValidator:
                 "score": dns_score,
             }
 
+            self._set_cached(cache_key, result)
+            return result
+
         except Exception as e:
             logger.error(f"DNS check error for {domain}: {str(e)}")
             return {"valid": False, "error": str(e), "score": 0}
 
     def _calculate_mx_score(self, mx_host: str) -> int:
-        """Calculate reputation score for MX host"""
         mx_lower = mx_host.lower()
-
-        if any(
-            provider in mx_lower
-            for provider in ["google", "outlook", "yahoo", "protonmail"]
-        ):
+        if any(p in mx_lower for p in ["google", "outlook", "yahoo", "protonmail"]):
             return 100
-        elif any(
-            provider in mx_lower for provider in ["amazon", "microsoft", "cloudflare"]
-        ):
+        elif any(p in mx_lower for p in ["amazon", "microsoft", "cloudflare"]):
             return 90
-        elif any(
-            provider in mx_lower for provider in ["godaddy", "namecheap", "hostgator"]
-        ):
+        elif any(p in mx_lower for p in ["godaddy", "namecheap", "hostgator"]):
             return 70
         else:
             return 50
@@ -259,36 +376,34 @@ class AdvancedEmailValidator:
     def _calculate_dns_score(
         self, mx_records: List[Dict], a_records: List[str], dnssec_valid: bool
     ) -> int:
-        """Calculate overall DNS score"""
         score = 0
-
         if mx_records:
             score += 40
             avg_mx_score = sum(mx["score"] for mx in mx_records) / len(mx_records)
             score += int(avg_mx_score * 0.3)
-
         if a_records:
             score += 20
-
         if dnssec_valid:
             score += 10
-
         return min(score, 100)
 
+    # ------------------------------------------------------------------ SMTP
     def smtp_handshake(
         self, email: str, domain: str, mx_records: List[Dict]
     ) -> Dict[str, Any]:
-        """Advanced SMTP handshake with catch-all detection"""
-        if not mx_records:
-            return {
-                "valid": False,
-                "error": "No MX records available",
-                "catch_all": False,
-                "greylisting": False,
-            }
+        """SMTP RCPT-TO probe.
 
+        Crucially distinguishes a *definitive* mailbox rejection (the server
+        said "user unknown") from an *indeterminate* result (port 25 blocked,
+        timeout, greylisting, ambiguous code). Only definitive rejections
+        should count against the address — an unreachable probe is an infra
+        signal about us, not about the email.
+
+        `status` is one of: deliverable | undeliverable | unknown | skipped
+        """
         results = {
             "valid": False,
+            "status": "unknown",
             "catch_all": False,
             "greylisting": False,
             "ndr_patterns": [],
@@ -296,152 +411,197 @@ class AdvancedEmailValidator:
             "errors": [],
         }
 
-        # Test with multiple MX servers
+        if not self.smtp_enabled:
+            results["status"] = "skipped"
+            return results
+
+        if not mx_records:
+            results["status"] = "unknown"
+            results["error"] = "No MX records available"
+            return results
+
+        connection_succeeded = False
+
         for mx in mx_records[:2]:
             mx_host = mx["host"]
-
+            server = None
             try:
-                server = smtplib.SMTP(timeout=10)
+                server = smtplib.SMTP(timeout=self.smtp_timeout)
                 server.connect(mx_host, 25)
-                server.helo("validation.example.com")
-                server.mail("validation@example.com")
+                connection_succeeded = True
+                server.helo(self.smtp_helo_host)
 
+                if self.smtp_use_starttls and server.has_extn("starttls"):
+                    try:
+                        server.starttls()
+                        server.helo(self.smtp_helo_host)
+                    except Exception:
+                        pass  # fall back to plaintext probe
+
+                server.mail(self.smtp_mail_from)
                 code, message = server.rcpt(email)
+                message_str = message.decode("utf-8", errors="ignore")
                 results["response_codes"].append(
-                    {
-                        "mx": mx_host,
-                        "code": code,
-                        "message": message.decode("utf-8", errors="ignore"),
-                    }
+                    {"mx": mx_host, "code": code, "message": message_str}
                 )
 
-                if code == 250:
+                if code in (250, 251):
                     results["valid"] = True
-                elif code == 450:
-                    results["greylisting"] = True
-                elif code in [550, 553, 554]:
-                    message_str = message.decode("utf-8", errors="ignore").lower()
+                    results["status"] = "deliverable"
+                elif code in (450, 451, 452, 421):
+                    # Temporary failure / greylisting — indeterminate.
+                    results["greylisting"] = code == 450
+                    results["status"] = "unknown"
+                elif code in (550, 551, 553, 554):
+                    lowered = message_str.lower()
                     if any(
-                        pattern in message_str
-                        for pattern in [
+                        p in lowered
+                        for p in [
                             "user unknown",
+                            "no such user",
                             "mailbox not found",
+                            "mailbox unavailable",
                             "does not exist",
+                            "recipient rejected",
+                            "invalid recipient",
+                            "address rejected",
                         ]
                     ):
-                        results["ndr_patterns"].append(message_str)
+                        results["ndr_patterns"].append(lowered)
+                        results["status"] = "undeliverable"
+                    else:
+                        # Policy block / anti-spam refusal — not proof the
+                        # mailbox is missing.
+                        results["status"] = "unknown"
+                else:
+                    results["status"] = "unknown"
 
-                server.quit()
+                try:
+                    server.quit()
+                except Exception:
+                    pass
 
+                # Stop after the first server that gave us a definitive answer.
+                if results["status"] in ("deliverable", "undeliverable"):
+                    break
+
+            except (socket.timeout, ConnectionRefusedError, OSError) as e:
+                results["errors"].append(f"MX {mx_host}: {str(e)}")
+                if server is not None:
+                    try:
+                        server.close()
+                    except Exception:
+                        pass
+                continue
             except Exception as e:
                 results["errors"].append(f"MX {mx_host}: {str(e)}")
                 continue
 
-        # Catch-all detection
-        if results["valid"]:
+        if not connection_succeeded:
+            # Couldn't reach any MX on port 25 (commonly blocked on cloud
+            # hosts). Report unknown rather than penalizing the address.
+            results["status"] = "unknown"
+            results["error"] = "SMTP port 25 unreachable from this host"
+
+        # Catch-all detection only when the mailbox itself looked deliverable.
+        if results["status"] == "deliverable":
             results["catch_all"] = self._detect_catch_all(domain, mx_records)
 
         return results
 
     def _detect_catch_all(self, domain: str, mx_records: List[Dict]) -> bool:
-        """Detect catch-all domains"""
+        """Detect catch-all domains with a single random-address probe."""
         if not mx_records:
             return False
 
-        test_emails = [
-            f"test-{int(time.time())}@{domain}",
-            f"nonexistent-{hash(domain)}@{domain}",
-            f"invalid-{int(time.time() * 1000)}@{domain}",
-        ]
-
-        accepted_count = 0
-
-        for test_email in test_emails:
-            try:
-                mx_host = mx_records[0]["host"]
-                server = smtplib.SMTP(timeout=10)
-                server.connect(mx_host, 25)
-                server.helo("validation.example.com")
-                server.mail("validation@example.com")
-
-                code, _ = server.rcpt(test_email)
-                server.quit()
-
-                if code == 250:
-                    accepted_count += 1
-
-            except Exception:
-                continue
-
-        return accepted_count >= len(test_emails) * 0.5
-
-    def check_domain_reputation(self, domain: str) -> Dict[str, Any]:
-        """Domain reputation analysis"""
+        test_email = f"xq7z9k-{int(time.time())}@{domain}"
+        server = None
         try:
-            # Check if disposable
-            is_disposable = domain.lower() in self.disposable_domains
+            mx_host = mx_records[0]["host"]
+            server = smtplib.SMTP(timeout=self.smtp_timeout)
+            server.connect(mx_host, 25)
+            server.helo(self.smtp_helo_host)
+            if self.smtp_use_starttls and server.has_extn("starttls"):
+                try:
+                    server.starttls()
+                    server.helo(self.smtp_helo_host)
+                except Exception:
+                    pass
+            server.mail(self.smtp_mail_from)
+            code, _ = server.rcpt(test_email)
+            return code in (250, 251)
+        except Exception:
+            return False
+        finally:
+            if server is not None:
+                try:
+                    server.quit()
+                except Exception:
+                    try:
+                        server.close()
+                    except Exception:
+                        pass
 
-            # Check TLD risk
-            tld_risk = any(domain.endswith(tld) for tld in self.risky_tlds)
+    # ------------------------------------------------------------ reputation
+    def check_domain_reputation(self, domain: str) -> Dict[str, Any]:
+        """Domain reputation analysis with caching."""
+        cache_key = f"rep:{domain}"
+        cached = self._get_cached(cache_key)
+        if cached is not None:
+            return cached
 
-            # Check if corporate provider
-            is_corporate = domain.lower() in self.corporate_providers
+        try:
+            domain_lower = domain.lower()
+            is_disposable = domain_lower in self.disposable_domains
+            tld_risk = any(domain_lower.endswith(tld) for tld in self.risky_tlds)
+            is_free_provider = domain_lower in self.free_providers
+            spam_trap_risk = self._detect_spam_trap_patterns(domain_lower)
 
-            # Spam trap detection
-            spam_trap_risk = self._detect_spam_trap_patterns(domain)
-
-            # Calculate reputation score
             reputation_score = self._calculate_reputation_score(
-                is_disposable, tld_risk, is_corporate, spam_trap_risk
+                is_disposable, tld_risk, is_free_provider, spam_trap_risk
             )
 
-            return {
+            result = {
                 "is_disposable": is_disposable,
                 "tld_risk": tld_risk,
-                "is_corporate": is_corporate,
+                # Backward-compatible key; now means "known major provider".
+                "is_corporate": is_free_provider,
+                "is_free_provider": is_free_provider,
                 "spam_trap_risk": spam_trap_risk,
                 "reputation_score": reputation_score,
                 "risk_level": self._get_risk_level(reputation_score),
             }
+            self._set_cached(cache_key, result)
+            return result
 
         except Exception as e:
             logger.error(f"Domain reputation check error for {domain}: {str(e)}")
             return {"error": str(e), "reputation_score": 0, "risk_level": "unknown"}
 
     def _detect_spam_trap_patterns(self, domain: str) -> float:
-        """Detect potential spam trap patterns"""
-        domain_lower = domain.lower()
-        risk_score = 0.0
-
-        for pattern in self.spam_trap_patterns:
-            if re.search(pattern, domain_lower):
-                risk_score += 0.2
-
-        return min(risk_score, 1.0)
+        """Whole-word spam-trap indicator detection (no substring false hits)."""
+        matches = set(self._spam_trap_regex.findall(domain))
+        return min(len(matches) * 0.3, 1.0)
 
     def _calculate_reputation_score(
         self,
         is_disposable: bool,
         tld_risk: bool,
-        is_corporate: bool,
+        is_free_provider: bool,
         spam_trap_risk: float,
     ) -> int:
-        """Calculate domain reputation score"""
         score = 100
-
         if is_disposable:
             score -= 80
         if tld_risk:
             score -= 30
-        if is_corporate:
+        if is_free_provider:
             score += 20
         if spam_trap_risk > 0.5:
             score -= 40
-
         return max(0, min(100, score))
 
     def _get_risk_level(self, score: int) -> str:
-        """Convert score to risk level"""
         if score >= 80:
             return "low"
         elif score >= 50:
@@ -449,21 +609,16 @@ class AdvancedEmailValidator:
         else:
             return "high"
 
+    # ------------------------------------------------------------------ role
     def detect_role_based(self, local_part: str) -> Dict[str, Any]:
-        """Role-based email detection"""
         local_lower = local_part.lower()
-
         detected_roles = []
         role_score = 0
-
         for role_name, pattern in self.role_patterns.items():
             if re.match(pattern, local_lower):
                 detected_roles.append(role_name)
                 role_score += 1
-
-        # Check for plus addressing
         has_plus_alias = "+" in local_part
-
         return {
             "is_role_based": len(detected_roles) > 0,
             "detected_roles": detected_roles,
@@ -474,10 +629,10 @@ class AdvancedEmailValidator:
             ),
         }
 
+    # ------------------------------------------------------------ risk score
     def calculate_risk_score(
         self, validation_results: Dict[str, Any]
     ) -> Dict[str, Any]:
-        """Calculate comprehensive risk score"""
         score = 100
         deductions = []
         explanations = []
@@ -491,7 +646,6 @@ class AdvancedEmailValidator:
         # DNS/MX validation
         dns_result = validation_results.get("dns", {})
         mx_records = dns_result.get("mx_records", [])
-        
         if not dns_result.get("valid", False):
             score -= 50
             deductions.append("No valid DNS records")
@@ -507,13 +661,18 @@ class AdvancedEmailValidator:
                 deductions.append("Low DNS reputation")
                 explanations.append("Domain has poor mail server reputation")
 
-        # SMTP validation
+        # SMTP validation — only penalize a *definitive* rejection. An
+        # unknown/skipped probe (port 25 blocked, greylisting, timeout) must
+        # not drag the score down for an infra reason.
         smtp_result = validation_results.get("smtp", {})
-        if not smtp_result.get("valid", False):
-            # Higher penalty - if SMTP explicitly fails, it's a strong signal
-            score -= 35
-            deductions.append("SMTP validation failed")
-            explanations.append("Email address does not exist on mail server")
+        smtp_status = smtp_result.get("status", "unknown")
+        if smtp_status == "undeliverable":
+            score -= 40
+            deductions.append("Mailbox does not exist")
+            explanations.append("Mail server rejected the recipient (user unknown)")
+        elif smtp_status == "deliverable":
+            # Confirmed mailbox — small confidence bump.
+            score = min(100, score + 5)
 
         # Domain reputation
         reputation = validation_results.get("reputation", {})
@@ -521,12 +680,10 @@ class AdvancedEmailValidator:
             score -= 40
             deductions.append("Disposable email domain")
             explanations.append("Domain is known for temporary/disposable emails")
-
         if reputation.get("tld_risk", False):
             score -= 20
             deductions.append("High-risk TLD")
             explanations.append("Top-level domain has poor reputation")
-
         if reputation.get("spam_trap_risk", 0) > 0.5:
             score -= 30
             deductions.append("Potential spam trap")
@@ -551,10 +708,8 @@ class AdvancedEmailValidator:
             deductions.append("Catch-all domain")
             explanations.append("Domain accepts all email addresses")
 
-        # Final score
         score = max(0, min(100, score))
 
-        # Determine verdict
         if score >= 80:
             verdict = "Valid"
         elif score >= 50:
@@ -571,6 +726,7 @@ class AdvancedEmailValidator:
             "explanations": explanations,
         }
 
+    # -------------------------------------------------------------- pipeline
     def validate_email(self, email: str) -> ValidationResult:
         """Complete email validation pipeline"""
         start_time = time.time()
@@ -596,24 +752,21 @@ class AdvancedEmailValidator:
             dns_result = self.check_dns_mx(domain)
 
             # Step 3: SMTP handshake
-            smtp_result = {}
             mx_records = dns_result.get("mx_records", [])
             a_records = dns_result.get("a_records", [])
-            
             if mx_records:
-                # Use MX records (preferred)
                 smtp_result = self.smtp_handshake(email, domain, mx_records)
             elif a_records:
-                # Fallback to A record as MX (RFC 5321)
+                # Fallback to A record as implicit MX (RFC 5321 §5.1).
                 smtp_result = self.smtp_handshake(
-                    email, 
-                    domain, 
-                    [{"host": domain, "preference": 0, "score": 30}]
+                    email,
+                    domain,
+                    [{"host": domain, "preference": 0, "score": 30}],
                 )
             else:
-                # No DNS records at all
                 smtp_result = {
                     "valid": False,
+                    "status": "unknown",
                     "error": "No DNS or MX records available",
                     "catch_all": False,
                     "greylisting": False,
@@ -633,10 +786,9 @@ class AdvancedEmailValidator:
                 "reputation": reputation_result,
                 "role_based": role_result,
             }
-
             risk_result = self.calculate_risk_score(validation_results)
 
-            # Generate warnings
+            # Warnings
             warnings = []
             if reputation_result.get("is_disposable", False):
                 warnings.append("Disposable email domain detected")
@@ -646,6 +798,10 @@ class AdvancedEmailValidator:
                 warnings.append("Catch-all domain detected")
             if reputation_result.get("spam_trap_risk", 0) > 0.5:
                 warnings.append("Potential spam trap detected")
+            if smtp_result.get("status") == "unknown":
+                warnings.append(
+                    "Mailbox could not be verified via SMTP (probe inconclusive)"
+                )
 
             return ValidationResult(
                 is_valid=risk_result["score"] >= 50,

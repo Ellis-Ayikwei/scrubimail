@@ -1,11 +1,74 @@
 import requests
 import json
+import logging
+import uuid
 from django.conf import settings
 from django.utils import timezone
 from datetime import datetime, timedelta
-from decimal import Decimal
+from decimal import Decimal, ROUND_HALF_UP
 from .models import BillingProfile, CreditTransaction, Subscription
+from .fx_rates import get_usd_to_ghs_rate
 from apps.plan.models import Plan
+
+logger = logging.getLogger(__name__)
+
+
+def _to_paystack_minor_units(amount):
+    """Major currency units → smallest unit (kobo, pesewas, cents, etc.)."""
+    d = Decimal(str(amount))
+    return int((d * 100).to_integral_value(rounding=ROUND_HALF_UP))
+
+
+def resolve_paystack_plan_charge(plan):
+    """
+    Map catalog Plan (e.g. USD in DB) to (amount_major, currency) for Paystack.
+
+    - If PAYSTACK_CHARGE_CURRENCY matches plan.currency: no conversion.
+    - If plan is USD and charge currency is GHS: amount = price * live rate (CurrencyFreaks,
+      cached) with PAYSTACK_FX_BUFFER, else PAYSTACK_FX_USD_TO_GHS fallback.
+
+    When Paystack enables USD: set PAYSTACK_CHARGE_CURRENCY=USD and keep Plan.currency=USD.
+    """
+    charge_ccy = (getattr(settings, "PAYSTACK_CHARGE_CURRENCY", None) or "").strip().upper()
+    if not charge_ccy:
+        charge_ccy = (plan.currency or "USD").upper()
+
+    plan_ccy = (plan.currency or "USD").strip().upper()
+    price = Decimal(str(plan.price))
+
+    if charge_ccy == plan_ccy:
+        amount = price
+    elif plan_ccy == "USD" and charge_ccy == "GHS":
+        rate = get_usd_to_ghs_rate()
+        if rate is None or rate <= 0:
+            raise ValueError(
+                "Could not resolve USD→GHS rate: set CURRENCYFREAKS_API_KEY or a positive "
+                "PAYSTACK_FX_USD_TO_GHS fallback."
+            )
+        amount = (price * rate).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+        logger.info(
+            "Paystack plan pricing: USD %s → GHS %s (rate=%s, plan=%s)",
+            price,
+            amount,
+            rate,
+            plan.name,
+        )
+    else:
+        raise ValueError(
+            f"No Paystack FX rule from catalog currency {plan_ccy} to "
+            f"PAYSTACK_CHARGE_CURRENCY={charge_ccy}. Align Plan.currency with "
+            "PAYSTACK_CHARGE_CURRENCY or extend resolve_paystack_plan_charge()."
+        )
+
+    if charge_ccy == "GHS":
+        min_ghs = Decimal(str(getattr(settings, "PAYSTACK_MIN_GHS_MAJOR", "2.00")))
+        if amount < min_ghs:
+            raise ValueError(
+                f"Converted charge {amount} GHS is below Paystack minimum {min_ghs} GHS "
+                f"(plan={plan.name}). Raise the USD price, FX buffer/rate, or fallback."
+            )
+
+    return amount, charge_ccy
 
 
 class PaystackService:
@@ -38,11 +101,17 @@ class PaystackService:
         }
 
         response = requests.post(url, headers=self.headers, json=data)
-        if response.status_code == 201:
-            customer_data = response.json()["data"]
-            return customer_data
-        else:
-            raise Exception(f"Failed to create customer: {response.text}")
+        try:
+            payload = response.json()
+        except ValueError as e:
+            raise Exception(f"Invalid Paystack response: {response.text}") from e
+
+        # Paystack may return 200 (e.g. existing customer) or 201; trust JSON status + data
+        if response.status_code in (200, 201) and payload.get("status") and payload.get(
+            "data"
+        ):
+            return payload["data"]
+        raise Exception(f"Failed to create customer: {response.text}")
 
     def initialize_transaction(
         self, email, amount, reference, callback_url=None, metadata=None
@@ -63,6 +132,73 @@ class PaystackService:
         else:
             raise Exception(f"Failed to initialize transaction: {response.text}")
 
+    def initialize_subscription_checkout(
+        self,
+        email,
+        plan_code,
+        reference,
+        callback_url=None,
+        metadata=None,
+        customer_code=None,
+        amount_minor=None,
+    ):
+        """
+        Start a subscription for a customer who has no saved card yet.
+
+        Paystack POST /subscription requires an existing authorization; this uses
+        POST /transaction/initialize with ``plan`` so the user pays on authorization_url
+        and Paystack creates the subscription after success (see webhooks).
+        """
+        url = f"{self.base_url}/transaction/initialize"
+        data = {
+            "email": email,
+            "plan": plan_code,
+            "reference": reference,
+        }
+        if callback_url:
+            data["callback_url"] = callback_url
+        if metadata:
+            data["metadata"] = metadata
+        if customer_code:
+            data["customer"] = customer_code
+        if amount_minor is not None:
+            data["amount"] = amount_minor
+
+        response = requests.post(url, headers=self.headers, json=data)
+        try:
+            payload = response.json()
+        except ValueError as e:
+            raise Exception(f"Invalid Paystack response: {response.text}") from e
+        if response.status_code == 200 and payload.get("status") and payload.get(
+            "data"
+        ):
+            return payload["data"]
+        raise Exception(
+            f"Failed to initialize subscription checkout: {response.text}"
+        )
+
+    def initialize_payment(
+        self,
+        email,
+        amount,
+        metadata=None,
+        reference=None,
+    ):
+        """One-off Paystack checkout (e.g. credit packages)."""
+        ref = reference or f"pkg_{uuid.uuid4().hex[:20]}"
+        callback_url = getattr(settings, "PAYMENT_SUCCESS_URL", None) or (
+            f"{getattr(settings, 'FRONTEND_URL', '')}/billing/payment/success"
+        )
+        amt = float(amount) if isinstance(amount, Decimal) else amount
+        data = self.initialize_transaction(
+            email, amt, ref, callback_url=callback_url, metadata=metadata or {}
+        )
+        return {
+            "authorization_url": data.get("authorization_url"),
+            "access_code": data.get("access_code"),
+            "reference": data.get("reference") or ref,
+        }
+
     def verify_transaction(self, reference):
         """Verify a payment transaction"""
         url = f"{self.base_url}/transaction/verify/{reference}"
@@ -73,21 +209,37 @@ class PaystackService:
         else:
             raise Exception(f"Failed to verify transaction: {response.text}")
 
-    def create_plan(self, name, amount, interval, description=None):
-        """Create a subscription plan"""
+    def create_plan(
+        self, name, amount, interval, description=None, currency=None
+    ):
+        """Create a subscription plan. Amount is in major units; currency must match the plan."""
+        minor = _to_paystack_minor_units(amount)
+        if minor <= 0:
+            raise ValueError(
+                "Plan price must be greater than zero to create a Paystack plan."
+            )
+        currency = currency or getattr(
+            settings, "PAYSTACK_CHARGE_CURRENCY", None
+        ) or getattr(settings, "PAYSTACK_CURRENCY", "NGN")
         url = f"{self.base_url}/plan"
         data = {
             "name": name,
-            "amount": int(amount * 100),  # Convert to kobo
-            "interval": interval,  # daily, weekly, monthly, yearly
+            "amount": minor,
+            "interval": interval,
             "description": description or f"ScrubiMail {name} Plan",
+            "currency": currency,
         }
 
         response = requests.post(url, headers=self.headers, json=data)
-        if response.status_code == 201:
-            return response.json()["data"]
-        else:
-            raise Exception(f"Failed to create plan: {response.text}")
+        try:
+            payload = response.json()
+        except ValueError as e:
+            raise Exception(f"Invalid Paystack response: {response.text}") from e
+        if response.status_code in (200, 201) and payload.get("status") and payload.get(
+            "data"
+        ):
+            return payload["data"]
+        raise Exception(f"Failed to create plan: {response.text}")
 
     def create_subscription(self, customer_id, plan_code, start_date=None):
         """Create a subscription for a customer"""
@@ -189,11 +341,14 @@ class BillingService:
         reference = f"credits_{user.id}_{timezone.now().timestamp()}"
 
         # Initialize Paystack transaction
+        success_cb = getattr(settings, "PAYMENT_SUCCESS_URL", None) or (
+            f"{settings.FRONTEND_URL}/billing/payment/success"
+        )
         transaction_data = self.paystack.initialize_transaction(
             email=user.email,
             amount=amount,
             reference=reference,
-            callback_url=f"{settings.FRONTEND_URL}/billing?success=1",
+            callback_url=success_cb,
             metadata={
                 "user_id": str(user.id),
                 "credits": credits,
@@ -208,7 +363,13 @@ class BillingService:
         }
 
     def initialize_plan_upgrade(self, user, plan):
-        """Initialize plan upgrade"""
+        """
+        Initialize plan upgrade: ensure Paystack customer + plan exist, then open checkout.
+
+        Uses transaction/initialize + ``plan`` so the user can add a card; Paystack
+        rejects POST /subscription without a saved authorization (no_active_authorizations).
+        After payment, subscription.create webhook updates the billing profile.
+        """
         profile = self.get_or_create_billing_profile(user)
 
         # Create Paystack customer if not exists
@@ -217,61 +378,158 @@ class BillingService:
             profile.paystack_customer_id = customer_data["customer_code"]
             profile.save()
 
-        # Create or get Paystack plan
+        # Create or get Paystack plan (amount/currency may differ from DB when FX is applied)
         if not plan.paystack_plan_code:
+            charge_amount, charge_currency = resolve_paystack_plan_charge(plan)
             paystack_plan = self.paystack.create_plan(
                 name=plan.name,
-                amount=plan.price,
+                amount=charge_amount,
                 interval="monthly",
                 description=plan.description,
+                currency=charge_currency,
             )
             plan.paystack_plan_code = paystack_plan["plan_code"]
             plan.save()
 
-        # Create subscription
-        subscription_data = self.paystack.create_subscription(
-            customer_id=profile.paystack_customer_id, plan_code=plan.paystack_plan_code
+        charge_amount, _charge_currency = resolve_paystack_plan_charge(plan)
+        amount_minor = _to_paystack_minor_units(charge_amount)
+        reference = f"planup_{user.id}_{uuid.uuid4().hex[:16]}"
+
+        checkout = self.paystack.initialize_subscription_checkout(
+            email=user.email,
+            plan_code=plan.paystack_plan_code,
+            reference=reference,
+            callback_url=getattr(settings, "PAYMENT_SUCCESS_URL", None)
+            or f"{getattr(settings, 'FRONTEND_URL', '')}/billing/payment/success",
+            metadata={
+                "user_id": str(user.id),
+                "plan_id": str(plan.id),
+                "type": "plan_upgrade",
+            },
+            customer_code=profile.paystack_customer_id,
+            amount_minor=amount_minor,
         )
 
         return {
-            "subscription_id": subscription_data["subscription_code"],
-            "authorization_url": subscription_data["authorization_url"],
+            "authorization_url": checkout["authorization_url"],
+            "access_code": checkout.get("access_code"),
+            "reference": reference,
+            "subscription_pending": True,
         }
 
-    def handle_payment_verification(self, reference):
-        """Handle payment verification after successful payment"""
+    def handle_payment_verification(self, reference, user):
+        """
+        Verify a Paystack transaction server-side and apply fulfillment when safe.
+
+        Returns a dict: ok, message, payment_type, paystack_status.
+        Always checks metadata.user_id matches ``user`` before mutating data.
+        """
+        out = {
+            "ok": False,
+            "message": "",
+            "payment_type": None,
+            "paystack_status": None,
+        }
+        if not reference:
+            out["message"] = "Reference is required"
+            return out
+        if user is None or not getattr(user, "is_authenticated", False):
+            out["message"] = "Authentication required"
+            return out
+
         try:
             transaction_data = self.paystack.verify_transaction(reference)
-
-            if transaction_data["status"] == "success":
-                metadata = transaction_data.get("metadata", {})
-                user_id = metadata.get("user_id")
-                credits = metadata.get("credits", 0)
-                transaction_type = metadata.get("type", "credit_purchase")
-
-                if user_id and credits:
-                    from django.contrib.auth import get_user_model
-
-                    User = get_user_model()
-                    user = User.objects.get(id=user_id)
-                    profile = self.get_or_create_billing_profile(user)
-
-                    if transaction_type == "credit_purchase":
-                        profile.add_credits(
-                            amount=credits,
-                            description=f"Credit purchase - {credits} credits",
-                            payment_reference=reference,
-                        )
-                        profile.total_amount_spent += Decimal(
-                            str(transaction_data["amount"] / 100)
-                        )
-                        profile.save()
-
-                    return True
-            return False
         except Exception as e:
-            print(f"Payment verification error: {e}")
-            return False
+            logger.exception("Paystack verify failed reference=%s", reference)
+            out["message"] = str(e)
+            return out
+
+        paystack_status = transaction_data.get("status")
+        out["paystack_status"] = paystack_status
+        if paystack_status != "success":
+            out["message"] = "Transaction was not successful"
+            return out
+
+        metadata = transaction_data.get("metadata") or {}
+        if not isinstance(metadata, dict):
+            metadata = {}
+
+        uid = metadata.get("user_id")
+        if uid is None or str(uid) != str(user.id):
+            out["message"] = "This payment is not linked to your account"
+            return out
+
+        trans_type = (metadata.get("type") or "").strip() or "credit_purchase"
+
+        if trans_type == "credit_package":
+            from .models import CreditPackagePurchase
+
+            out["payment_type"] = "credit_package"
+            purchase_id = metadata.get("purchase_id")
+            if not purchase_id:
+                out["message"] = "Missing purchase reference in payment metadata"
+                return out
+            try:
+                purchase = CreditPackagePurchase.objects.select_related(
+                    "package", "billing_profile"
+                ).get(id=purchase_id, user=user)
+            except CreditPackagePurchase.DoesNotExist:
+                out["message"] = "Purchase record not found"
+                return out
+            if purchase.status == "pending":
+                purchase.complete_purchase()
+                out["message"] = "Payment verified. Credits have been added to your account."
+            else:
+                out["message"] = "Payment was already applied to your account."
+            out["ok"] = True
+            return out
+
+        if trans_type == "plan_upgrade":
+            out["payment_type"] = "plan_upgrade"
+            out["ok"] = True
+            out["message"] = (
+                "Payment confirmed with Paystack. If your plan has not updated yet, "
+                "wait a moment and open Billing again — subscription activation is usually automatic."
+            )
+            return out
+
+        if trans_type == "credit_purchase":
+            out["payment_type"] = "credit_purchase"
+            try:
+                credits = int(metadata.get("credits") or 0)
+            except (TypeError, ValueError):
+                credits = 0
+            if credits <= 0:
+                out["message"] = "Invalid or missing credit amount in transaction"
+                return out
+            profile = self.get_or_create_billing_profile(user)
+            if CreditTransaction.objects.filter(
+                billing_profile=profile, paystack_payment_reference=reference
+            ).exists():
+                out["ok"] = True
+                out["message"] = "Payment was already applied to your account."
+                return out
+            profile.add_credits(
+                amount=credits,
+                description=f"Credit purchase - {credits} credits",
+                payment_reference=reference,
+            )
+            try:
+                amt_major = Decimal(str(transaction_data.get("amount", 0))) / Decimal(
+                    "100"
+                )
+            except Exception:
+                amt_major = Decimal("0")
+            profile.total_amount_spent += amt_major
+            profile.save(update_fields=["total_amount_spent"])
+            out["ok"] = True
+            out["message"] = "Payment verified. Credits have been added to your account."
+            return out
+
+        out["payment_type"] = trans_type
+        out["ok"] = True
+        out["message"] = "Payment confirmed with Paystack."
+        return out
 
     def handle_subscription_webhook(self, event_data):
         """Handle subscription webhook events"""

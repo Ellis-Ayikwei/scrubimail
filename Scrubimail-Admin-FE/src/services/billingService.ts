@@ -317,6 +317,7 @@ class BillingService {
    * NOTE: This endpoint may need to be created in the backend
    */
   async createPromoCode(data: Partial<PromoCode>): Promise<PromoCode> {
+    console.log("data", data);
     try {
       const response = await axiosInstance.post('/promo-codes/', data);
       return response.data.promo_code || response.data;
@@ -356,15 +357,16 @@ class BillingService {
   // ========== Invoices ==========
 
   /**
-   * Get invoices with filters
+   * Get all invoices via admin endpoint (all users).
+   * Falls back to user-scoped /invoices/ if admin endpoint fails.
    */
-  async getInvoices(filters?: any): Promise<Invoice[]> {
+  async getInvoices(filters?: any): Promise<any> {
     try {
-      const response = await axiosInstance.get('/invoices/', {
+      const response = await axiosInstance.get('/admin/invoices/', {
         params: filters
       });
-      // Backend returns { success: true, invoices: [...] }
-      return response.data.invoices || response.data;
+      // Admin endpoint returns { results: [...], stats: {...}, ... }
+      return response.data;
     } catch (error: any) {
       console.error('Error fetching invoices:', error);
       throw new Error(error.response?.data?.detail || 'Failed to load invoices');
@@ -414,15 +416,14 @@ class BillingService {
   }
 
   /**
-   * Update invoice status (Admin only)
-   * NOTE: This endpoint may need to be created in the backend
+   * Update invoice status via admin endpoint
    */
   async updateInvoiceStatus(id: string, status: string): Promise<Invoice> {
     try {
-      const response = await axiosInstance.patch(`/invoices/${id}/`, {
+      const response = await axiosInstance.patch(`/admin/invoices/${id}/`, {
         status
       });
-      return response.data.invoice || response.data;
+      return response.data;
     } catch (error: any) {
       console.error('Error updating invoice status:', error);
       throw new Error(error.response?.data?.detail || 'Failed to update invoice status');

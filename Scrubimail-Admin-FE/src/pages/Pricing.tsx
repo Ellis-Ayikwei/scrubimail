@@ -297,7 +297,7 @@ const Pricing: React.FC = () => {
                 </div>
 
                 <Link
-                  to={tier.id === 'enterprise' ? '/contact' : '/onboarding'}
+                  to={tier.id === 'enterprise' ? '/contact' : '/register'}
                   className={`w-full inline-flex items-center justify-center px-6 py-3 rounded-3xl font-medium transition-all duration-200 ${
                     tier.buttonVariant === 'primary'
                       ? 'bg-[#2ED8A3] text-white hover:bg-[#00C48C] shadow-lg hover:shadow-xl'
@@ -420,7 +420,7 @@ const Pricing: React.FC = () => {
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <Link
-              to="/onboarding"
+              to="/register"
               className="inline-flex items-center px-8 py-4 bg-white text-[#2ED8A3] font-semibold rounded-3xl hover:bg-gray-50 transition-colors shadow-lg"
             >
               Start free trial

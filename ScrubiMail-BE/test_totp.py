@@ -107,8 +107,11 @@ def test_trusted_device():
         # Create a test trusted device
         device_id = "test-device-123"
         device_fingerprint = "test-fingerprint-abc123"
-        salt = "test-salt"
-        fp_hash = hashlib.sha256((salt + device_fingerprint).encode()).hexdigest()
+        from django.conf import settings as dj_settings
+
+        fp_hash = hashlib.sha256(
+            (dj_settings.SECRET_KEY + device_fingerprint).encode()
+        ).hexdigest()
 
         trusted_device, created = TrustedDevice.objects.update_or_create(
             user=user,

@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useDispatch } from 'react-redux';
-import { 
-  Mail, 
-  Lock, 
-  Shield, 
-  ArrowLeft, 
-  Loader2, 
+import {
+  Mail,
+  Lock,
+  Shield,
+  ArrowLeft,
+  Loader2,
   AlertCircle,
   CheckCircle,
   Eye,
@@ -15,7 +15,8 @@ import {
   Github,
   Chrome,
   Gitlab,
-  Home
+  Home,
+  Zap
 } from 'lucide-react';
 import { LoginUser } from '../../store/authSlice';
 import { showMessage } from '../../utils/notifications';
@@ -41,7 +42,7 @@ const MultiStepLogin: React.FC = () => {
   const [password, setPassword] = useState('');
   const [totpToken, setTotpToken] = useState('');
   const [backupCode, setBackupCode] = useState('');
-  const [rememberMe, setRememberMe] = useState(false);
+  const [rememberMe, setRememberMe] = useState(localStorage.getItem('trustDevice') === 'true' ? true : false);
   const [showPassword, setShowPassword] = useState(false);
   const [showTotpToken, setShowTotpToken] = useState(false);
   const [showBackupCode, setShowBackupCode] = useState(false);
@@ -212,6 +213,9 @@ const MultiStepLogin: React.FC = () => {
         useBackupCode ? backupCode : undefined, 
         rememberMe); 
 
+        console.log("the response....", response);
+        console.log("the response data....", response.status);
+
 
       if (response.status === 200 || response.status === 201) {
         console.log("the response....", response);
@@ -226,7 +230,15 @@ const MultiStepLogin: React.FC = () => {
         setError(response.data?.detail || 'Login failed. Please check your credentials.');
       }
     } catch (err: any) {
-      setError('Network error. Please try again.');
+      const serverData = err.response?.data;
+      const message =
+        serverData?.detail ||
+        serverData?.message ||
+        serverData?.error ||
+        (typeof serverData === 'string' ? serverData : null) ||
+        err.message ||
+        'Login failed. Please check your credentials and try again.';
+      setError(message);
     } finally {
       setLoading(false);
     }
@@ -319,407 +331,280 @@ const MultiStepLogin: React.FC = () => {
     setTotpToken('');
     setBackupCode('');
   };
+  
+
+  const handleRememberMe = (value: boolean) => {
+    setRememberMe(value);
+    localStorage.setItem('trustDevice', value.toString());
+  };
 
   return (
-    <div className="min-h-screen flex flex-col bg-[#F4F5F7] dark:bg-gray-900 relative overflow-hidden">
-      {/* Background Mail Icon */}
-      <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-        <Mail 
-          className="w-[900px] h-[900px] md:w-[1200px] md:h-[1200px] lg:w-[1500px] lg:h-[1500px] text-primary/5 dark:text-primary/10"
-          strokeWidth={1}
-        />
-      </div>
+    <div
+      className="min-h-screen relative overflow-hidden flex flex-col items-center justify-center p-6"
+      style={{
+        backgroundColor: '#101418',
+        backgroundImage: 'radial-gradient(rgba(0,229,160,0.12) 0.5px, transparent 0.5px)',
+        backgroundSize: '32px 32px',
+        fontFamily: 'Inter, sans-serif',
+      }}
+    >
+      {/* Radial aura */}
+      <div className="absolute inset-0 pointer-events-none" style={{ background: 'radial-gradient(circle at 50% -10%, rgba(0,229,160,0.10) 0%, transparent 60%)' }} />
 
-      {/* Home Button */}
-      <Link 
-        to="/" 
-        className="fixed top-4 left-4 z-50 flex items-center gap-2 px-4 py-2 bg-white dark:bg-gray-800 rounded-lg shadow-md hover:shadow-lg transition-shadow border border-gray-200 dark:border-gray-700"
-      >
-        <Home className="w-4 h-4 text-[#333333] dark:text-white" />
-        <span className="text-sm font-medium text-[#333333] dark:text-white">Home</span>
-      </Link>
+      {/* Floating corner decorations */}
+      <pre className="fixed bottom-8 left-8 opacity-[0.07] pointer-events-none hidden lg:block font-mono text-[9px] text-[#6effc0] leading-relaxed">
+{`{
+  "scrub_action": "sanitize",
+  "priority": "high",
+  "status": "waiting_auth..."
+}`}
+      </pre>
+      <pre className="fixed top-20 right-10 opacity-[0.07] pointer-events-none hidden lg:block font-mono text-[9px] text-[#6effc0] leading-relaxed">
+{`$ sc-auth --verify
+Connecting to scrubi-terminal-1...
+[OK] Protocol v2.4.1`}
+      </pre>
 
-      <div className="flex-1 flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8 relative z-10">
-        <div className="max-w-md w-full space-y-8">
-        {/* Header */}
-        <div className="text-center">
-          <div className="flex justify-center mb-6">
-            <Link to="/" className="flex items-center">
-              <img 
-                src="/assets/images/scrubi mail full.png" 
-                alt="Scrubimail Logo" 
-                className="h-12 md:h-12 w-auto"
-              />
-            </Link>
-          </div>
-          <h2 className="mt-6 text-3xl font-bold text-[#333333] dark:text-white">
+      <div className="relative z-10 w-full max-w-md">
+        {/* Brand */}
+        <div className="text-center mb-8">
+          <Link to="/" className="inline-flex items-center gap-2 mb-5">
+            <div className="w-8 h-8 bg-[#6effc0] flex items-center justify-center rounded-sm">
+              <Zap className="w-4 h-4 text-[#003824]" strokeWidth={2.5} />
+            </div>
+            <span className="font-['Epilogue',sans-serif] font-black tracking-tighter text-[#6effc0] text-xl">Scrubi</span>
+          </Link>
+          <h1 className="font-['Epilogue',sans-serif] font-bold text-[#e0e3e8] text-2xl tracking-tight mb-1">
             {steps[currentStep].title}
-          </h2>
-          <p className="mt-2 text-sm text-[#333333]/70 dark:text-gray-400">
-            {steps[currentStep].description}
+          </h1>
+          <p className="font-['Space_Grotesk',sans-serif] uppercase tracking-[0.2em] text-[9px] text-[#3b4a41]">
+            Terminal Session Access
           </p>
         </div>
 
-        {/* Progress Indicator */}
-        {/* <div className="flex items-center justify-center space-x-4">
-          <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
-            currentStep === 'credentials' ? 'bg-primary text-white' : 
-            currentStep === 'totp' ? 'bg-primary text-white' : 'bg-green-500 text-white'
-          }`}>
-            {currentStep === 'credentials' ? '1' : currentStep === 'totp' ? '2' : <CheckCircle className="w-5 h-5" />}
-          </div>
-          <div className={`w-16 h-1 ${currentStep === 'totp' || currentStep === 'success' ? 'bg-primary' : 'bg-gray-300'}`}></div>
-          <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
-            currentStep === 'totp' ? 'bg-primary text-white' : 
-            currentStep === 'success' ? 'bg-green-500 text-white' : 'bg-gray-300 text-gray-500'
-          }`}>
-            {currentStep === 'totp' ? '2' : currentStep === 'success' ? <CheckCircle className="w-5 h-5" /> : '2'}
-          </div>
-        </div> */}
-
-        {/* Login Form */}
-        <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl border border-gray-200 dark:border-gray-700 p-8">
-           {/* SSO Providers */}
-           <div className="mb-6">
-            <div className="flex justify-center space-x-3">
-              {ssoProviders.map((provider) => {
-                const IconComponent = provider.icon;
-                return (
-                  <button
-                    key={provider.id}
-                    onClick={() => handleSSO(provider.id)}
-                    disabled={loading}
-                    className={`flex-1 p-3 rounded-lg border-2 transition-all duration-200 ${provider.color} ${provider.textColor} hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed`}
-                  >
-                    <div className="flex items-center justify-center space-x-2">
-                      <IconComponent className="w-4 h-4" />
-                      <span className="text-sm font-medium">{provider.name}</span>
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
+        {/* Card */}
+        <div className="bg-[#181c20] border border-[#3b4a41]/20 rounded-sm shadow-2xl overflow-hidden">
+          {/* Terminal chrome bar */}
+          <div className="h-1 bg-[#31353a] flex items-center px-3 gap-1">
+            <div className="w-1.5 h-1.5 rounded-full bg-[#3b4a41]/50" />
+            <div className="w-1.5 h-1.5 rounded-full bg-[#3b4a41]/50" />
+            <div className="w-1.5 h-1.5 rounded-full bg-[#3b4a41]/50" />
           </div>
 
-          {/* Divider */}
-          <div className="relative mb-6">
-            <div className="absolute inset-0 flex items-center">
-              <div className="w-full border-t border-gray-300 dark:border-gray-600" />
-            </div>
-            <div className="relative flex justify-center text-sm">
-              <span className="px-2 bg-white dark:bg-gray-800 text-[#333333]/70 dark:text-gray-400">
-                Or continue with email
-              </span>
-            </div>
-          </div>
-          
-          {currentStep === 'credentials' && (
-            <form className="space-y-6" onSubmit={handleCredentialsSubmit}>
-              {/* Email Field */}
-              <div>
-                <label htmlFor="email" className="block text-sm font-medium text-[#333333] dark:text-gray-300 mb-2">
-                  Email address
-                </label>
-                <div className="relative">
-                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                    <Mail className="h-5 w-5 text-[#333333]/50" />
-                  </div>
-                  <input
-                    id="email"
-                    name="email"
-                    type="email"
-                    autoComplete="email"
-                    required
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    className="w-full pl-10 pr-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent bg-white dark:bg-gray-700 text-[#333333] dark:text-white placeholder-[#333333]/50 dark:placeholder-gray-400 transition-colors duration-200"
-                    placeholder="Enter your email"
-                  />
+          <div className="p-8">
+            {/* SSO — credentials step only */}
+            {currentStep === 'credentials' && (
+              <>
+                <div className="grid grid-cols-2 gap-3 mb-6">
+                  {ssoProviders.map((provider) => {
+                    const IconComponent = provider.icon;
+                    return (
+                      <button
+                        key={provider.id}
+                        onClick={() => handleSSO(provider.id)}
+                        disabled={!!loading}
+                        className="flex items-center justify-center gap-2 px-4 py-2.5 bg-[#1c2024] border border-[#3b4a41]/30 rounded-sm hover:border-[#6effc0]/40 hover:text-[#6effc0] transition-all text-[#bacbbf] disabled:opacity-40"
+                      >
+                        {ssoLoading === provider.id ? (
+                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        ) : (
+                          <IconComponent className="w-3.5 h-3.5" />
+                        )}
+                        <span className="font-mono text-[10px] uppercase tracking-[0.1em]">{provider.name}</span>
+                      </button>
+                    );
+                  })}
                 </div>
-              </div>
 
-              {/* Password Field */}
-              <div>
-                <label htmlFor="password" className="block text-sm font-medium text-[#333333] dark:text-gray-300 mb-2">
-                  Password
-                </label>
-                <div className="relative">
-                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                    <Lock className="h-5 w-5 text-[#333333]/50" />
+                <div className="relative mb-6">
+                  <div className="absolute inset-0 flex items-center">
+                    <div className="w-full border-t border-[#3b4a41]/30" />
                   </div>
-                  <input
-                    id="password"
-                    name="password"
-                    type={showPassword ? 'text' : 'password'}
-                    autoComplete="current-password"
-                    required
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    className="w-full pl-10 pr-12 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent bg-white dark:bg-gray-700 text-[#333333] dark:text-white placeholder-[#333333]/50 dark:placeholder-gray-400 transition-colors duration-200"
-                    placeholder="Enter your password"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="absolute inset-y-0 right-0 pr-3 flex items-center"
-                  >
-                    {showPassword ? (
-                      <EyeOff className="h-5 w-5 text-[#333333]/50 hover:text-[#333333]/70" />
-                    ) : (
-                      <Eye className="h-5 w-5 text-[#333333]/50 hover:text-[#333333]/70" />
-                    )}
-                  </button>
+                  <div className="relative flex justify-center">
+                    <span className="px-3 bg-[#181c20] font-['Space_Grotesk',sans-serif] uppercase tracking-[0.2em] text-[9px] text-[#3b4a41]">
+                      Or continue with email
+                    </span>
+                  </div>
                 </div>
-              </div>
+              </>
+            )}
 
-              {/* Remember Me */}
-              <div className="flex items-center justify-between">
-                <div className="flex items-center">
+            {/* Error */}
+            {error && (
+              <div className="bg-[#ff4c4c]/10 border border-[#ff4c4c]/30 rounded-sm p-3 flex items-center gap-2 text-[#ff4c4c] font-mono text-xs mb-5">
+                <AlertCircle className="w-3.5 h-3.5 flex-shrink-0" />
+                {error}
+              </div>
+            )}
+
+            {/* Step: Credentials */}
+            {currentStep === 'credentials' && (
+              <form onSubmit={handleCredentialsSubmit} className="space-y-4">
+                <div>
+                  <label className="block font-['Space_Grotesk',sans-serif] uppercase tracking-[0.1em] text-[9px] text-[#bacbbf] mb-1.5">Email Address</label>
+                  <div className="relative">
+                    <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-[#3b4a41]" />
+                    <input
+                      type="email"
+                      required
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      placeholder="dev@scrubi.io"
+                      className="bg-[#101418] border border-[#3b4a41]/40 rounded-sm pl-9 pr-3 py-2.5 text-[#e0e3e8] font-mono text-sm focus:border-[#6effc0]/50 focus:outline-none w-full placeholder-[#3b4a41]"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label className="font-['Space_Grotesk',sans-serif] uppercase tracking-[0.1em] text-[9px] text-[#bacbbf]">Password</label>
+                    <a href="/forgot-password" className="font-['Space_Grotesk',sans-serif] uppercase tracking-[0.1em] text-[9px] text-[#6effc0] hover:underline">Forgot?</a>
+                  </div>
+                  <div className="relative">
+                    <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-[#3b4a41]" />
+                    <input
+                      type={showPassword ? 'text' : 'password'}
+                      required
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      placeholder="••••••••"
+                      className="bg-[#101418] border border-[#3b4a41]/40 rounded-sm pl-9 pr-10 py-2.5 text-[#e0e3e8] font-mono text-sm focus:border-[#6effc0]/50 focus:outline-none w-full placeholder-[#3b4a41]"
+                    />
+                    <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-[#3b4a41] hover:text-[#6effc0]">
+                      {showPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                    </button>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2">
                   <input
-                    id="remember-me"
-                    name="remember-me"
+                    id="remember"
                     type="checkbox"
                     checked={rememberMe}
-                    onChange={(e) => setRememberMe(e.target.checked)}
-                    className="h-4 w-4 text-primary focus:ring-primary border-gray-300 rounded"
+                    onChange={(e) => handleRememberMe(e.target.checked)}
+                    className="w-3.5 h-3.5 rounded-sm border-[#3b4a41] bg-[#101418] accent-[#6effc0]"
                   />
-                  <label htmlFor="remember-me" className="ml-2 block text-sm text-[#333333] dark:text-gray-300">
-                    Remember this device
+                  <label htmlFor="remember" className="font-['Space_Grotesk',sans-serif] uppercase tracking-[0.1em] text-[9px] text-[#3b4a41]">
+                    Keep session alive
                   </label>
                 </div>
-              </div>
 
-              {/* Error Display */}
-              {error && (
-                <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4">
-                  <div className="flex items-center">
-                    <AlertCircle className="w-5 h-5 text-red-600 dark:text-red-400 mr-3" />
-                    <p className="text-sm text-red-700 dark:text-red-300">{error}</p>
-                  </div>
-                </div>
-              )}
-
-              {/* Submit Button */}
-              <div>
                 <button
                   type="submit"
                   disabled={loading}
-                  className="group relative w-full flex justify-center py-3 px-4 border border-transparent text-sm font-medium rounded-lg text-white bg-primary hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 shadow-sm"
+                  className="w-full bg-[#6effc0] text-[#003824] font-mono text-[10px] uppercase tracking-[0.2em] font-bold py-3 rounded-sm hover:brightness-105 transition-all disabled:opacity-40 flex items-center justify-center gap-2 mt-2"
+                  style={{ boxShadow: '0 8px 24px rgba(110,255,192,0.12)' }}
                 >
-                  {loading ? (
-                    <div className="flex items-center">
-                      <Loader2 className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" />
-                      Signing in...
-                    </div>
-                  ) : (
-                    'Sign in'
-                  )}
+                  {loading ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Authenticating...</> : 'Sign In'}
                 </button>
-              </div>
+              </form>
+            )}
 
-             
-
-              {/* SSO Loading State */}
-              {ssoLoading && (
-                <div className="text-center">
-                  <p className="text-sm text-gray-600 dark:text-gray-400">
-                    Redirecting to {ssoLoading}...
-                  </p>
+            {/* Step: TOTP */}
+            {currentStep === 'totp' && (
+              <form onSubmit={handle2FASubmit} className="space-y-5">
+                {/* Method toggle */}
+                <div className="flex bg-[#101418] p-0.5 rounded-sm border border-[#3b4a41]/30">
+                  <button
+                    type="button"
+                    onClick={() => setUseBackupCode(false)}
+                    className={`flex-1 py-2 font-mono text-[10px] uppercase tracking-[0.1em] transition-all rounded-sm flex items-center justify-center gap-1.5 ${!useBackupCode ? 'bg-[#6effc0]/15 text-[#6effc0] border border-[#6effc0]/20' : 'text-[#bacbbf]/50 hover:text-[#bacbbf]'}`}
+                  >
+                    <Smartphone className="w-3 h-3" /> Authenticator
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setUseBackupCode(true)}
+                    className={`flex-1 py-2 font-mono text-[10px] uppercase tracking-[0.1em] transition-all rounded-sm flex items-center justify-center gap-1.5 ${useBackupCode ? 'bg-[#6effc0]/15 text-[#6effc0] border border-[#6effc0]/20' : 'text-[#bacbbf]/50 hover:text-[#bacbbf]'}`}
+                  >
+                    <Shield className="w-3 h-3" /> Backup Code
+                  </button>
                 </div>
-              )}
-            </form>
-          )}
 
-          {currentStep === 'totp' && (
-            <form className="space-y-6" onSubmit={handle2FASubmit}>
-              {/* 2FA Method Toggle */}
-              <div className="flex items-center justify-center space-x-4">
-                <button
-                  type="button"
-                  onClick={() => setUseBackupCode(false)}
-                  className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                    !useBackupCode
-                      ? 'bg-primary text-white'
-                      : 'bg-gray-200 dark:bg-gray-600 text-gray-700 dark:text-gray-300'
-                  }`}
-                >
-                  <Smartphone className="w-4 h-4 inline mr-2" />
-                  Authenticator App
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setUseBackupCode(true)}
-                  className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                    useBackupCode
-                      ? 'bg-primary text-white'
-                      : 'bg-gray-200 dark:bg-gray-600 text-gray-700 dark:text-gray-300'
-                  }`}
-                >
-                  <Shield className="w-4 h-4 inline mr-2" />
-                  Backup Code
-                </button>
-              </div>
-
-              {/* TOTP Token Input */}
-              {!useBackupCode && (
-                <div>
-                  <label htmlFor="totpToken" className="block text-sm font-medium text-[#333333] dark:text-gray-300 mb-2">
-                    Enter 6-digit code from your authenticator app
-                  </label>
-                  <div className="relative">
-                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                      <Shield className="h-5 w-5 text-[#333333]/50" />
-                    </div>
+                {!useBackupCode ? (
+                  <div>
+                    <label className="block font-['Space_Grotesk',sans-serif] uppercase tracking-[0.1em] text-[9px] text-[#bacbbf] mb-1.5">6-Digit Code</label>
                     <input
-                      id="totpToken"
-                      name="totpToken"
                       type={showTotpToken ? 'text' : 'password'}
-                      autoComplete="off"
                       required
                       value={totpToken}
                       onChange={(e) => setTotpToken(e.target.value.replace(/\D/g, '').slice(0, 6))}
-                      className="w-full pl-10 pr-12 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent bg-white dark:bg-gray-700 text-[#333333] dark:text-white placeholder-[#333333]/50 dark:placeholder-gray-400 transition-colors duration-200 text-center text-2xl tracking-widest"
                       placeholder="000000"
                       maxLength={6}
+                      className="bg-[#101418] border border-[#3b4a41]/40 rounded-sm px-3 py-3 text-[#6effc0] font-mono text-2xl text-center tracking-[0.5em] focus:border-[#6effc0]/50 focus:outline-none w-full placeholder-[#3b4a41]"
                     />
-                    <button
-                      type="button"
-                      onClick={() => setShowTotpToken(!showTotpToken)}
-                      className="absolute inset-y-0 right-0 pr-3 flex items-center"
-                    >
-                      {showTotpToken ? (
-                        <EyeOff className="h-5 w-5 text-[#333333]/50 hover:text-[#333333]/70" />
-                      ) : (
-                        <Eye className="h-5 w-5 text-[#333333]/50 hover:text-[#333333]/70" />
-                      )}
-                    </button>
                   </div>
-                </div>
-              )}
-
-              {/* Backup Code Input */}
-              {useBackupCode && (
-                <div>
-                  <label htmlFor="backupCode" className="block text-sm font-medium text-[#333333] dark:text-gray-300 mb-2">
-                    Enter your backup code
-                  </label>
-                  <div className="relative">
-                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                      <Shield className="h-5 w-5 text-[#333333]/50" />
+                ) : (
+                  <div>
+                    <label className="block font-['Space_Grotesk',sans-serif] uppercase tracking-[0.1em] text-[9px] text-[#bacbbf] mb-1.5">Backup Code</label>
+                    <div className="relative">
+                      <input
+                        type={showBackupCode ? 'text' : 'password'}
+                        required
+                        value={backupCode}
+                        onChange={(e) => setBackupCode(e.target.value.toUpperCase())}
+                        placeholder="XXXX-XXXX"
+                        className="bg-[#101418] border border-[#3b4a41]/40 rounded-sm px-3 py-2.5 pr-10 text-[#e0e3e8] font-mono text-sm tracking-[0.2em] focus:border-[#6effc0]/50 focus:outline-none w-full placeholder-[#3b4a41]"
+                      />
+                      <button type="button" onClick={() => setShowBackupCode(!showBackupCode)} className="absolute right-3 top-1/2 -translate-y-1/2 text-[#3b4a41] hover:text-[#6effc0]">
+                        {showBackupCode ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                      </button>
                     </div>
-                    <input
-                      id="backupCode"
-                      name="backupCode"
-                      type={showBackupCode ? 'text' : 'password'}
-                      autoComplete="off"
-                      required
-                      value={backupCode}
-                      onChange={(e) => setBackupCode(e.target.value.toUpperCase())}
-                      className="w-full pl-10 pr-12 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent bg-white dark:bg-gray-700 text-[#333333] dark:text-white placeholder-[#333333]/50 dark:placeholder-gray-400 transition-colors duration-200"
-                      placeholder="Enter backup code"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowBackupCode(!showBackupCode)}
-                      className="absolute inset-y-0 right-0 pr-3 flex items-center"
-                    >
-                      {showBackupCode ? (
-                        <EyeOff className="h-5 w-5 text-[#333333]/50 hover:text-[#333333]/70" />
-                      ) : (
-                        <Eye className="h-5 w-5 text-[#333333]/50 hover:text-[#333333]/70" />
-                      )}
-                    </button>
                   </div>
-                </div>
-              )}
+                )}
 
-              {/* Error Display */}
-              {error && (
-                <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4">
-                  <div className="flex items-center">
-                    <AlertCircle className="w-5 h-5 text-red-600 dark:text-red-400 mr-3" />
-                    <p className="text-sm text-red-700 dark:text-red-300">{error}</p>
-                  </div>
-                </div>
-              )}
-
-              {/* Action Buttons */}
-              <div className="space-y-3">
                 <button
                   type="submit"
                   disabled={loading || (!useBackupCode && totpToken.length !== 6) || (useBackupCode && !backupCode)}
-                  className="w-full flex justify-center py-3 px-4 border border-transparent text-sm font-medium rounded-lg text-white bg-primary hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 shadow-sm"
+                  className="w-full bg-[#6effc0] text-[#003824] font-mono text-[10px] uppercase tracking-[0.2em] font-bold py-3 rounded-sm hover:brightness-105 transition-all disabled:opacity-40 flex items-center justify-center gap-2"
+                  style={{ boxShadow: '0 8px 24px rgba(110,255,192,0.12)' }}
                 >
-                  {loading ? (
-                    <div className="flex items-center">
-                      <Loader2 className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" />
-                      Verifying...
-                    </div>
-                  ) : (
-                    'Verify & Sign In'
-                  )}
+                  {loading ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Verifying...</> : 'Verify & Sign In'}
                 </button>
-
-                <button
-                  type="button"
-                  onClick={goBack}
-                  className="w-full flex justify-center items-center py-3 px-4 border border-gray-300 dark:border-gray-600 text-sm font-medium rounded-lg text-[#333333] dark:text-white bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary transition-all duration-200"
-                >
-                  <ArrowLeft className="w-4 h-4 mr-2" />
-                  Back to credentials
+                <button type="button" onClick={goBack} className="w-full border border-[#3b4a41]/40 text-[#bacbbf] font-mono text-[10px] uppercase tracking-[0.1em] py-2.5 rounded-sm hover:border-[#6effc0]/40 hover:text-[#6effc0] transition-all flex items-center justify-center gap-2">
+                  <ArrowLeft className="w-3.5 h-3.5" /> Back to credentials
                 </button>
-              </div>
-            </form>
-          )}
+              </form>
+            )}
 
-          {currentStep === 'success' && (
-            <div className="text-center space-y-6">
-              <div className="w-16 h-16 bg-green-100 dark:bg-green-900 rounded-full flex items-center justify-center mx-auto">
-                <CheckCircle className="w-8 h-8 text-green-600 dark:text-green-400" />
+            {/* Step: Success */}
+            {currentStep === 'success' && (
+              <div className="text-center space-y-5 py-4">
+                <div className="w-14 h-14 bg-[#6effc0]/10 border border-[#6effc0]/20 rounded-sm flex items-center justify-center mx-auto">
+                  <CheckCircle className="w-7 h-7 text-[#6effc0]" />
+                </div>
+                <div>
+                  <p className="font-['Epilogue',sans-serif] font-bold text-[#e0e3e8] text-lg mb-1">Authentication Complete</p>
+                  <p className="font-mono text-xs text-[#bacbbf]/60">Redirecting to dashboard...</p>
+                </div>
+                <div className="flex items-center justify-center gap-2">
+                  <Loader2 className="w-4 h-4 animate-spin text-[#6effc0]" />
+                  <span className="font-mono text-xs text-[#3b4a41]">Establishing session...</span>
+                </div>
               </div>
-              <div>
-                <h3 className="text-lg font-semibold text-[#333333] dark:text-white">
-                  Welcome back!
-                </h3>
-                <p className="text-sm text-[#333333]/70 dark:text-gray-400 mt-2">
-                  You have successfully signed in to your account.
-                </p>
-              </div>
-              <div className="flex items-center justify-center">
-                <Loader2 className="animate-spin h-5 w-5 text-primary mr-2" />
-                <span className="text-sm text-[#333333]/70 dark:text-gray-400">
-                  Redirecting to dashboard...
-                </span>
-              </div>
-            </div>
-          )}
+            )}
+          </div>
         </div>
 
-        {/* Footer Links */}
+        {/* Footer links */}
         {currentStep === 'credentials' && (
-          <div className="text-center space-y-4">
-            <div className="flex items-center justify-center space-x-4 text-sm">
-              <a
-                href="/forgot-password"
-                className="text-primary hover:text-primary/80 dark:text-primary dark:hover:text-primary/80"
-              >
-                Forgot your password?
-              </a>
-              <span className="text-[#333333]/50 dark:text-gray-400">•</span>
-              <a
-                href="/register"
-                className="text-primary hover:text-primary/80 dark:text-primary dark:hover:text-primary/80"
-              >
-                Create an account
-              </a>
-            </div>
+          <div className="text-center mt-6 space-x-4 font-mono text-[10px] uppercase tracking-[0.1em]">
+            <a href="/forgot-password" className="text-[#3b4a41] hover:text-[#6effc0] transition-colors">Forgot Password</a>
+            <span className="text-[#3b4a41]">·</span>
+            <a href="/register" className="text-[#3b4a41] hover:text-[#6effc0] transition-colors">Create Account</a>
           </div>
         )}
+
+        {/* Status bar */}
+        <div className="mt-8 flex items-center justify-center gap-6 font-mono text-[9px] uppercase tracking-[0.2em] text-[#3b4a41]">
+          {[['Auth Service', 'Active'], ['SSL', 'Encrypted'], ['Region', 'US-EAST-1']].map(([k, v]) => (
+            <div key={k} className="flex items-center gap-1.5">
+              <span className="w-1 h-1 rounded-full bg-[#6effc0]" />
+              {k}: {v}
+            </div>
+          ))}
         </div>
       </div>
-      
-      {/* Thin Footer */}
-      <AuthFooter />
     </div>
   );
 };

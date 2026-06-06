@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<link href="https://fonts.googleapis.com/css2?family=Epilogue:wght@400;700;900&amp;family=Inter:wght@300;400;500;600&amp;family=Space+Grotesk:wght@300;400;500;700&amp;family=IBM+Plex+Mono:wght@400;500&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "tertiary-fixed": "#e2e2e2",
+                        "surface-container": "#1c2024",
+                        "secondary": "#c2c7d0",
+                        "on-primary": "#003824",
+                        "surface-container-lowest": "#0a0f13",
+                        "secondary-fixed": "#dee2ec",
+                        "secondary-container": "#42474f",
+                        "tertiary": "#e5e5e5",
+                        "secondary-fixed-dim": "#c2c7d0",
+                        "on-primary-fixed-variant": "#005236",
+                        "primary": "#6effc0",
+                        "surface-container-low": "#181c20",
+                        "on-secondary-fixed": "#171c23",
+                        "on-primary-container": "#006141",
+                        "error-container": "#93000a",
+                        "tertiary-fixed-dim": "#c6c6c7",
+                        "surface-container-high": "#262a2f",
+                        "error": "#ffb4ab",
+                        "on-surface": "#e0e3e8",
+                        "surface-variant": "#31353a",
+                        "tertiary-container": "#c9c9c9",
+                        "primary-fixed-dim": "#00e29e",
+                        "on-secondary": "#2c3138",
+                        "surface-container-highest": "#31353a",
+                        "on-error-container": "#ffdad6",
+                        "on-background": "#e0e3e8",
+                        "inverse-primary": "#006c49",
+                        "on-tertiary-fixed-variant": "#454747",
+                        "inverse-surface": "#e0e3e8",
+                        "surface-dim": "#101418",
+                        "outline-variant": "#3b4a41",
+                        "background": "#101418",
+                        "on-secondary-container": "#b1b5bf",
+                        "outline": "#84958a",
+                        "surface": "#101418",
+                        "on-error": "#690005",
+                        "surface-bright": "#353a3e",
+                        "on-tertiary": "#2f3131",
+                        "on-surface-variant": "#bacbbf",
+                        "primary-container": "#00e5a0",
+                        "on-secondary-fixed-variant": "#42474f",
+                        "surface-tint": "#00e29e",
+                        "inverse-on-surface": "#2d3135",
+                        "on-tertiary-fixed": "#1a1c1c",
+                        "on-primary-fixed": "#002114",
+                        "primary-fixed": "#47ffb8",
+                        "on-tertiary-container": "#535455"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.125rem",
+                        "lg": "0.25rem",
+                        "xl": "0.5rem",
+                        "full": "0.75rem"
+                    },
+                    "fontFamily": {
+                        "headline": ["Epilogue"],
+                        "body": ["Inter"],
+                        "label": ["Space Grotesk"],
+                        "mono": ["IBM Plex Mono"]
+                    }
+                },
+            },
+        }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        body {
+            background-color: #080C10;
+            color: #e0e3e8;
+            font-family: 'Inter', sans-serif;
+        }
+        .code-block {
+            font-family: 'IBM Plex Mono', monospace;
+        }
+        .glass-nav {
+            background: rgba(8, 12, 16, 0.7);
+            backdrop-filter: blur(20px);
+        }
+        ::-webkit-scrollbar {
+            width: 4px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #080C10;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #3b4a41;
+        }
+    </style>
+</head>
+<body class="bg-surface-dim selection:bg-primary/30">
+<!-- TopNavBar -->
+<nav class="fixed top-0 w-full z-50 flex justify-between items-center px-6 h-16 w-full border-b border-[#3b4a41]/15 bg-[#080C10]/70 backdrop-blur-xl">
+<div class="flex items-center gap-8">
+<span class="text-xl font-black tracking-tighter text-[#00E5A0] font-['Epilogue']">SCRUBI_SYS</span>
+<div class="hidden md:flex items-center gap-6">
+<a class="text-[#00E5A0] font-bold border-b-2 border-[#00E5A0] font-['Epilogue'] tracking-tight hover:text-[#6effc0] transition-colors duration-200" href="#">Documentation</a>
+<a class="text-slate-400 font-medium font-['Epilogue'] tracking-tight hover:text-[#6effc0] transition-colors duration-200" href="#">API Reference</a>
+<a class="text-slate-400 font-medium font-['Epilogue'] tracking-tight hover:text-[#6effc0] transition-colors duration-200" href="#">Changelog</a>
+</div>
+</div>
+<div class="flex items-center gap-4">
+<div class="relative hidden sm:block">
+<span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-sm">search</span>
+<input class="bg-surface-container-low border-none text-[11px] font-label uppercase tracking-widest pl-10 pr-4 py-2 w-64 focus:ring-1 focus:ring-primary" placeholder="SEARCH_RESOURCES..." type="text"/>
+</div>
+<div class="flex items-center gap-3">
+<button class="p-2 text-slate-400 hover:text-primary transition-all active:opacity-80 active:scale-95">
+<span class="material-symbols-outlined">terminal</span>
+</button>
+<button class="p-2 text-slate-400 hover:text-primary transition-all active:opacity-80 active:scale-95">
+<span class="material-symbols-outlined">notifications</span>
+</button>
+<button class="p-2 text-slate-400 hover:text-primary transition-all active:opacity-80 active:scale-95">
+<span class="material-symbols-outlined">settings</span>
+</button>
+<div class="w-8 h-8 rounded-sm bg-surface-container-high border border-outline-variant/20 overflow-hidden ml-2">
+<img alt="Developer Profile" class="w-full h-full object-cover" data-alt="close-up portrait of a digital developer avatar with neon mint accents and technical aesthetic" src="https://lh3.googleusercontent.com/aida-public/AB6AXuA9lwHCSg0UsMsIY7whMOBK6SQMAR_GvaPfYEc6c38xA6MCB7d2kS3g__F-hDT00vxgHRpvnVVDgCVCs5Qg_p3yHscJuQrlAfZJ99WkBbmg3Oo78vqAD__QpaXTMIdvcUY58Xfauwsvisf1HN2A_kLz2bTiJBSbRNbfVFrKNZyh72FWMAcg9V01rqVmtE73mhy15D221bIxv18WgtVTrU0i2-2BufLZ3aJq3fMuYhwDvjy5GBqRTgcxnnSa3rPDMxzD85nDHP6PqT5M"/>
+</div>
+</div>
+</div>
+</nav>
+<!-- SideNavBar -->
+<aside class="h-screen w-64 fixed left-0 top-0 pt-20 flex flex-col border-r border-[#3b4a41]/15 bg-[#0D1117] z-40 hidden md:flex">
+<div class="px-4 mb-8">
+<div class="text-lg font-bold text-[#00E5A0] font-['Space_Grotesk'] uppercase tracking-[0.1em]">ENGINEER_CONSOLE</div>
+<div class="text-[10px] text-slate-500 font-label tracking-widest">v2.4.0_STABLE</div>
+</div>
+<nav class="flex-1 space-y-1">
+<a class="flex items-center gap-3 px-4 py-3 bg-[#181c20] text-[#00E5A0] border-r-2 border-[#00E5A0] font-['Space_Grotesk'] uppercase tracking-[0.1em] text-[11px] hover:bg-[#181c20] hover:text-[#6effc0] transition-all" href="#">
+<span class="material-symbols-outlined text-sm">description</span>
+                Documentation
+            </a>
+<a class="flex items-center gap-3 px-4 py-3 text-slate-500 hover:text-slate-200 font-['Space_Grotesk'] uppercase tracking-[0.1em] text-[11px] hover:bg-[#181c20] transition-all" href="#">
+<span class="material-symbols-outlined text-sm">key</span>
+                API Keys
+            </a>
+<a class="flex items-center gap-3 px-4 py-3 text-slate-500 hover:text-slate-200 font-['Space_Grotesk'] uppercase tracking-[0.1em] text-[11px] hover:bg-[#181c20] transition-all" href="#">
+<span class="material-symbols-outlined text-sm">history</span>
+                Validation Logs
+            </a>
+<a class="flex items-center gap-3 px-4 py-3 text-slate-500 hover:text-slate-200 font-['Space_Grotesk'] uppercase tracking-[0.1em] text-[11px] hover:bg-[#181c20] transition-all" href="#">
+<span class="material-symbols-outlined text-sm">payments</span>
+                Subscription
+            </a>
+<a class="flex items-center gap-3 px-4 py-3 text-slate-500 hover:text-slate-200 font-['Space_Grotesk'] uppercase tracking-[0.1em] text-[11px] hover:bg-[#181c20] transition-all" href="#">
+<span class="material-symbols-outlined text-sm">person</span>
+                Account
+            </a>
+</nav>
+<div class="mt-auto p-4 space-y-1 border-t border-outline-variant/10">
+<a class="flex items-center gap-3 px-2 py-2 text-slate-500 hover:text-slate-200 font-['Space_Grotesk'] uppercase tracking-[0.1em] text-[10px] transition-all" href="#">
+<span class="material-symbols-outlined text-sm">help_center</span>
+                Support
+            </a>
+<a class="flex items-center gap-3 px-2 py-2 text-slate-500 hover:text-slate-200 font-['Space_Grotesk'] uppercase tracking-[0.1em] text-[10px] transition-all" href="#">
+<span class="material-symbols-outlined text-sm">logout</span>
+                Sign Out
+            </a>
+</div>
+</aside>
+<!-- Main Content Canvas -->
+<main class="md:ml-64 pt-24 px-6 pb-12 lg:px-12 xl:px-24">
+<!-- Header Section -->
+<header class="mb-16 max-w-4xl">
+<div class="flex items-center gap-3 mb-4">
+<span class="px-2 py-0.5 bg-primary/10 text-primary text-[10px] font-label uppercase tracking-widest border border-primary/20">System Core</span>
+<span class="text-slate-500 text-[10px] font-label uppercase tracking-widest">Docs / API / Validation</span>
+</div>
+<h1 class="text-5xl md:text-6xl font-black font-headline tracking-tighter mb-6 leading-tight">
+                EMAIL_SCRUBBING <br/>
+<span class="text-primary">CORE_API</span>
+</h1>
+<p class="text-slate-400 text-lg leading-relaxed font-body max-w-2xl">
+                The Scrubi Core API provides high-precision email validation, MX record analysis, and deliverability scoring. Engineered for millisecond-latency and clinical accuracy.
+            </p>
+</header>
+<!-- API Content Layout -->
+<div class="grid grid-cols-1 lg:grid-cols-12 gap-12">
+<!-- Documentation Column -->
+<div class="lg:col-span-7 space-y-24">
+<!-- Section: Authentication -->
+<section id="auth">
+<h2 class="text-sm font-label uppercase tracking-[0.2em] text-primary mb-8 flex items-center gap-4">
+                        01 // Authentication
+                        <div class="h-px flex-1 bg-outline-variant/20"></div>
+</h2>
+<div class="space-y-6">
+<p class="text-on-surface/80 leading-relaxed">To authenticate your requests, include your API key in the <code class="bg-surface-container-high px-1.5 py-0.5 text-primary text-sm font-mono">X-API-KEY</code> header. Keep your keys secure; they grant full access to your scrubbing credits.</p>
+<div class="bg-surface-container-lowest p-6 border-l-2 border-primary">
+<h4 class="text-[11px] font-label text-slate-500 uppercase tracking-widest mb-2">Required Header</h4>
+<div class="font-mono text-sm text-primary">X-API-KEY: your_scrubimail_api_key...</div>
+</div>
+</div>
+</section>
+<!-- Section: Validation Endpoint -->
+<section id="validation">
+<h2 class="text-sm font-label uppercase tracking-[0.2em] text-primary mb-8 flex items-center gap-4">
+                        02 // Single Validation
+                        <div class="h-px flex-1 bg-outline-variant/20"></div>
+</h2>
+<div class="mb-10">
+<div class="flex items-center gap-4 mb-4">
+<span class="bg-primary-container text-on-primary-container px-3 py-1 font-mono text-xs font-bold">POST</span>
+<span class="font-mono text-slate-300">/v1/validate</span>
+</div>
+<p class="text-on-surface/80 mb-6">Performs a 12-point clinical scrub of a single email address. Checks syntax, DNS, SMTP, and disposable providers.</p>
+<h4 class="text-[11px] font-label text-slate-500 uppercase tracking-widest mb-4">Body Parameters</h4>
+<div class="space-y-4">
+<div class="grid grid-cols-3 py-3 border-b border-outline-variant/10">
+<span class="font-mono text-sm text-primary">email</span>
+<span class="text-xs text-slate-500 font-label uppercase">string (required)</span>
+<span class="text-xs text-slate-400">The target email address.</span>
+</div>
+<div class="grid grid-cols-3 py-3 border-b border-outline-variant/10">
+<span class="font-mono text-sm text-primary">strict_mode</span>
+<span class="text-xs text-slate-500 font-label uppercase">boolean</span>
+<span class="text-xs text-slate-400">Enable aggressive filtering.</span>
+</div>
+</div>
+</div>
+</section>
+<!-- Section: Batch Operations -->
+<section id="batch">
+<h2 class="text-sm font-label uppercase tracking-[0.2em] text-primary mb-8 flex items-center gap-4">
+                        03 // Batch Scrubbing
+                        <div class="h-px flex-1 bg-outline-variant/20"></div>
+</h2>
+<div class="p-8 bg-surface-container-low border border-outline-variant/10 relative overflow-hidden group">
+<div class="absolute top-0 right-0 p-4 opacity-10">
+<span class="material-symbols-outlined text-6xl">layers</span>
+</div>
+<h3 class="text-xl font-headline font-bold mb-4">High-Velocity Processing</h3>
+<p class="text-slate-400 text-sm mb-6 leading-relaxed">Submit up to 10,000 emails in a single array. The Scrubi engine distributes tasks across our node-clusters for concurrent validation.</p>
+<button class="bg-primary-container text-on-primary-container font-label text-[11px] px-6 py-2 uppercase tracking-widest hover:bg-primary transition-all">View Batch Guide</button>
+</div>
+</section>
+</div>
+<!-- Code & Response Column -->
+<div class="lg:col-span-5">
+<div class="sticky top-24 space-y-6">
+<!-- Code Terminal -->
+<div class="bg-surface-container-lowest rounded-sm overflow-hidden border border-outline-variant/10 shadow-2xl">
+<div class="bg-surface-container px-4 py-2 flex items-center justify-between border-b border-outline-variant/10">
+<div class="flex gap-1.5">
+<div class="w-2.5 h-2.5 rounded-full bg-outline-variant/30"></div>
+<div class="w-2.5 h-2.5 rounded-full bg-outline-variant/30"></div>
+<div class="w-2.5 h-2.5 rounded-full bg-outline-variant/30"></div>
+</div>
+<span class="text-[10px] font-mono text-slate-500">cURL / Node.js / Python</span>
+</div>
+<div class="p-6 overflow-x-auto">
+<pre class="text-sm font-mono leading-relaxed"><span class="text-primary">curl</span> -X POST https://api.scrubi.com/v1/validate \
+  -H <span class="text-secondary">"X-API-KEY: your_api_key"</span> \
+  -H <span class="text-secondary">"Content-Type: application/json"</span> \
+  -d <span class="text-secondary">'{
+    "email": "dev@scrubi.io",
+    "strict_mode": true
+  }'</span></pre>
+</div>
+</div>
+<!-- Response Preview -->
+<div class="bg-surface-container-lowest rounded-sm overflow-hidden border border-outline-variant/10">
+<div class="bg-surface-container px-4 py-2 flex items-center justify-between border-b border-outline-variant/10">
+<span class="text-[10px] font-mono text-primary uppercase tracking-widest">200 OK — Response Body</span>
+<span class="text-[10px] font-mono text-slate-500">142ms</span>
+</div>
+<div class="p-6">
+<pre class="text-sm font-mono leading-relaxed"><span class="text-slate-500">{</span>
+  <span class="text-primary">"status"</span>: <span class="text-secondary">"valid"</span>,
+  <span class="text-primary">"score"</span>: <span class="text-secondary">0.98</span>,
+  <span class="text-primary">"checks"</span>: <span class="text-slate-500">{</span>
+    <span class="text-primary">"syntax"</span>: <span class="text-secondary">true</span>,
+    <span class="text-primary">"mx_records"</span>: <span class="text-secondary">true</span>,
+    <span class="text-primary">"disposable"</span>: <span class="text-secondary">false</span>,
+    <span class="text-primary">"smtp_repro"</span>: <span class="text-secondary">"success"</span>
+  <span class="text-slate-500">}</span>,
+  <span class="text-primary">"suggestion"</span>: <span class="text-secondary">null</span>
+<span class="text-slate-500">}</span></pre>
+</div>
+</div>
+<!-- Visual Data Map (Extra Content) -->
+<div class="p-6 bg-surface-container-low border border-outline-variant/10 rounded-sm">
+<div class="flex items-center justify-between mb-4">
+<h4 class="text-[10px] font-label text-slate-500 uppercase tracking-widest">Validation Health</h4>
+<span class="text-primary text-xs font-mono">LIVE_FEED</span>
+</div>
+<div class="h-32 flex items-end gap-1">
+<div class="flex-1 bg-primary/20 h-[60%] border-t border-primary/40"></div>
+<div class="flex-1 bg-primary/20 h-[85%] border-t border-primary/40"></div>
+<div class="flex-1 bg-primary/20 h-[40%] border-t border-primary/40"></div>
+<div class="flex-1 bg-primary/20 h-[95%] border-t border-primary/40"></div>
+<div class="flex-1 bg-primary/20 h-[70%] border-t border-primary/40"></div>
+<div class="flex-1 bg-primary/20 h-[55%] border-t border-primary/40"></div>
+<div class="flex-1 bg-primary h-[80%] shadow-[0_0_15px_rgba(0,229,160,0.3)]"></div>
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- Footer / Editorial Ending -->
+<footer class="mt-32 pt-16 border-t border-outline-variant/10 flex flex-col md:flex-row justify-between items-start gap-12">
+<div>
+<div class="text-primary font-black tracking-tighter text-2xl mb-4 font-headline">SCRUBI_SYS</div>
+<p class="text-slate-500 text-sm max-w-xs font-body">Precision-tuned infrastructure for the modern communication stack. Built for engineers, by engineers.</p>
+</div>
+<div class="grid grid-cols-2 gap-16">
+<div>
+<h5 class="text-[10px] font-label text-slate-400 uppercase tracking-widest mb-4">Ecosystem</h5>
+<ul class="space-y-2 text-xs font-label uppercase text-slate-500">
+<li class="hover:text-primary cursor-pointer transition-colors">SDKs</li>
+<li class="hover:text-primary cursor-pointer transition-colors">Webhooks</li>
+<li class="hover:text-primary cursor-pointer transition-colors">CLI Tool</li>
+</ul>
+</div>
+<div>
+<h5 class="text-[10px] font-label text-slate-400 uppercase tracking-widest mb-4">Network</h5>
+<ul class="space-y-2 text-xs font-label uppercase text-slate-500">
+<li class="hover:text-primary cursor-pointer transition-colors">Status</li>
+<li class="hover:text-primary cursor-pointer transition-colors">Uptime</li>
+<li class="hover:text-primary cursor-pointer transition-colors">Latency</li>
+</ul>
+</div>
+</div>
+</footer>
+</main>
+<!-- FAB Suppression (Per instructions, hidden on Documentation/Details) -->
+</body></html>

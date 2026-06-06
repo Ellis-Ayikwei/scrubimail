@@ -1,5 +1,6 @@
 from django.shortcuts import redirect
 from django.conf import settings
+from django.core.exceptions import ObjectDoesNotExist
 from django.contrib.auth import login
 from django.http import JsonResponse
 from rest_framework.views import APIView
@@ -268,7 +269,7 @@ class OAuthCallbackView(APIView):
 
         elif provider == "google":
             resp = oauth_client.parse_id_token(
-                token, nonce=request.session.get("oauth_nonce")
+                token, nonce=self.request.session.get("oauth_nonce")
             )
             user_info = resp
             return {
@@ -298,7 +299,7 @@ class OAuthCallbackView(APIView):
                 user.profile_picture = user_info["avatar_url"]
             user.save()
             return user
-        except User.DoesNotExist:
+        except ObjectDoesNotExist:
             pass
 
         # Create new user

@@ -256,14 +256,13 @@ const Profile: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="max-w-4xl mx-auto space-y-8">
-        <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-200 dark:border-gray-700">
-          <div className="flex items-center space-x-4">
-            <div className="w-20 h-20 bg-gray-200 dark:bg-gray-700 rounded-full animate-pulse"></div>
+      <div className="max-w-3xl mx-auto space-y-4">
+        <div className="bg-[#1c2024] border border-[#3b4a41]/40 rounded-sm p-6">
+          <div className="flex items-center gap-4">
+            <div className="w-14 h-14 bg-[#31353a] rounded-sm animate-pulse" />
             <div className="space-y-2">
-              <div className="h-6 w-48 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
-              <div className="h-4 w-64 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
-              <div className="h-3 w-32 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
+              <div className="h-3 w-40 bg-[#31353a] rounded animate-pulse" />
+              <div className="h-2 w-56 bg-[#31353a] rounded animate-pulse" />
             </div>
           </div>
         </div>
@@ -272,186 +271,120 @@ const Profile: React.FC = () => {
   }
 
   return (
-    <div className="max-w-4xl mx-auto space-y-8">
-      {/* Error/Success Messages */}
+    <div className="max-w-3xl mx-auto space-y-4 font-mono">
+
+      {/* Error/Success */}
       {error && (
-        <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4 flex items-center space-x-2">
-          <AlertCircle className="w-5 h-5 text-red-500" />
-          <span className="text-red-700 dark:text-red-300">{error}</span>
+        <div className="bg-[#ff4c4c]/10 border border-[#ff4c4c]/30 rounded-sm p-3 flex items-center gap-2 text-[#ff4c4c] text-xs">
+          <AlertCircle className="w-3.5 h-3.5 flex-shrink-0" />
+          {error}
         </div>
       )}
-      
       {success && (
-        <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-4 flex items-center space-x-2">
-          <CheckCircle className="w-5 h-5 text-green-500" />
-          <span className="text-green-700 dark:text-green-300">{success}</span>
+        <div className="bg-[#6effc0]/10 border border-[#6effc0]/30 rounded-sm p-3 flex items-center gap-2 text-[#6effc0] text-xs">
+          <CheckCircle className="w-3.5 h-3.5 flex-shrink-0" />
+          {success}
         </div>
       )}
 
-      {/* Header */}
-      <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-200 dark:border-gray-700">
+      {/* Header card */}
+      <div className="bg-[#1c2024] border border-[#3b4a41]/40 rounded-sm p-5">
         <div className="flex items-center justify-between">
-        <div className="flex items-center space-x-4">
-          <div className="relative">
-            <div className="w-20 h-20 bg-[#2ED8A3] rounded-full flex items-center justify-center text-white text-2xl font-bold">
-                {userProfile ? userService.getInitials(userProfile) : 'U'}
+          <div className="flex items-center gap-4">
+            <div className="w-14 h-14 bg-[#6effc0] rounded-sm flex items-center justify-center text-[#003824] font-bold text-xl flex-shrink-0" style={{ fontFamily: 'Epilogue, sans-serif' }}>
+              {userProfile ? userService.getInitials(userProfile) : 'U'}
             </div>
-            <button className="absolute -bottom-1 -right-1 w-6 h-6 bg-[#004E8A] rounded-full flex items-center justify-center text-white hover:bg-[#2ED8A3] transition-colors">
-              <Camera className="w-3 h-3" />
-            </button>
-          </div>
-          <div>
-            <h1 className="text-2xl font-bold text-[#333333] dark:text-white">
-                {userProfile ? userService.getFullName(userProfile) : 'Loading...'}
-            </h1>
-              <p className="text-[#333333]/70 dark:text-gray-400">{userProfile?.email || 'Loading...'}</p>
-              <p className="text-sm text-[#333333]/50 dark:text-gray-500">
-                Member since {userProfile ? userService.formatDate(userProfile.date_joined) : 'Loading...'}
-              </p>
+            <div>
+              <h1 className="font-bold text-[#e0e3e8] text-base tracking-tight" style={{ fontFamily: 'Epilogue, sans-serif' }}>
+                {userProfile ? userService.getFullName(userProfile) : '—'}
+              </h1>
+              <p className="text-[10px] text-[#bacbbf] mt-0.5">{userProfile?.email}</p>
+              <div className="flex items-center gap-1.5 mt-1">
+                <span className="w-1 h-1 rounded-full bg-[#6effc0]" />
+                <span className="uppercase tracking-[0.1em] text-[9px] text-[#3b4a41]">
+                  Member since {userProfile ? userService.formatDate(userProfile.date_joined) : '—'}
+                </span>
+              </div>
             </div>
           </div>
           <button
             onClick={() => window.location.reload()}
             disabled={loading}
-            className="p-2 text-gray-400 hover:text-[#2ED8A3] transition-colors duration-200 disabled:opacity-50"
-            title="Refresh profile"
+            className="p-1.5 text-[#3b4a41] hover:text-[#6effc0] hover:bg-[#31353a] rounded-sm transition-colors disabled:opacity-40"
           >
-            <RefreshCw className={`w-5 h-5 ${loading ? 'animate-spin' : ''}`} />
+            <RefreshCw className="w-4 h-4" />
           </button>
         </div>
       </div>
 
-      {/* Tabs */}
-      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700">
-        <div className="border-b border-gray-200 dark:border-gray-700">
-          <nav className="flex space-x-8 px-6">
-            {tabs.map((tab) => {
-              const IconComponent = tab.icon;
-              return (
-                <button
-                  key={tab.id}
-                  onClick={() => setActiveTab(tab.id)}
-                  className={`flex items-center space-x-2 py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
-                    activeTab === tab.id
-                      ? 'border-[#2ED8A3] text-[#2ED8A3]'
-                      : 'border-transparent text-[#333333]/70 dark:text-gray-400 hover:text-[#333333] dark:hover:text-white'
-                  }`}
-                >
-                  <IconComponent className="w-4 h-4" />
-                  <span>{tab.label}</span>
-                </button>
-              );
-            })}
-          </nav>
+      {/* Tabs + content */}
+      <div className="bg-[#1c2024] border border-[#3b4a41]/40 rounded-sm">
+        {/* Tab bar */}
+        <div className="flex border-b border-[#3b4a41]/40">
+          {tabs.map((tab) => {
+            const IconComponent = tab.icon;
+            return (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                className={`flex items-center gap-1.5 px-4 py-3 uppercase tracking-[0.1em] text-[10px] transition-colors border-b-2 -mb-px ${
+                  activeTab === tab.id
+                    ? 'border-[#6effc0] text-[#6effc0]'
+                    : 'border-transparent text-[#bacbbf]/50 hover:text-[#bacbbf]'
+                }`}
+              >
+                <IconComponent className="w-3.5 h-3.5" />
+                {tab.label}
+              </button>
+            );
+          })}
         </div>
 
         <div className="p-6">
+
           {/* Profile Tab */}
           {activeTab === 'profile' && (
-            <div className="space-y-6">
-              <h2 className="text-xl font-semibold text-[#333333] dark:text-white">Personal Information</h2>
-              
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div>
-                  <label className="block text-sm font-medium text-[#333333] dark:text-gray-300 mb-2">
-                    First Name
-                  </label>
-                  <input
-                    type="text"
-                    name="firstName"
-                    value={profileData.firstName}
-                    onChange={handleProfileChange}
-                    className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-[#2ED8A3] focus:border-transparent bg-white dark:bg-gray-700 text-[#333333] dark:text-white"
-                  />
-                </div>
-                
-                <div>
-                  <label className="block text-sm font-medium text-[#333333] dark:text-gray-300 mb-2">
-                    Last Name
-                  </label>
-                  <input
-                    type="text"
-                    name="lastName"
-                    value={profileData.lastName}
-                    onChange={handleProfileChange}
-                    className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-[#2ED8A3] focus:border-transparent bg-white dark:bg-gray-700 text-[#333333] dark:text-white"
-                  />
-                </div>
-                
-                <div>
-                  <label className="block text-sm font-medium text-[#333333] dark:text-gray-300 mb-2">
-                    Email Address
-                  </label>
-                  <input
-                    type="email"
-                    name="email"
-                    value={profileData.email}
-                    onChange={handleProfileChange}
-                    className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-[#2ED8A3] focus:border-transparent bg-white dark:bg-gray-700 text-[#333333] dark:text-white"
-                  />
-                </div>
-                
-                <div>
-                  <label className="block text-sm font-medium text-[#333333] dark:text-gray-300 mb-2">
-                    Phone Number
-                  </label>
-                  <input
-                    type="tel"
-                    name="phone"
-                    value={profileData.phone}
-                    onChange={handleProfileChange}
-                    className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-[#2ED8A3] focus:border-transparent bg-white dark:bg-gray-700 text-[#333333] dark:text-white"
-                  />
-                </div>
-                
-                <div>
-                  <label className="block text-sm font-medium text-[#333333] dark:text-gray-300 mb-2">
-                    Company
-                  </label>
-                  <input
-                    type="text"
-                    name="company"
-                    value={profileData.company}
-                    onChange={handleProfileChange}
-                    className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-[#2ED8A3] focus:border-transparent bg-white dark:bg-gray-700 text-[#333333] dark:text-white"
-                  />
-                </div>
-                
-                <div>
-                  <label className="block text-sm font-medium text-[#333333] dark:text-gray-300 mb-2">
-                    Location
-                  </label>
-                  <input
-                    type="text"
-                    name="location"
-                    value={profileData.location}
-                    onChange={handleProfileChange}
-                    className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-[#2ED8A3] focus:border-transparent bg-white dark:bg-gray-700 text-[#333333] dark:text-white"
-                  />
-                </div>
+            <div className="space-y-5">
+              <p className="uppercase tracking-[0.12em] text-[9px] text-[#3b4a41]">Personal Information</p>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {[
+                  { label: 'First Name', name: 'firstName', type: 'text' },
+                  { label: 'Last Name', name: 'lastName', type: 'text' },
+                  { label: 'Email Address', name: 'email', type: 'email' },
+                  { label: 'Phone Number', name: 'phone', type: 'tel' },
+                  { label: 'Company', name: 'company', type: 'text' },
+                  { label: 'Location', name: 'location', type: 'text' },
+                ].map(({ label, name, type }) => (
+                  <div key={name}>
+                    <label className="block uppercase tracking-[0.1em] text-[9px] text-[#bacbbf] mb-1.5">{label}</label>
+                    <input
+                      type={type}
+                      name={name}
+                      value={(profileData as any)[name]}
+                      onChange={handleProfileChange}
+                      className="bg-[#101418] border border-[#3b4a41]/40 rounded-sm px-3 py-2 text-[#e0e3e8] font-mono text-xs focus:border-[#6effc0]/50 focus:outline-none w-full"
+                    />
+                  </div>
+                ))}
               </div>
-              
               <div>
-                <label className="block text-sm font-medium text-[#333333] dark:text-gray-300 mb-2">
-                  Bio
-                </label>
+                <label className="block uppercase tracking-[0.1em] text-[9px] text-[#bacbbf] mb-1.5">Bio</label>
                 <textarea
                   name="bio"
-                  rows={4}
+                  rows={3}
                   value={profileData.bio}
                   onChange={handleProfileChange}
-                  className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-[#2ED8A3] focus:border-transparent bg-white dark:bg-gray-700 text-[#333333] dark:text-white resize-none"
+                  className="bg-[#101418] border border-[#3b4a41]/40 rounded-sm px-3 py-2 text-[#e0e3e8] font-mono text-xs focus:border-[#6effc0]/50 focus:outline-none w-full resize-none"
                 />
               </div>
-              
               <div className="flex justify-end">
                 <button
                   onClick={handleProfileSave}
                   disabled={saving}
-                  className="px-6 py-3 bg-[#2ED8A3] text-white font-semibold rounded-lg hover:bg-[#00C48C] transition-colors flex items-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="flex items-center gap-2 bg-[#6effc0] text-[#003824] px-4 py-2 rounded-sm uppercase tracking-[0.1em] text-[10px] font-bold hover:bg-[#47ffb8] transition-colors disabled:opacity-40"
                 >
-                  <Save className="w-4 h-4" />
-                  <span>{saving ? 'Saving...' : 'Save Changes'}</span>
+                  <Save className="w-3.5 h-3.5" />
+                  {saving ? 'Saving...' : 'Save Changes'}
                 </button>
               </div>
             </div>
@@ -459,120 +392,62 @@ const Profile: React.FC = () => {
 
           {/* Security Tab */}
           {activeTab === 'security' && (
-            <div className="space-y-6">
+            <div className="space-y-5">
               <div className="flex items-center justify-between">
-                <h2 className="text-xl font-semibold text-[#333333] dark:text-white">Security Settings</h2>
-                <Link 
-                  to="/security" 
-                  className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                <p className="uppercase tracking-[0.12em] text-[9px] text-[#3b4a41]">Security Settings</p>
+                <Link
+                  to="/security"
+                  className="flex items-center gap-1.5 bg-[#6effc0]/10 border border-[#6effc0]/20 text-[#6effc0] px-3 py-1.5 rounded-sm uppercase tracking-[0.1em] text-[9px] hover:bg-[#6effc0]/20 transition-colors"
                 >
-                  <Key className="w-4 h-4 mr-2" />
-                  Two-Factor Authentication
+                  <Key className="w-3 h-3" />
+                  2FA Setup
                 </Link>
               </div>
-              
-              <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4">
-                <div className="flex items-center">
-                  <Lock className="w-5 h-5 text-yellow-600 dark:text-yellow-400 mr-3" />
-                  <div>
-                    <h3 className="font-medium text-yellow-800 dark:text-yellow-200">Enhanced Security Available</h3>
-                    <p className="text-sm text-yellow-700 dark:text-yellow-300 mt-1">
-                      Enable two-factor authentication to add an extra layer of security to your account.
-                    </p>
-                  </div>
+
+              <div className="bg-[#101418] border border-[#6effc0]/15 rounded-sm p-4 flex items-start gap-3">
+                <Lock className="w-4 h-4 text-[#6effc0] flex-shrink-0 mt-0.5" />
+                <div>
+                  <p className="uppercase tracking-[0.1em] text-[10px] text-[#6effc0] font-bold">Enhanced Security Available</p>
+                  <p className="text-[10px] text-[#bacbbf]/70 mt-1">Enable two-factor authentication to add an extra layer of security.</p>
                 </div>
               </div>
-              
-              <h3 className="text-lg font-semibold text-[#333333] dark:text-white">Change Password</h3>
-              
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-[#333333] dark:text-gray-300 mb-2">
-                    Current Password
-                  </label>
-                  <div className="relative">
-                    <input
-                      type={showCurrentPassword ? 'text' : 'password'}
-                      name="currentPassword"
-                      value={passwordData.currentPassword}
-                      onChange={handlePasswordInputChange}
-                      className="w-full px-4 py-3 pr-12 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-[#2ED8A3] focus:border-transparent bg-white dark:bg-gray-700 text-[#333333] dark:text-white"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowCurrentPassword(!showCurrentPassword)}
-                      className="absolute inset-y-0 right-0 pr-3 flex items-center"
-                    >
-                      {showCurrentPassword ? (
-                        <EyeOff className="w-5 h-5 text-[#333333]/50" />
-                      ) : (
-                        <Eye className="w-5 h-5 text-[#333333]/50" />
-                      )}
-                    </button>
+
+              <p className="uppercase tracking-[0.12em] text-[9px] text-[#3b4a41] pt-2">Change Password</p>
+              <div className="space-y-3">
+                {[
+                  { label: 'Current Password', name: 'currentPassword', show: showCurrentPassword, toggle: () => setShowCurrentPassword(!showCurrentPassword) },
+                  { label: 'New Password', name: 'newPassword', show: showNewPassword, toggle: () => setShowNewPassword(!showNewPassword) },
+                  { label: 'Confirm New Password', name: 'confirmPassword', show: showConfirmPassword, toggle: () => setShowConfirmPassword(!showConfirmPassword) },
+                ].map(({ label, name, show, toggle }) => (
+                  <div key={name}>
+                    <label className="block uppercase tracking-[0.1em] text-[9px] text-[#bacbbf] mb-1.5">{label}</label>
+                    <div className="relative">
+                      <input
+                        type={show ? 'text' : 'password'}
+                        name={name}
+                        value={(passwordData as any)[name]}
+                        onChange={handlePasswordInputChange}
+                        className="bg-[#101418] border border-[#3b4a41]/40 rounded-sm px-3 py-2 pr-10 text-[#e0e3e8] font-mono text-xs focus:border-[#6effc0]/50 focus:outline-none w-full"
+                      />
+                      <button
+                        type="button"
+                        onClick={toggle}
+                        className="absolute inset-y-0 right-0 pr-3 flex items-center text-[#3b4a41] hover:text-[#6effc0]"
+                      >
+                        {show ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                      </button>
+                    </div>
                   </div>
-                </div>
-                
-                <div>
-                  <label className="block text-sm font-medium text-[#333333] dark:text-gray-300 mb-2">
-                    New Password
-                  </label>
-                  <div className="relative">
-                    <input
-                      type={showNewPassword ? 'text' : 'password'}
-                      name="newPassword"
-                      value={passwordData.newPassword}
-                      onChange={handlePasswordInputChange}
-                      className="w-full px-4 py-3 pr-12 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-[#2ED8A3] focus:border-transparent bg-white dark:bg-gray-700 text-[#333333] dark:text-white"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowNewPassword(!showNewPassword)}
-                      className="absolute inset-y-0 right-0 pr-3 flex items-center"
-                    >
-                      {showNewPassword ? (
-                        <EyeOff className="w-5 h-5 text-[#333333]/50" />
-                      ) : (
-                        <Eye className="w-5 h-5 text-[#333333]/50" />
-                      )}
-                    </button>
-                  </div>
-                </div>
-                
-                <div>
-                  <label className="block text-sm font-medium text-[#333333] dark:text-gray-300 mb-2">
-                    Confirm New Password
-                  </label>
-                  <div className="relative">
-                    <input
-                      type={showConfirmPassword ? 'text' : 'password'}
-                      name="confirmPassword"
-                      value={passwordData.confirmPassword}
-                      onChange={handlePasswordInputChange}
-                      className="w-full px-4 py-3 pr-12 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-[#2ED8A3] focus:border-transparent bg-white dark:bg-gray-700 text-[#333333] dark:text-white"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                      className="absolute inset-y-0 right-0 pr-3 flex items-center"
-                    >
-                      {showConfirmPassword ? (
-                        <EyeOff className="w-5 h-5 text-[#333333]/50" />
-                      ) : (
-                        <Eye className="w-5 h-5 text-[#333333]/50" />
-                      )}
-                    </button>
-                  </div>
-                </div>
+                ))}
               </div>
-              
               <div className="flex justify-end">
                 <button
                   onClick={handlePasswordSubmit}
                   disabled={saving || !passwordData.currentPassword || !passwordData.newPassword || !passwordData.confirmPassword}
-                  className="px-6 py-3 bg-[#2ED8A3] text-white font-semibold rounded-lg hover:bg-[#00C48C] transition-colors flex items-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="flex items-center gap-2 bg-[#6effc0] text-[#003824] px-4 py-2 rounded-sm uppercase tracking-[0.1em] text-[10px] font-bold hover:bg-[#47ffb8] transition-colors disabled:opacity-40"
                 >
-                  <Shield className="w-4 h-4" />
-                  <span>{saving ? 'Updating...' : 'Update Password'}</span>
+                  <Shield className="w-3.5 h-3.5" />
+                  {saving ? 'Updating...' : 'Update Password'}
                 </button>
               </div>
             </div>
@@ -580,99 +455,41 @@ const Profile: React.FC = () => {
 
           {/* Notifications Tab */}
           {activeTab === 'notifications' && (
-            <div className="space-y-6">
-              <h2 className="text-xl font-semibold text-[#333333] dark:text-white">Notification Preferences</h2>
-              
-              <div className="space-y-4">
-                <div className="flex items-center justify-between p-4 bg-[#F4F5F7] dark:bg-gray-700 rounded-lg">
-                  <div>
-                    <h3 className="font-medium text-[#333333] dark:text-white">Email Notifications</h3>
-                    <p className="text-sm text-[#333333]/70 dark:text-gray-400">Receive updates about your account and validation results</p>
+            <div className="space-y-5">
+              <p className="uppercase tracking-[0.12em] text-[9px] text-[#3b4a41]">Notification Preferences</p>
+              <div className="space-y-2">
+                {[
+                  { key: 'email_notifications' as const, label: 'Email Notifications', desc: 'Updates about your account and validation results' },
+                  { key: 'credit_alerts' as const, label: 'Credit Alerts', desc: 'Get notified when your credits are running low' },
+                  { key: 'api_usage_reports' as const, label: 'API Usage Reports', desc: 'Weekly reports on your API usage and performance' },
+                  { key: 'marketing_emails' as const, label: 'Marketing Emails', desc: 'Updates about new features and promotions' },
+                  { key: 'security_alerts' as const, label: 'Security Alerts', desc: 'Important security updates and alerts' },
+                ].map(({ key, label, desc }) => (
+                  <div key={key} className="flex items-center justify-between p-4 bg-[#101418] border border-[#3b4a41]/20 rounded-sm">
+                    <div>
+                      <p className="uppercase tracking-[0.08em] text-[11px] text-[#e0e3e8]">{label}</p>
+                      <p className="text-[10px] text-[#bacbbf]/60 mt-0.5">{desc}</p>
+                    </div>
+                    <label className="relative inline-flex items-center cursor-pointer flex-shrink-0 ml-4">
+                      <input
+                        type="checkbox"
+                        className="sr-only peer"
+                        checked={notificationPreferences[key]}
+                        onChange={() => handleNotificationChange(key)}
+                      />
+                      <div className="w-9 h-5 bg-[#31353a] rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-[#6effc0]" />
+                    </label>
                   </div>
-                  <label className="relative inline-flex items-center cursor-pointer">
-                    <input 
-                      type="checkbox" 
-                      className="sr-only peer" 
-                      checked={notificationPreferences.email_notifications}
-                      onChange={() => handleNotificationChange('email_notifications')}
-                    />
-                    <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-[#2ED8A3]/20 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-[#2ED8A3]"></div>
-                  </label>
-                </div>
-                
-                <div className="flex items-center justify-between p-4 bg-[#F4F5F7] dark:bg-gray-700 rounded-lg">
-                  <div>
-                    <h3 className="font-medium text-[#333333] dark:text-white">Credit Alerts</h3>
-                    <p className="text-sm text-[#333333]/70 dark:text-gray-400">Get notified when your credits are running low</p>
-                  </div>
-                  <label className="relative inline-flex items-center cursor-pointer">
-                    <input 
-                      type="checkbox" 
-                      className="sr-only peer" 
-                      checked={notificationPreferences.credit_alerts}
-                      onChange={() => handleNotificationChange('credit_alerts')}
-                    />
-                    <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-[#2ED8A3]/20 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-[#2ED8A3]"></div>
-                  </label>
-                </div>
-                
-                <div className="flex items-center justify-between p-4 bg-[#F4F5F7] dark:bg-gray-700 rounded-lg">
-                  <div>
-                    <h3 className="font-medium text-[#333333] dark:text-white">API Usage Reports</h3>
-                    <p className="text-sm text-[#333333]/70 dark:text-gray-400">Weekly reports on your API usage and performance</p>
-                  </div>
-                  <label className="relative inline-flex items-center cursor-pointer">
-                    <input 
-                      type="checkbox" 
-                      className="sr-only peer" 
-                      checked={notificationPreferences.api_usage_reports}
-                      onChange={() => handleNotificationChange('api_usage_reports')}
-                    />
-                    <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-[#2ED8A3]/20 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-[#2ED8A3]"></div>
-                  </label>
-                </div>
-
-                <div className="flex items-center justify-between p-4 bg-[#F4F5F7] dark:bg-gray-700 rounded-lg">
-                  <div>
-                    <h3 className="font-medium text-[#333333] dark:text-white">Marketing Emails</h3>
-                    <p className="text-sm text-[#333333]/70 dark:text-gray-400">Receive updates about new features and promotions</p>
-                  </div>
-                  <label className="relative inline-flex items-center cursor-pointer">
-                    <input 
-                      type="checkbox" 
-                      className="sr-only peer" 
-                      checked={notificationPreferences.marketing_emails}
-                      onChange={() => handleNotificationChange('marketing_emails')}
-                    />
-                    <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-[#2ED8A3]/20 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-[#2ED8A3]"></div>
-                  </label>
-                </div>
-
-                <div className="flex items-center justify-between p-4 bg-[#F4F5F7] dark:bg-gray-700 rounded-lg">
-                  <div>
-                    <h3 className="font-medium text-[#333333] dark:text-white">Security Alerts</h3>
-                    <p className="text-sm text-[#333333]/70 dark:text-gray-400">Get notified about important security updates</p>
-                  </div>
-                  <label className="relative inline-flex items-center cursor-pointer">
-                    <input 
-                      type="checkbox" 
-                      className="sr-only peer" 
-                      checked={notificationPreferences.security_alerts}
-                      onChange={() => handleNotificationChange('security_alerts')}
-                    />
-                    <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-[#2ED8A3]/20 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-[#2ED8A3]"></div>
-                  </label>
-                </div>
+                ))}
               </div>
-
               <div className="flex justify-end">
                 <button
                   onClick={handleNotificationSave}
                   disabled={saving}
-                  className="px-6 py-3 bg-[#2ED8A3] text-white font-semibold rounded-lg hover:bg-[#00C48C] transition-colors flex items-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="flex items-center gap-2 bg-[#6effc0] text-[#003824] px-4 py-2 rounded-sm uppercase tracking-[0.1em] text-[10px] font-bold hover:bg-[#47ffb8] transition-colors disabled:opacity-40"
                 >
-                  <Bell className="w-4 h-4" />
-                  <span>{saving ? 'Saving...' : 'Save Preferences'}</span>
+                  <Bell className="w-3.5 h-3.5" />
+                  {saving ? 'Saving...' : 'Save Preferences'}
                 </button>
               </div>
             </div>
@@ -680,70 +497,61 @@ const Profile: React.FC = () => {
 
           {/* Billing Tab */}
           {activeTab === 'billing' && (
-            <div className="space-y-6">
-              <h2 className="text-xl font-semibold text-[#333333] dark:text-white">Billing Information</h2>
-              
-              <div className="bg-[#F4F5F7] dark:bg-gray-700 rounded-lg p-6">
+            <div className="space-y-5">
+              <p className="uppercase tracking-[0.12em] text-[9px] text-[#3b4a41]">Billing Information</p>
+              <div className="bg-[#101418] border border-[#3b4a41]/30 rounded-sm p-5">
                 <div className="flex items-center justify-between mb-4">
-                  <h3 className="font-medium text-[#333333] dark:text-white">Current Plan</h3>
-                  <span className="px-3 py-1 bg-[#2ED8A3] text-white text-sm font-medium rounded-full">
+                  <p className="uppercase tracking-[0.1em] text-[10px] text-[#bacbbf]">Current Plan</p>
+                  <span className="bg-[#6effc0]/10 border border-[#6effc0]/20 text-[#6effc0] px-2 py-1 rounded-sm uppercase tracking-[0.1em] text-[9px] font-bold">
                     {billingProfile?.current_plan?.name || 'Free Plan'}
                   </span>
                 </div>
-                
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-                  <div>
-                    <p className="text-sm text-[#333333]/70 dark:text-gray-400">Monthly Cost</p>
-                    <p className="text-lg font-semibold text-[#333333] dark:text-white">
-                      ${billingProfile?.current_plan?.price || '0.00'}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-[#333333]/70 dark:text-gray-400">Credits Used</p>
-                    <p className="text-lg font-semibold text-[#333333] dark:text-white">
-                      {billingProfile ? `${billingProfile.credits_used_this_month?.toLocaleString() || '0'} / ${((billingProfile.credits_remaining || 0) + (billingProfile.credits_used_this_month || 0)).toLocaleString()}` : '0 / 0'}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-[#333333]/70 dark:text-gray-400">Credits Remaining</p>
-                    <p className="text-lg font-semibold text-[#333333] dark:text-white">
-                      {billingProfile?.credits_remaining?.toLocaleString() || '0'}
-                    </p>
-                  </div>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-5">
+                  {[
+                    { label: 'Monthly Cost', value: `$${billingProfile?.current_plan?.price || '0.00'}` },
+                    { label: 'Credits Used', value: billingProfile ? `${(billingProfile.credits_used_this_month || 0).toLocaleString()} / ${((billingProfile.credits_remaining || 0) + (billingProfile.credits_used_this_month || 0)).toLocaleString()}` : '0 / 0' },
+                    { label: 'Credits Remaining', value: (billingProfile?.credits_remaining || 0).toLocaleString() },
+                  ].map(({ label, value }) => (
+                    <div key={label}>
+                      <p className="uppercase tracking-[0.1em] text-[9px] text-[#3b4a41] mb-1">{label}</p>
+                      <p className="text-[#e0e3e8] text-base font-bold">{value}</p>
+                    </div>
+                  ))}
                 </div>
-                
-                <div className="flex space-x-4">
-                  <button className="px-4 py-2 bg-[#2ED8A3] text-white font-medium rounded-lg hover:bg-[#00C48C] transition-colors">
+                <div className="flex gap-3">
+                  <Link to="/billing" className="bg-[#6effc0] text-[#003824] px-4 py-2 rounded-sm uppercase tracking-[0.1em] text-[10px] font-bold hover:bg-[#47ffb8] transition-colors">
                     Upgrade Plan
-                  </button>
-                  <button className="px-4 py-2 border border-[#2ED8A3] text-[#2ED8A3] font-medium rounded-lg hover:bg-[#2ED8A3] hover:text-white transition-colors">
+                  </Link>
+                  <Link to="/billing" className="border border-[#3b4a41]/40 text-[#bacbbf] px-4 py-2 rounded-sm uppercase tracking-[0.1em] text-[10px] hover:border-[#6effc0]/40 hover:text-[#6effc0] transition-colors">
                     View Invoice
-                  </button>
+                  </Link>
                 </div>
               </div>
             </div>
           )}
+
         </div>
       </div>
 
       {/* Danger Zone */}
-      <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-200 dark:border-gray-700">
-        <h2 className="text-xl font-semibold text-[#FF4C4C] mb-4">Danger Zone</h2>
-        <div className="flex items-center justify-between p-4 bg-red-50 dark:bg-red-900/20 rounded-lg">
+      <div className="bg-[#1c2024] border border-[#ff4c4c]/20 rounded-sm p-5">
+        <p className="uppercase tracking-[0.12em] text-[9px] text-[#ff4c4c] mb-4">Danger Zone</p>
+        <div className="flex items-center justify-between p-4 bg-[#ff4c4c]/5 border border-[#ff4c4c]/10 rounded-sm">
           <div>
-            <h3 className="font-medium text-[#333333] dark:text-white">Delete Account</h3>
-            <p className="text-sm text-[#333333]/70 dark:text-gray-400">Permanently delete your account and all associated data</p>
+            <p className="uppercase tracking-[0.08em] text-[11px] text-[#e0e3e8]">Delete Account</p>
+            <p className="text-[10px] text-[#bacbbf]/60 mt-0.5">Permanently delete your account and all associated data</p>
           </div>
-          <button 
+          <button
             onClick={handleDeleteAccount}
             disabled={saving}
-            className="px-4 py-2 bg-[#FF4C4C] text-white font-medium rounded-lg hover:bg-red-600 transition-colors flex items-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="flex items-center gap-2 bg-[#ff4c4c]/10 border border-[#ff4c4c]/30 text-[#ff4c4c] px-4 py-2 rounded-sm uppercase tracking-[0.1em] text-[10px] hover:bg-[#ff4c4c]/20 transition-colors disabled:opacity-40 flex-shrink-0 ml-4"
           >
-            <LogOut className="w-4 h-4" />
-            <span>{saving ? 'Deleting...' : 'Delete Account'}</span>
+            <LogOut className="w-3.5 h-3.5" />
+            {saving ? 'Deleting...' : 'Delete Account'}
           </button>
         </div>
       </div>
+
     </div>
   );
 };

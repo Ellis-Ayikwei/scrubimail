@@ -110,6 +110,18 @@ class LoginSerializer(serializers.Serializer):
     refresh = serializers.CharField(read_only=True)
 
     def validate(self, data):
+        from apps.User.models import User as UserModel
+        # First check if the account exists and whether it's suspended,
+        # so we can give a precise error instead of "Invalid credentials".
+        try:
+            db_user = UserModel.objects.get(email__iexact=data["email"])
+            if not db_user.is_active:
+                raise serializers.ValidationError(
+                    "Your account has been suspended. Please contact support."
+                )
+        except UserModel.DoesNotExist:
+            pass  # fall through — authenticate() will reject it below
+
         user = authenticate(email=data["email"], password=data["password"])
         if not user:
             raise serializers.ValidationError("Invalid credentials")
@@ -229,11 +241,7 @@ class LoginWithTOTPSerializer(serializers.Serializer):
     remember_me = serializers.BooleanField(required=False, default=False)
 
     def validate(self, data):
-        # At least one 2FA method must be provided if user has 2FA enabled
-        if not data.get("totp_token") and not data.get("backup_code"):
-            raise serializers.ValidationError(
-                "Either TOTP token or backup code is required for 2FA"
-            )
+        # TOTP / backup / trusted-device policy is enforced in LoginWithTOTPView
         return data
 
     def validate_totp_token(self, value):

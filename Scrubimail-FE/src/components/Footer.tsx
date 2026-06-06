@@ -206,7 +206,7 @@ const Footer: React.FC = () => {
                 </a>
               </li>
               <li>
-                <Link to="/onboarding" className="text-[#7d8590] hover:text-white transition-colors text-xs sm:text-sm">
+                <Link to="/register" className="text-[#7d8590] hover:text-white transition-colors text-xs sm:text-sm">
                   Getting Started
                 </Link>
               </li>

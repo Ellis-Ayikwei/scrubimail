@@ -1,0 +1,384 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Pricing | SCRUBI - The Digital Surgeon</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Epilogue:wght@400;600;700;800;900&amp;family=Inter:wght@300;400;500;600&amp;family=Space+Grotesk:wght@300;400;500;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+          darkMode: "class",
+          theme: {
+            extend: {
+              "colors": {
+                      "surface-bright": "#353a3e",
+                      "on-tertiary-fixed": "#1a1c1c",
+                      "tertiary": "#e5e5e5",
+                      "background": "#101418",
+                      "on-secondary": "#2c3138",
+                      "on-primary-fixed-variant": "#005236",
+                      "on-surface-variant": "#bacbbf",
+                      "inverse-surface": "#e0e3e8",
+                      "on-tertiary-fixed-variant": "#454747",
+                      "on-primary": "#003824",
+                      "secondary-container": "#42474f",
+                      "on-tertiary-container": "#535455",
+                      "on-secondary-fixed-variant": "#42474f",
+                      "secondary-fixed-dim": "#c2c7d0",
+                      "surface-dim": "#101418",
+                      "primary-fixed": "#47ffb8",
+                      "primary": "#6effc0",
+                      "surface-container-high": "#262a2f",
+                      "outline-variant": "#3b4a41",
+                      "on-background": "#e0e3e8",
+                      "surface-tint": "#00e29e",
+                      "on-primary-fixed": "#002114",
+                      "tertiary-fixed-dim": "#c6c6c7",
+                      "secondary-fixed": "#dee2ec",
+                      "on-secondary-fixed": "#171c23",
+                      "secondary": "#c2c7d0",
+                      "error-container": "#93000a",
+                      "tertiary-container": "#c9c9c9",
+                      "primary-container": "#00e5a0",
+                      "surface-variant": "#31353a",
+                      "surface-container-lowest": "#0a0f13",
+                      "surface-container": "#1c2024",
+                      "outline": "#84958a",
+                      "on-primary-container": "#006141",
+                      "surface-container-highest": "#31353a",
+                      "on-secondary-container": "#b1b5bf",
+                      "inverse-primary": "#006c49",
+                      "on-surface": "#e0e3e8",
+                      "primary-fixed-dim": "#00e29e",
+                      "on-error": "#690005",
+                      "error": "#ffb4ab",
+                      "tertiary-fixed": "#e2e2e2",
+                      "surface": "#101418",
+                      "on-tertiary": "#2f3131",
+                      "on-error-container": "#ffdad6",
+                      "inverse-on-surface": "#2d3135",
+                      "surface-container-low": "#181c20"
+              },
+              "borderRadius": {
+                      "DEFAULT": "0.125rem",
+                      "lg": "0.25rem",
+                      "xl": "0.5rem",
+                      "full": "0.75rem"
+              },
+              "fontFamily": {
+                      "headline": ["Epilogue"],
+                      "body": ["Inter"],
+                      "label": ["Space Grotesk"]
+              }
+            },
+          },
+        }
+    </script>
+<style>
+        .grid-pattern {
+            background-image: radial-gradient(circle, #3b4a41 1px, transparent 1px);
+            background-size: 40px 40px;
+            background-position: center;
+        }
+        .glass-header {
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+        }
+    </style>
+</head>
+<body class="bg-surface-dim text-on-surface font-body selection:bg-primary-container selection:text-on-primary-container">
+<!-- TopNavBar Shell -->
+<nav class="fixed top-0 w-full z-50 bg-[#080C10]/70 backdrop-blur-xl">
+<div class="flex justify-between items-center px-8 py-4 w-full max-w-screen-2xl mx-auto">
+<div class="text-2xl font-bold tracking-tighter text-[#6effc0] font-['Epilogue']">SCRUBI</div>
+<div class="hidden md:flex items-center gap-8">
+<a class="text-slate-400 font-medium font-['Epilogue'] tracking-tight hover:text-[#00e5a0] transition-colors duration-200" href="#">Platform</a>
+<a class="text-slate-400 font-medium font-['Epilogue'] tracking-tight hover:text-[#00e5a0] transition-colors duration-200" href="#">Precision</a>
+<a class="text-slate-400 font-medium font-['Epilogue'] tracking-tight hover:text-[#00e5a0] transition-colors duration-200" href="#">Docs</a>
+<a class="text-[#6effc0] border-b-2 border-[#6effc0] pb-1 font-['Epilogue'] tracking-tight hover:text-[#00e5a0] transition-colors duration-200" href="#">Pricing</a>
+</div>
+<div class="flex items-center gap-4">
+<button class="text-slate-400 font-medium font-['Epilogue'] tracking-tight hover:text-[#00e5a0] px-4 py-2">Log In</button>
+<button class="bg-[#00e5a0] text-[#003824] font-bold px-6 py-2 rounded-sm font-['Epilogue'] tracking-tight hover:opacity-90 active:scale-95 transition-all">Get Started</button>
+</div>
+</div>
+</nav>
+<main class="pt-24 pb-20">
+<!-- Hero Section -->
+<section class="relative overflow-hidden px-8 py-20 lg:py-32">
+<div class="absolute inset-0 grid-pattern opacity-10"></div>
+<div class="relative max-w-screen-xl mx-auto text-center">
+<div class="inline-flex items-center gap-2 px-3 py-1 bg-surface-container-high rounded-full border border-outline-variant/20 mb-8">
+<span class="w-2 h-2 rounded-full bg-primary animate-pulse"></span>
+<span class="text-[10px] font-label font-bold tracking-[0.2em] text-primary uppercase">Precision Scaling</span>
+</div>
+<h1 class="font-headline font-black text-5xl md:text-7xl lg:text-8xl tracking-tighter leading-none mb-8 text-on-surface">
+                    Simple, Transparent Pricing for <span class="text-primary italic">Scalable Operations.</span>
+</h1>
+<p class="font-body text-on-surface-variant text-lg md:text-xl max-w-2xl mx-auto leading-relaxed">
+                    Choose the surgical precision level that matches your growth. No hidden fees, no unnecessary bloat. Just pure data integrity.
+                </p>
+</div>
+</section>
+<!-- Pricing Grid -->
+<section class="px-8 pb-32">
+<div class="max-w-screen-2xl mx-auto grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+<!-- Starter Tier -->
+<div class="bg-surface-container-low p-8 border border-outline-variant/10 flex flex-col justify-between hover:bg-surface-container-high transition-colors group">
+<div>
+<div class="font-label text-xs tracking-widest text-slate-500 uppercase mb-4">Tier 01</div>
+<h3 class="font-headline text-3xl font-bold mb-2">Starter</h3>
+<p class="font-body text-sm text-on-surface-variant mb-8">For early-stage startups and solo developers.</p>
+<div class="mb-8">
+<span class="font-label text-4xl font-bold text-primary">$29</span>
+<span class="text-on-surface-variant text-sm tracking-tight">/month</span>
+</div>
+<ul class="space-y-4 mb-12">
+<li class="flex items-center gap-3 text-sm font-label">
+<span class="material-symbols-outlined text-primary text-lg" data-icon="check_circle">check_circle</span>
+                                10,000 Validations
+                            </li>
+<li class="flex items-center gap-3 text-sm font-label">
+<span class="material-symbols-outlined text-primary text-lg" data-icon="check_circle">check_circle</span>
+                                Standard API Access
+                            </li>
+<li class="flex items-center gap-3 text-sm font-label">
+<span class="material-symbols-outlined text-primary text-lg" data-icon="check_circle">check_circle</span>
+                                MX/DNS Lookups
+                            </li>
+</ul>
+</div>
+<button class="w-full py-4 border border-outline-variant hover:border-primary text-on-surface font-bold uppercase tracking-widest text-xs transition-all group-hover:bg-surface-container-highest">Select Starter</button>
+</div>
+<!-- Professional Tier (Featured) -->
+<div class="bg-surface-container-low p-8 border-2 border-primary relative flex flex-col justify-between hover:bg-surface-container-high transition-colors group shadow-[0_0_40px_rgba(110,255,192,0.1)]">
+<div class="absolute top-0 right-0 bg-primary text-on-primary text-[10px] font-label font-bold px-3 py-1 tracking-widest uppercase">Most Popular</div>
+<div>
+<div class="font-label text-xs tracking-widest text-primary uppercase mb-4">Tier 02</div>
+<h3 class="font-headline text-3xl font-bold mb-2">Professional</h3>
+<p class="font-body text-sm text-on-surface-variant mb-8">Optimized for growing teams and high-traffic apps.</p>
+<div class="mb-8">
+<span class="font-label text-4xl font-bold text-primary">$99</span>
+<span class="text-on-surface-variant text-sm tracking-tight">/month</span>
+</div>
+<ul class="space-y-4 mb-12">
+<li class="flex items-center gap-3 text-sm font-label">
+<span class="material-symbols-outlined text-primary text-lg" data-icon="check_circle" data-weight="fill" style="font-variation-settings: 'FILL' 1;">check_circle</span>
+                                100,000 Validations
+                            </li>
+<li class="flex items-center gap-3 text-sm font-label">
+<span class="material-symbols-outlined text-primary text-lg" data-icon="check_circle" data-weight="fill" style="font-variation-settings: 'FILL' 1;">check_circle</span>
+                                High-Priority API
+                            </li>
+<li class="flex items-center gap-3 text-sm font-label">
+<span class="material-symbols-outlined text-primary text-lg" data-icon="check_circle" data-weight="fill" style="font-variation-settings: 'FILL' 1;">check_circle</span>
+                                Spam Trap Detection
+                            </li>
+<li class="flex items-center gap-3 text-sm font-label">
+<span class="material-symbols-outlined text-primary text-lg" data-icon="check_circle" data-weight="fill" style="font-variation-settings: 'FILL' 1;">check_circle</span>
+                                Bulk Validation Tool
+                            </li>
+</ul>
+</div>
+<button class="w-full py-4 bg-primary text-on-primary font-black uppercase tracking-widest text-xs transition-all hover:brightness-110 active:scale-95">Upgrade to Pro</button>
+</div>
+<!-- Free Tier -->
+<div class="bg-surface-container-low p-8 border border-outline-variant/10 flex flex-col justify-between hover:bg-surface-container-high transition-colors group">
+<div>
+<div class="font-label text-xs tracking-widest text-slate-500 uppercase mb-4">Tier 03</div>
+<h3 class="font-headline text-3xl font-bold mb-2">Custom</h3>
+<p class="font-body text-sm text-on-surface-variant mb-8">Build your own plan based on precise usage metrics.</p>
+<div class="mb-8">
+<span class="font-label text-4xl font-bold text-primary">Free</span>
+<span class="text-on-surface-variant text-sm tracking-tight">/entry</span>
+</div>
+<ul class="space-y-4 mb-12">
+<li class="flex items-center gap-3 text-sm font-label">
+<span class="material-symbols-outlined text-primary text-lg" data-icon="check_circle">check_circle</span>
+                                Pay-as-you-go
+                            </li>
+<li class="flex items-center gap-3 text-sm font-label">
+<span class="material-symbols-outlined text-primary text-lg" data-icon="check_circle">check_circle</span>
+                                No monthly minimum
+                            </li>
+<li class="flex items-center gap-3 text-sm font-label">
+<span class="material-symbols-outlined text-primary text-lg" data-icon="check_circle">check_circle</span>
+                                Access to all Core tools
+                            </li>
+</ul>
+</div>
+<button class="w-full py-4 border border-outline-variant hover:border-primary text-on-surface font-bold uppercase tracking-widest text-xs transition-all group-hover:bg-surface-container-highest">Configure Usage</button>
+</div>
+<!-- Enterprise Tier -->
+<div class="bg-surface-container-lowest p-8 border border-outline-variant/20 flex flex-col justify-between hover:bg-surface-container-low transition-colors group relative overflow-hidden">
+<div class="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-primary/50 to-transparent"></div>
+<div>
+<div class="font-label text-xs tracking-widest text-slate-500 uppercase mb-4">Tier 04</div>
+<h3 class="font-headline text-3xl font-bold mb-2">Enterprise</h3>
+<p class="font-body text-sm text-on-surface-variant mb-8">Mission-critical infrastructure for global operations.</p>
+<div class="mb-8">
+<span class="font-label text-4xl font-bold text-primary">Custom</span>
+<span class="text-on-surface-variant text-sm tracking-tight">/contract</span>
+</div>
+<ul class="space-y-4 mb-12">
+<li class="flex items-center gap-3 text-sm font-label">
+<span class="material-symbols-outlined text-primary text-lg" data-icon="check_circle" data-weight="fill" style="font-variation-settings: 'FILL' 1;">check_circle</span>
+                                Unlimited Validations
+                            </li>
+<li class="flex items-center gap-3 text-sm font-label">
+<span class="material-symbols-outlined text-primary text-lg" data-icon="check_circle" data-weight="fill" style="font-variation-settings: 'FILL' 1;">check_circle</span>
+                                Dedicated Manager
+                            </li>
+<li class="flex items-center gap-3 text-sm font-label">
+<span class="material-symbols-outlined text-primary text-lg" data-icon="check_circle" data-weight="fill" style="font-variation-settings: 'FILL' 1;">check_circle</span>
+                                99.99% Uptime SLA
+                            </li>
+<li class="flex items-center gap-3 text-sm font-label">
+<span class="material-symbols-outlined text-primary text-lg" data-icon="check_circle" data-weight="fill" style="font-variation-settings: 'FILL' 1;">check_circle</span>
+                                On-Prem Deployment
+                            </li>
+</ul>
+</div>
+<button class="w-full py-4 bg-on-surface text-surface-dim font-black uppercase tracking-widest text-xs transition-all hover:bg-primary active:scale-95">Contact Sales</button>
+</div>
+</div>
+</section>
+<!-- Feature Comparison Table -->
+<section class="px-8 py-24 bg-surface-container-low/30">
+<div class="max-w-screen-xl mx-auto">
+<div class="mb-16 text-center">
+<h2 class="font-headline text-4xl font-bold mb-4">Detailed Feature Matrix</h2>
+<p class="font-label text-sm text-slate-400 uppercase tracking-widest">Compare technical capabilities across surgical tiers</p>
+</div>
+<div class="overflow-x-auto">
+<table class="w-full border-collapse">
+<thead>
+<tr class="border-b border-outline-variant/10">
+<th class="py-6 text-left font-label text-xs tracking-widest text-slate-500 uppercase">Capabilities</th>
+<th class="py-6 text-center font-headline text-lg font-bold">Starter</th>
+<th class="py-6 text-center font-headline text-lg font-bold text-primary">Professional</th>
+<th class="py-6 text-center font-headline text-lg font-bold">Custom</th>
+<th class="py-6 text-center font-headline text-lg font-bold">Enterprise</th>
+</tr>
+</thead>
+<tbody class="divide-y divide-outline-variant/5">
+<tr>
+<td class="py-8 font-body font-semibold">API Access</td>
+<td class="text-center font-label text-sm">Standard (REST)</td>
+<td class="text-center font-label text-sm font-bold text-primary">Priority (REST/gRPC)</td>
+<td class="text-center font-label text-sm">Full Access</td>
+<td class="text-center font-label text-sm">Dedicated Nodes</td>
+</tr>
+<tr>
+<td class="py-8 font-body font-semibold">Bulk Validation</td>
+<td class="text-center">
+<span class="material-symbols-outlined text-slate-700" data-icon="close">close</span>
+</td>
+<td class="text-center">
+<span class="material-symbols-outlined text-primary" data-icon="done_all">done_all</span>
+</td>
+<td class="text-center">
+<span class="material-symbols-outlined text-primary" data-icon="done">done</span>
+</td>
+<td class="text-center">
+<span class="material-symbols-outlined text-primary" data-icon="done_all" data-weight="fill" style="font-variation-settings: 'FILL' 1;">done_all</span>
+</td>
+</tr>
+<tr>
+<td class="py-8 font-body font-semibold">MX/DNS Checks</td>
+<td class="text-center"><span class="material-symbols-outlined text-primary" data-icon="check">check</span></td>
+<td class="text-center"><span class="material-symbols-outlined text-primary" data-icon="check">check</span></td>
+<td class="text-center"><span class="material-symbols-outlined text-primary" data-icon="check">check</span></td>
+<td class="text-center"><span class="material-symbols-outlined text-primary" data-icon="check">check</span></td>
+</tr>
+<tr>
+<td class="py-8 font-body font-semibold">Spam Trap Detection</td>
+<td class="text-center"><span class="material-symbols-outlined text-slate-700" data-icon="close">close</span></td>
+<td class="text-center"><span class="material-symbols-outlined text-primary" data-icon="check">check</span></td>
+<td class="text-center font-label text-xs">Add-on available</td>
+<td class="text-center"><span class="material-symbols-outlined text-primary" data-icon="check">check</span></td>
+</tr>
+<tr>
+<td class="py-8 font-body font-semibold">Dedicated Account Manager</td>
+<td class="text-center"><span class="material-symbols-outlined text-slate-700" data-icon="close">close</span></td>
+<td class="text-center"><span class="material-symbols-outlined text-slate-700" data-icon="close">close</span></td>
+<td class="text-center"><span class="material-symbols-outlined text-slate-700" data-icon="close">close</span></td>
+<td class="text-center"><span class="material-symbols-outlined text-primary" data-icon="check">check</span></td>
+</tr>
+<tr>
+<td class="py-8 font-body font-semibold">Custom SLAs</td>
+<td class="text-center font-label text-xs">Standard</td>
+<td class="text-center font-label text-xs">Priority</td>
+<td class="text-center font-label text-xs">Standard</td>
+<td class="text-center font-label text-xs font-bold text-primary">Uptime Guarantee</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+</section>
+<!-- FAQ Section -->
+<section class="px-8 py-32">
+<div class="max-w-4xl mx-auto">
+<div class="mb-16">
+<h2 class="font-headline text-4xl font-bold mb-2">Technical Briefing</h2>
+<p class="font-label text-sm text-primary uppercase tracking-[0.3em]">Frequently Asked Questions</p>
+</div>
+<div class="space-y-12">
+<div class="grid md:grid-cols-[1fr_2fr] gap-8">
+<div class="font-headline font-bold text-xl text-primary">01. How accurate is the validation?</div>
+<p class="text-on-surface-variant leading-relaxed">
+                            SCRUBI achieves a <span class="text-on-surface font-mono">99.98%</span> precision rate by utilizing a multi-layered verification stack including SMTP handshake simulation, syntax analysis, and proprietary spam-trap fingerprints. We don't just guess; we verify against live servers.
+                        </p>
+</div>
+<div class="grid md:grid-cols-[1fr_2fr] gap-8 border-t border-outline-variant/10 pt-12">
+<div class="font-headline font-bold text-xl text-primary">02. Do you support custom integrations?</div>
+<p class="text-on-surface-variant leading-relaxed">
+                            Yes. Beyond our standard REST API, we offer Webhooks, gRPC streams for ultra-low latency, and native SDKs for Node.js, Go, and Python. Enterprise customers can request bespoke connectors for legacy systems.
+                        </p>
+</div>
+<div class="grid md:grid-cols-[1fr_2fr] gap-8 border-t border-outline-variant/10 pt-12">
+<div class="font-headline font-bold text-xl text-primary">03. What's the sub-500ms guarantee?</div>
+<p class="text-on-surface-variant leading-relaxed">
+                            Our global edge network ensures that validation requests are processed at the node nearest to your server. We guarantee that <span class="text-on-surface font-mono">95%</span> of individual validation requests will return a status in under 500ms, or we credit your account.
+                        </p>
+</div>
+</div>
+</div>
+</section>
+<!-- Enterprise CTA -->
+<section class="px-8 py-20">
+<div class="max-w-screen-xl mx-auto bg-primary px-8 md:px-16 py-16 flex flex-col md:flex-row items-center justify-between gap-8 relative overflow-hidden">
+<div class="absolute inset-0 grid-pattern opacity-5"></div>
+<div class="relative z-10 max-w-xl">
+<h2 class="font-headline text-4xl md:text-5xl font-black text-on-primary leading-none mb-4 tracking-tighter">Need a custom surgical procedure?</h2>
+<p class="text-on-primary/80 font-body text-lg">Our architects are ready to design a high-volume validation pipeline tailored specifically to your enterprise infrastructure.</p>
+</div>
+<div class="relative z-10">
+<button class="bg-on-primary text-primary font-black px-10 py-5 uppercase tracking-[0.2em] text-sm hover:scale-105 active:scale-95 transition-all shadow-2xl">
+                        Consult with Specialists
+                    </button>
+</div>
+</div>
+</section>
+</main>
+<!-- Footer Shell -->
+<footer class="w-full border-t border-[#3b4a41]/15 bg-[#080C10]">
+<div class="flex flex-col md:flex-row justify-between items-center px-12 py-10 w-full">
+<div class="text-lg font-black text-[#6effc0] mb-6 md:mb-0 font-headline">SCRUBI</div>
+<div class="flex flex-wrap justify-center gap-8 mb-8 md:mb-0">
+<a class="font-['Space_Grotesk'] text-xs tracking-widest uppercase text-slate-500 hover:text-[#6effc0] transition-opacity" href="#">Terminal</a>
+<a class="font-['Space_Grotesk'] text-xs tracking-widest uppercase text-slate-500 hover:text-[#6effc0] transition-opacity" href="#">API Reference</a>
+<a class="font-['Space_Grotesk'] text-xs tracking-widest uppercase text-slate-500 hover:text-[#6effc0] transition-opacity" href="#">Status</a>
+<a class="font-['Space_Grotesk'] text-xs tracking-widest uppercase text-slate-500 hover:text-[#6effc0] transition-opacity" href="#">Privacy</a>
+<a class="font-['Space_Grotesk'] text-xs tracking-widest uppercase text-slate-500 hover:text-[#6effc0] transition-opacity" href="#">Terms</a>
+</div>
+<div class="font-['Space_Grotesk'] text-xs tracking-widest uppercase text-slate-500 text-center md:text-right">
+                © 2024 SCRUBI. THE DIGITAL SURGEON. ALL RIGHTS RESERVED.
+            </div>
+</div>
+</footer>
+</body></html>

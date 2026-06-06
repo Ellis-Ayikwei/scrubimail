@@ -144,7 +144,7 @@ const Onboarding: React.FC = () => {
                 <div className="flex items-center space-x-2">
                   <input
                     type="text"
-                    value="sk_live_1234567890abcdef..."
+                    value="your_scrubimail_api_key..."
                     readOnly
                     className="flex-1 px-3 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-3xl text-sm font-mono"
                   />
@@ -166,7 +166,7 @@ const Onboarding: React.FC = () => {
             <h3 className="font-medium text-[#333333] dark:text-white mb-2">Quick Start Example:</h3>
             <pre className="text-xs bg-black text-green-400 p-3 rounded-3xl overflow-x-auto">
 {`curl -X POST https://api.scrubimail.com/validate \\
-  -H "Authorization: Bearer sk_live_1234..." \\
+  -H "X-API-Key: your_scrubimail_api_key..." \\
   -H "Content-Type: application/json" \\
   -d '{"email": "test@example.com"}'`}
             </pre>

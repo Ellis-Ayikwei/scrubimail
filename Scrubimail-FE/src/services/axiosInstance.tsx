@@ -43,12 +43,20 @@ axiosInstance.interceptors.request.use(
 axiosInstance.interceptors.response.use(
     (response) => response,
     async (error) => {
-        console.log('intercepting response');
-        if (error.response.status === 401) {
+        if (error.response?.status === 401) {
             const currentPath = window.location.pathname + window.location.search;
             window.location.href = `/login?from=${encodeURIComponent(currentPath)}`;
         }
-        return Promise.reject(error);
+        // Extract the actual server error message so callers get readable errors
+        const serverData = error.response?.data;
+        const message =
+            serverData?.detail ||
+            serverData?.message ||
+            serverData?.error ||
+            (typeof serverData === 'string' ? serverData : null) ||
+            error.message ||
+            'An unexpected error occurred';
+        return Promise.reject(new Error(message));
     }
 );
 

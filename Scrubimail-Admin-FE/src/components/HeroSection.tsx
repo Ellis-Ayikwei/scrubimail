@@ -142,7 +142,7 @@ const HeroSection: React.FC = () => {
               />
               </div>
               <Link
-              to={`/onboarding${ctaEmail ? `?email=${encodeURIComponent(ctaEmail)}` : ''}`}
+              to={`/register${ctaEmail ? `?email=${encodeURIComponent(ctaEmail)}` : ''}`}
               className="inline-flex items-center justify-center px-10 py-2 bg-gradient-to-r from-[#10B981] to-[#059669] text-white font-bold rounded-full hover:from-[#059669] hover:to-[#10B981] transition-all duration-200 shadow-xl hover:shadow-2xl transform hover:scale-105 text-lg"
               >
               Start validating for free

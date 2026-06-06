@@ -1,33 +1,34 @@
 import React, { useEffect, useState } from 'react';
-import { 
-  CreditCard, 
-  Search, 
-  Filter, 
-  Download, 
-  RefreshCw, 
-  Eye, 
-  DollarSign, 
-  Calendar, 
-  User, 
-  CheckCircle, 
-  XCircle, 
-  Clock, 
+import {
+  CreditCard,
+  Search,
+  Filter,
+  Download,
+  RefreshCw,
+  Eye,
+  DollarSign,
+  Calendar,
+  User,
+  CheckCircle,
+  XCircle,
+  Clock,
   AlertTriangle,
   TrendingUp,
-  TrendingDown,
-  Activity,
   Receipt,
-  Banknote
+  ChevronLeft,
+  ChevronRight
 } from 'lucide-react';
 import axiosInstance from '../../services/axiosInstance';
 
+interface PaymentUser {
+  id: string;
+  email: string;
+  name?: string | null;
+}
+
 interface Payment {
-  id: number;
-  user: {
-    id: number;
-    email: string;
-    name?: string;
-  };
+  id: string;
+  user: PaymentUser;
   amount: number;
   currency: string;
   status: 'pending' | 'completed' | 'failed' | 'refunded';
@@ -36,8 +37,8 @@ interface Payment {
   created_at: string;
   updated_at: string;
   description?: string;
-  plan?: string;
-  billing_cycle?: string;
+  plan?: string | null;
+  type?: string;
 }
 
 interface PaymentStats {
@@ -47,7 +48,7 @@ interface PaymentStats {
   failed_payments: number;
   average_transaction: number;
   top_plans: Array<{
-    plan: string;
+    plan_name: string;
     count: number;
     revenue: number;
   }>;
@@ -63,19 +64,42 @@ const ManagePayments: React.FC = () => {
   const [filterDateRange, setFilterDateRange] = useState<string>('all');
   const [selectedPayment, setSelectedPayment] = useState<Payment | null>(null);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalCount, setTotalCount] = useState(0);
 
   const fetchPayments = async () => {
     setLoading(true);
     setError(null);
     try {
+      const params: Record<string, string> = { page: String(page), page_size: '50' };
+      if (searchTerm) params.search = searchTerm;
+      if (filterStatus !== 'all') params.status = filterStatus;
+
+      if (filterDateRange !== 'all') {
+        const now = new Date();
+        let from: Date | null = null;
+        if (filterDateRange === 'today') {
+          from = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        } else if (filterDateRange === 'week') {
+          from = new Date(now.getTime() - 7 * 86400000);
+        } else if (filterDateRange === 'month') {
+          from = new Date(now.getFullYear(), now.getMonth() - 1, now.getDate());
+        }
+        if (from) params.date_from = from.toISOString().slice(0, 10);
+      }
+
       const [paymentsRes, statsRes] = await Promise.all([
-        axiosInstance.get('/admin/payments/'),
+        axiosInstance.get('/admin/payments/', { params }),
         axiosInstance.get('/admin/payments/stats/')
       ]);
-      setPayments(paymentsRes.data);
+
+      setPayments(paymentsRes.data.results || []);
+      setTotalPages(paymentsRes.data.total_pages || 1);
+      setTotalCount(paymentsRes.data.count || 0);
       setStats(statsRes.data);
     } catch (err: any) {
-      setError('Failed to fetch payments data');
+      setError(err?.message || 'Failed to fetch payments data');
       console.error('Error fetching payments:', err);
     } finally {
       setLoading(false);
@@ -84,19 +108,11 @@ const ManagePayments: React.FC = () => {
 
   useEffect(() => {
     fetchPayments();
-  }, []);
+  }, [page, filterStatus, filterDateRange]);
 
-  const handleUpdatePaymentStatus = async (paymentId: number, newStatus: string) => {
-    try {
-      await axiosInstance.patch(`/admin/payments/${paymentId}/`, {
-        status: newStatus
-      });
-      setPayments(prev => prev.map(payment => 
-        payment.id === paymentId ? { ...payment, status: newStatus as any } : payment
-      ));
-    } catch (err: any) {
-      setError('Failed to update payment status');
-    }
+  const handleSearch = () => {
+    setPage(1);
+    fetchPayments();
   };
 
   const getStatusBadge = (status: string) => {
@@ -109,34 +125,12 @@ const ManagePayments: React.FC = () => {
     return statusConfig[status as keyof typeof statusConfig] || statusConfig.pending;
   };
 
-  const filteredPayments = payments.filter(payment => {
-    const matchesSearch = payment.user.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         payment.user.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         payment.transaction_id?.toLowerCase().includes(searchTerm.toLowerCase());
-    
-    const matchesStatus = filterStatus === 'all' || payment.status === filterStatus;
-    
-    const matchesDate = filterDateRange === 'all' || (() => {
-      const paymentDate = new Date(payment.created_at);
-      const now = new Date();
-      switch (filterDateRange) {
-        case 'today':
-          return paymentDate.toDateString() === now.toDateString();
-        case 'week':
-          const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-          return paymentDate >= weekAgo;
-        case 'month':
-          const monthAgo = new Date(now.getFullYear(), now.getMonth() - 1, now.getDate());
-          return paymentDate >= monthAgo;
-        default:
-          return true;
-      }
-    })();
-    
-    return matchesSearch && matchesStatus && matchesDate;
-  });
+  const formatCurrency = (amount: number, currency: string = 'NGN') => {
+    const sym = currency === 'NGN' ? '₦' : currency === 'USD' ? '$' : currency;
+    return `${sym}${amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  };
 
-  if (loading) {
+  if (loading && payments.length === 0) {
     return (
       <div className="flex items-center justify-center h-64">
         <div className="text-center">
@@ -153,19 +147,18 @@ const ManagePayments: React.FC = () => {
       <div className="flex justify-between items-center">
         <div>
           <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Payments Management</h1>
-          <p className="text-gray-500 dark:text-gray-400 mt-1">Monitor and manage all payment transactions</p>
+          <p className="text-gray-500 dark:text-gray-400 mt-1">
+            Monitor and manage all payment transactions ({totalCount} total)
+          </p>
         </div>
         <div className="flex space-x-3">
           <button
             onClick={fetchPayments}
+            disabled={loading}
             className="flex items-center space-x-2 px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700"
           >
-            <RefreshCw className="w-4 h-4" />
+            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
             <span>Refresh</span>
-          </button>
-          <button className="flex items-center space-x-2 bg-[#2ED8A3] text-white px-4 py-2 rounded-lg hover:bg-[#00C48C]">
-            <Download className="w-4 h-4" />
-            <span>Export</span>
           </button>
         </div>
       </div>
@@ -192,12 +185,12 @@ const ManagePayments: React.FC = () => {
               <div className="ml-4">
                 <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Total Revenue</p>
                 <p className="text-2xl font-semibold text-gray-900 dark:text-white">
-                  ${stats.total_revenue.toLocaleString()}
+                  {formatCurrency(stats.total_revenue)}
                 </p>
               </div>
             </div>
           </div>
-          
+
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
             <div className="flex items-center">
               <div className="p-2 bg-blue-100 dark:bg-blue-900 rounded-lg">
@@ -206,12 +199,12 @@ const ManagePayments: React.FC = () => {
               <div className="ml-4">
                 <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Monthly Revenue</p>
                 <p className="text-2xl font-semibold text-gray-900 dark:text-white">
-                  ${stats.monthly_revenue.toLocaleString()}
+                  {formatCurrency(stats.monthly_revenue)}
                 </p>
               </div>
             </div>
           </div>
-          
+
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
             <div className="flex items-center">
               <div className="p-2 bg-yellow-100 dark:bg-yellow-900 rounded-lg">
@@ -225,7 +218,7 @@ const ManagePayments: React.FC = () => {
               </div>
             </div>
           </div>
-          
+
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
             <div className="flex items-center">
               <div className="p-2 bg-red-100 dark:bg-red-900 rounded-lg">
@@ -253,22 +246,23 @@ const ManagePayments: React.FC = () => {
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
               <input
                 type="text"
-                placeholder="Search by user, transaction ID..."
+                placeholder="Search by user, reference..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-[#2ED8A3] focus:border-transparent"
+                onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
+                className="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-[#2ED8A3] focus:border-transparent"
               />
             </div>
           </div>
-          
+
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
               Status
             </label>
             <select
               value={filterStatus}
-              onChange={(e) => setFilterStatus(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-[#2ED8A3] focus:border-transparent"
+              onChange={(e) => { setFilterStatus(e.target.value); setPage(1); }}
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-[#2ED8A3] focus:border-transparent"
             >
               <option value="all">All Status</option>
               <option value="pending">Pending</option>
@@ -277,15 +271,15 @@ const ManagePayments: React.FC = () => {
               <option value="refunded">Refunded</option>
             </select>
           </div>
-          
+
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
               Date Range
             </label>
             <select
               value={filterDateRange}
-              onChange={(e) => setFilterDateRange(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-[#2ED8A3] focus:border-transparent"
+              onChange={(e) => { setFilterDateRange(e.target.value); setPage(1); }}
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-[#2ED8A3] focus:border-transparent"
             >
               <option value="all">All Time</option>
               <option value="today">Today</option>
@@ -293,11 +287,14 @@ const ManagePayments: React.FC = () => {
               <option value="month">This Month</option>
             </select>
           </div>
-          
+
           <div className="flex items-end">
-            <button className="w-full flex items-center justify-center space-x-2 px-4 py-2 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600">
+            <button
+              onClick={handleSearch}
+              className="w-full flex items-center justify-center space-x-2 px-4 py-2 bg-[#2ED8A3] text-white rounded-lg hover:bg-[#00C48C]"
+            >
               <Filter className="w-4 h-4" />
-              <span>More Filters</span>
+              <span>Apply</span>
             </button>
           </div>
         </div>
@@ -322,7 +319,7 @@ const ManagePayments: React.FC = () => {
                   Status
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                  Method
+                  Type
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                   Date
@@ -333,114 +330,114 @@ const ManagePayments: React.FC = () => {
               </tr>
             </thead>
             <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-              {filteredPayments.map((payment) => {
-                const statusBadge = getStatusBadge(payment.status);
-                const StatusIcon = statusBadge.icon;
-                
-                return (
-                  <tr key={payment.id} className="hover:bg-gray-50 dark:hover:bg-gray-700">
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div>
-                        <div className="text-sm font-medium text-gray-900 dark:text-white">
-                          #{payment.id}
-                        </div>
-                        {payment.transaction_id && (
-                          <div className="text-sm text-gray-500 dark:text-gray-400">
-                            {payment.transaction_id}
-                          </div>
-                        )}
-                        {payment.description && (
-                          <div className="text-xs text-gray-400 dark:text-gray-500">
-                            {payment.description}
-                          </div>
-                        )}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="flex items-center space-x-2">
-                        <User className="w-4 h-4 text-gray-400" />
+              {payments.length === 0 ? (
+                <tr>
+                  <td colSpan={7} className="px-6 py-12 text-center text-gray-500 dark:text-gray-400">
+                    No payments found.
+                  </td>
+                </tr>
+              ) : (
+                payments.map((payment) => {
+                  const statusBadge = getStatusBadge(payment.status);
+                  const StatusIcon = statusBadge.icon;
+
+                  return (
+                    <tr key={payment.id} className="hover:bg-gray-50 dark:hover:bg-gray-700">
+                      <td className="px-6 py-4 whitespace-nowrap">
                         <div>
-                          <div className="text-sm font-medium text-gray-900 dark:text-white">
-                            {payment.user.name || 'No name'}
+                          <div className="text-sm font-medium text-gray-900 dark:text-white truncate max-w-[180px]">
+                            {payment.transaction_id || payment.id}
                           </div>
-                          <div className="text-sm text-gray-500 dark:text-gray-400">
-                            {payment.user.email}
+                          {payment.description && (
+                            <div className="text-xs text-gray-400 dark:text-gray-500 truncate max-w-[180px]">
+                              {payment.description}
+                            </div>
+                          )}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="flex items-center space-x-2">
+                          <User className="w-4 h-4 text-gray-400 shrink-0" />
+                          <div>
+                            <div className="text-sm font-medium text-gray-900 dark:text-white">
+                              {payment.user.name || 'No name'}
+                            </div>
+                            <div className="text-sm text-gray-500 dark:text-gray-400">
+                              {payment.user.email}
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm font-medium text-gray-900 dark:text-white">
-                        ${payment.amount.toLocaleString()}
-                      </div>
-                      <div className="text-xs text-gray-500 dark:text-gray-400">
-                        {payment.currency.toUpperCase()}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`inline-flex items-center px-2 py-1 text-xs font-semibold rounded-full ${statusBadge.color}`}>
-                        <StatusIcon className="w-3 h-3 mr-1" />
-                        {statusBadge.text}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
-                      <div className="flex items-center space-x-1">
-                        <CreditCard className="w-4 h-4 text-gray-400" />
-                        <span>{payment.payment_method}</span>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                      <div className="flex items-center space-x-1">
-                        <Calendar className="w-3 h-3" />
-                        <span>{new Date(payment.created_at).toLocaleDateString()}</span>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                      <div className="flex items-center space-x-2">
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm font-medium text-gray-900 dark:text-white">
+                          {formatCurrency(payment.amount, payment.currency)}
+                        </div>
+                        <div className="text-xs text-gray-500 dark:text-gray-400">
+                          {payment.currency}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span className={`inline-flex items-center px-2 py-1 text-xs font-semibold rounded-full ${statusBadge.color}`}>
+                          <StatusIcon className="w-3 h-3 mr-1" />
+                          {statusBadge.text}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600 dark:text-gray-300">
+                        {payment.type?.replace(/_/g, ' ') || payment.payment_method}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                        <div className="flex items-center space-x-1">
+                          <Calendar className="w-3 h-3" />
+                          <span>{new Date(payment.created_at).toLocaleDateString()}</span>
+                        </div>
+                        <div className="text-xs text-gray-400">
+                          {new Date(payment.created_at).toLocaleTimeString()}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                         <button
                           onClick={() => {
                             setSelectedPayment(payment);
                             setShowPaymentModal(true);
                           }}
                           className="text-blue-600 hover:text-blue-700"
+                          title="View details"
                         >
                           <Eye className="w-4 h-4" />
                         </button>
-                        {payment.status === 'pending' && (
-                          <>
-                            <button
-                              onClick={() => handleUpdatePaymentStatus(payment.id, 'completed')}
-                              className="text-green-600 hover:text-green-700"
-                              title="Mark as completed"
-                            >
-                              <CheckCircle className="w-4 h-4" />
-                            </button>
-                            <button
-                              onClick={() => handleUpdatePaymentStatus(payment.id, 'failed')}
-                              className="text-red-600 hover:text-red-700"
-                              title="Mark as failed"
-                            >
-                              <XCircle className="w-4 h-4" />
-                            </button>
-                          </>
-                        )}
-                        {payment.status === 'completed' && (
-                          <button
-                            onClick={() => handleUpdatePaymentStatus(payment.id, 'refunded')}
-                            className="text-orange-600 hover:text-orange-700"
-                            title="Process refund"
-                          >
-                            <Receipt className="w-4 h-4" />
-                          </button>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })}
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
             </tbody>
           </table>
         </div>
+
+        {/* Pagination */}
+        {totalPages > 1 && (
+          <div className="flex items-center justify-between px-6 py-3 border-t border-gray-200 dark:border-gray-700">
+            <p className="text-sm text-gray-500 dark:text-gray-400">
+              Page {page} of {totalPages} ({totalCount} results)
+            </p>
+            <div className="flex space-x-2">
+              <button
+                onClick={() => setPage(p => Math.max(1, p - 1))}
+                disabled={page <= 1}
+                className="p-2 border border-gray-300 dark:border-gray-600 rounded-lg disabled:opacity-50 hover:bg-gray-50 dark:hover:bg-gray-700"
+              >
+                <ChevronLeft className="w-4 h-4" />
+              </button>
+              <button
+                onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                disabled={page >= totalPages}
+                className="p-2 border border-gray-300 dark:border-gray-600 rounded-lg disabled:opacity-50 hover:bg-gray-50 dark:hover:bg-gray-700"
+              >
+                <ChevronRight className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Payment Details Modal */}
@@ -453,32 +450,38 @@ const ManagePayments: React.FC = () => {
               </h3>
               <button
                 onClick={() => setShowPaymentModal(false)}
-                className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+                className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 text-xl"
               >
-                ×
+                &times;
               </button>
             </div>
-            
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
                 <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">Transaction Information</h4>
                 <div className="space-y-2">
                   <div>
-                    <span className="text-sm text-gray-500 dark:text-gray-400">Transaction ID:</span>
-                    <span className="ml-2 text-sm text-gray-900 dark:text-white">
+                    <span className="text-sm text-gray-500 dark:text-gray-400">Reference:</span>
+                    <span className="ml-2 text-sm text-gray-900 dark:text-white break-all">
                       {selectedPayment.transaction_id || 'N/A'}
                     </span>
                   </div>
                   <div>
                     <span className="text-sm text-gray-500 dark:text-gray-400">Amount:</span>
                     <span className="ml-2 text-sm text-gray-900 dark:text-white">
-                      ${selectedPayment.amount.toLocaleString()} {selectedPayment.currency.toUpperCase()}
+                      {formatCurrency(selectedPayment.amount, selectedPayment.currency)}
                     </span>
                   </div>
                   <div>
                     <span className="text-sm text-gray-500 dark:text-gray-400">Status:</span>
                     <span className={`ml-2 inline-flex items-center px-2 py-1 text-xs font-semibold rounded-full ${getStatusBadge(selectedPayment.status).color}`}>
                       {getStatusBadge(selectedPayment.status).text}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-sm text-gray-500 dark:text-gray-400">Type:</span>
+                    <span className="ml-2 text-sm text-gray-900 dark:text-white">
+                      {selectedPayment.type?.replace(/_/g, ' ') || 'N/A'}
                     </span>
                   </div>
                   <div>
@@ -489,7 +492,7 @@ const ManagePayments: React.FC = () => {
                   </div>
                 </div>
               </div>
-              
+
               <div>
                 <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">User Information</h4>
                 <div className="space-y-2">
@@ -513,18 +516,10 @@ const ManagePayments: React.FC = () => {
                       </span>
                     </div>
                   )}
-                  {selectedPayment.billing_cycle && (
-                    <div>
-                      <span className="text-sm text-gray-500 dark:text-gray-400">Billing Cycle:</span>
-                      <span className="ml-2 text-sm text-gray-900 dark:text-white">
-                        {selectedPayment.billing_cycle}
-                      </span>
-                    </div>
-                  )}
                 </div>
               </div>
             </div>
-            
+
             <div className="mt-6">
               <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">Timeline</h4>
               <div className="space-y-2">
@@ -535,14 +530,25 @@ const ManagePayments: React.FC = () => {
                     {new Date(selectedPayment.created_at).toLocaleString()}
                   </span>
                 </div>
-                <div className="flex items-center space-x-2">
-                  <Activity className="w-4 h-4 text-gray-400" />
-                  <span className="text-sm text-gray-500 dark:text-gray-400">Updated:</span>
-                  <span className="text-sm text-gray-900 dark:text-white">
-                    {new Date(selectedPayment.updated_at).toLocaleString()}
-                  </span>
-                </div>
+                {selectedPayment.updated_at && selectedPayment.updated_at !== selectedPayment.created_at && (
+                  <div className="flex items-center space-x-2">
+                    <CreditCard className="w-4 h-4 text-gray-400" />
+                    <span className="text-sm text-gray-500 dark:text-gray-400">Updated:</span>
+                    <span className="text-sm text-gray-900 dark:text-white">
+                      {new Date(selectedPayment.updated_at).toLocaleString()}
+                    </span>
+                  </div>
+                )}
               </div>
+            </div>
+
+            <div className="mt-6 flex justify-end">
+              <button
+                onClick={() => setShowPaymentModal(false)}
+                className="px-4 py-2 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600"
+              >
+                Close
+              </button>
             </div>
           </div>
         </div>
@@ -552,4 +558,3 @@ const ManagePayments: React.FC = () => {
 };
 
 export default ManagePayments;
-

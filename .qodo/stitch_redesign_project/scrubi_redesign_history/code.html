@@ -1,0 +1,403 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<link href="https://fonts.googleapis.com/css2?family=Epilogue:wght@400;600;700;900&amp;family=Inter:wght@400;500;600&amp;family=Space+Grotesk:wght@400;500;700&amp;family=JetBrains+Mono&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+    tailwind.config = {
+      darkMode: "class",
+      theme: {
+        extend: {
+          colors: {
+            "surface-container-highest": "#31353a",
+            "surface-container-lowest": "#0a0f13",
+            "on-tertiary": "#2f3131",
+            "primary-fixed-dim": "#00e29e",
+            "on-background": "#e0e3e8",
+            "on-tertiary-container": "#535455",
+            "inverse-surface": "#e0e3e8",
+            "error-container": "#93000a",
+            "secondary": "#c2c7d0",
+            "on-tertiary-fixed-variant": "#454747",
+            "primary": "#6effc0",
+            "outline": "#84958a",
+            "surface-bright": "#353a3e",
+            "tertiary-fixed-dim": "#c6c6c7",
+            "surface-tint": "#00e29e",
+            "on-surface-variant": "#bacbbf",
+            "surface-container-low": "#181c20",
+            "background": "#101418",
+            "on-tertiary-fixed": "#1a1c1c",
+            "inverse-on-surface": "#2d3135",
+            "on-primary-fixed": "#002114",
+            "on-error-container": "#ffdad6",
+            "on-primary": "#003824",
+            "on-surface": "#e0e3e8",
+            "on-primary-container": "#006141",
+            "surface": "#101418",
+            "inverse-primary": "#006c49",
+            "tertiary": "#e5e5e5",
+            "primary-container": "#00e5a0",
+            "on-secondary-container": "#b1b5bf",
+            "on-secondary-fixed": "#171c23",
+            "on-primary-fixed-variant": "#005236",
+            "surface-container": "#1c2024",
+            "secondary-fixed-dim": "#c2c7d0",
+            "secondary-fixed": "#dee2ec",
+            "error": "#ffb4ab",
+            "secondary-container": "#42474f",
+            "surface-container-high": "#262a2f",
+            "outline-variant": "#3b4a41",
+            "primary-fixed": "#47ffb8",
+            "surface-variant": "#31353a",
+            "on-error": "#690005",
+            "surface-dim": "#101418",
+            "tertiary-container": "#c9c9c9",
+            "on-secondary-fixed-variant": "#42474f",
+            "on-secondary": "#2c3138",
+            "tertiary-fixed": "#e2e2e2"
+          },
+          fontFamily: {
+            "headline": ["Epilogue"],
+            "body": ["Inter"],
+            "label": ["Space Grotesk"],
+            "mono": ["JetBrains Mono"]
+          },
+          borderRadius: {"DEFAULT": "0.125rem", "lg": "0.25rem", "xl": "0.5rem", "full": "0.75rem"},
+        },
+      },
+    }
+  </script>
+<style>
+    .material-symbols-outlined {
+      font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+    }
+    body {
+      background-color: #080C10;
+      color: #e0e3e8;
+    }
+    .glass-nav {
+      backdrop-filter: blur(20px);
+    }
+    .technical-grid {
+      background-image: radial-gradient(circle at 2px 2px, rgba(59, 74, 65, 0.15) 1px, transparent 0);
+      background-size: 24px 24px;
+    }
+  </style>
+</head>
+<body class="font-body selection:bg-primary-container selection:text-on-primary-container">
+<!-- SideNavBar -->
+<aside class="fixed left-0 top-0 h-full flex flex-col py-6 px-4 bg-[#0D1117] w-64 border-r border-transparent z-50">
+<div class="mb-10 px-2">
+<span class="text-xl font-black text-[#00E5A0] tracking-tighter font-headline">SCRUBI</span>
+<p class="text-[10px] font-mono text-outline uppercase tracking-widest mt-1">Technical Editorial</p>
+</div>
+<nav class="flex-1 space-y-1">
+<a class="flex items-center gap-3 px-3 py-2 text-slate-500 hover:text-slate-200 transition-colors font-headline tracking-tight hover:bg-[#181c20]" href="#">
+<span class="material-symbols-outlined" data-icon="person">person</span>
+<span class="text-sm">Profile</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 text-slate-500 hover:text-slate-200 transition-colors font-headline tracking-tight hover:bg-[#181c20]" href="#">
+<span class="material-symbols-outlined" data-icon="key">key</span>
+<span class="text-sm">API Keys</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 text-slate-500 hover:text-slate-200 transition-colors font-headline tracking-tight hover:bg-[#181c20]" href="#">
+<span class="material-symbols-outlined" data-icon="menu_book">menu_book</span>
+<span class="text-sm">Documentation</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 text-slate-500 hover:text-slate-200 transition-colors font-headline tracking-tight hover:bg-[#181c20]" href="#">
+<span class="material-symbols-outlined" data-icon="payments">payments</span>
+<span class="text-sm">Billing</span>
+</a>
+<!-- Active State Logic: Validation History page maps to History tab -->
+<a class="flex items-center gap-3 px-3 py-2 text-[#00E5A0] border-l-2 border-[#00E5A0] bg-[#181c20] font-bold font-headline tracking-tight" href="#">
+<span class="material-symbols-outlined" data-icon="history">history</span>
+<span class="text-sm font-bold">History</span>
+</a>
+</nav>
+<div class="mt-auto space-y-4 pt-6 border-t border-outline-variant/10">
+<button class="w-full bg-primary-container text-on-primary-container py-2.5 font-headline font-bold text-xs uppercase tracking-widest rounded-sm hover:brightness-110 transition-all shadow-lg shadow-primary/10">
+        New Validation
+      </button>
+<div class="space-y-1">
+<a class="flex items-center gap-3 px-3 py-2 text-slate-500 hover:text-slate-200 transition-colors text-sm" href="#">
+<span class="material-symbols-outlined" data-icon="help_outline">help_outline</span>
+<span>Support</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 text-slate-500 hover:text-slate-200 transition-colors text-sm" href="#">
+<span class="material-symbols-outlined" data-icon="settings">settings</span>
+<span>Settings</span>
+</a>
+</div>
+</div>
+</aside>
+<!-- TopNavBar -->
+<header class="fixed top-0 right-0 left-0 h-16 flex justify-between items-center bg-[#080C10]/70 backdrop-blur-xl z-40 pl-72 pr-8 border-b border-[#3b4a41]/15">
+<div class="flex items-center gap-4 flex-1 max-w-md">
+<div class="relative w-full">
+<span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-outline text-lg">search</span>
+<input class="w-full bg-surface-container-highest/30 border-none text-sm py-2 pl-10 focus:ring-1 focus:ring-primary rounded-sm placeholder:text-outline/50 font-label" placeholder="Search validation logs..." type="text"/>
+</div>
+</div>
+<div class="flex items-center gap-6 ml-auto">
+<div class="flex items-center gap-4">
+<button class="text-slate-400 hover:text-[#00E5A0] transition-colors relative">
+<span class="material-symbols-outlined" data-icon="account_balance_wallet">account_balance_wallet</span>
+</button>
+<button class="text-slate-400 hover:text-[#00E5A0] transition-colors">
+<span class="material-symbols-outlined" data-icon="terminal">terminal</span>
+</button>
+<button class="text-slate-400 hover:text-[#00E5A0] transition-colors relative">
+<span class="material-symbols-outlined" data-icon="notifications">notifications</span>
+<span class="absolute top-0 right-0 w-2 h-2 bg-primary rounded-full border-2 border-background"></span>
+</button>
+</div>
+<div class="h-6 w-px bg-outline-variant/20"></div>
+<button class="font-headline font-semibold text-sm text-[#00E5A0] hover:shadow-[#00E5A0]/30 transition-all">
+        Scrub Now
+      </button>
+<div class="w-8 h-8 rounded-full overflow-hidden border border-outline-variant/30">
+<img alt="User profile" class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCwcwdpm7bFPU7esiSPS_JzdDkSB88A8G9KfrnNbqRAcWD4MZHFWpcT4LSdyAX02Rd_TTImEfkl93-tbYNUqqKr_GhoMt66NQCjgJSHkomglnb-yEJrr8GSsRAEE7CJr7nAZ8qRGbIwNL6bRBsxS1uQTOXIQBXKlWsZ0XJ0uyKlAVSRxURi3Ycf3cgw9fXwQ6SzoUlNPZ64QBNfVr3Itlv3szotVJfnA7Ti6yiRo_4GartQyT2Eer8eDUXwjLdclMlCDjrmo_IsnhX8"/>
+</div>
+</div>
+</header>
+<!-- Main Content Canvas -->
+<main class="pt-24 pl-72 pr-8 pb-12 min-h-screen technical-grid">
+<!-- Editorial Header -->
+<div class="mb-10">
+<h1 class="font-headline font-black text-4xl text-on-surface tracking-tighter leading-none mb-2">History Logs</h1>
+<p class="font-label text-sm text-outline tracking-wider uppercase">Validation audit trail and status reports</p>
+</div>
+<!-- Summary Bento Grid -->
+<div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+<div class="bg-surface-container-low p-6 border-l-4 border-primary">
+<p class="font-label text-xs text-outline uppercase tracking-widest mb-1">Total Cleaned</p>
+<div class="flex items-baseline gap-2">
+<span class="text-3xl font-mono font-bold text-on-surface">1.2M</span>
+<span class="text-primary text-xs font-mono">+12.4%</span>
+</div>
+</div>
+<div class="bg-surface-container-low p-6">
+<p class="font-label text-xs text-outline uppercase tracking-widest mb-1">Deliverable</p>
+<div class="flex items-baseline gap-2">
+<span class="text-3xl font-mono font-bold text-on-surface">842,019</span>
+<span class="text-outline text-xs font-mono">70.2%</span>
+</div>
+</div>
+<div class="bg-surface-container-low p-6">
+<p class="font-label text-xs text-outline uppercase tracking-widest mb-1">Risky</p>
+<div class="flex items-baseline gap-2">
+<span class="text-3xl font-mono font-bold text-on-surface">251,442</span>
+<span class="text-outline text-xs font-mono">20.9%</span>
+</div>
+</div>
+<div class="bg-surface-container-low p-6 border-l-4 border-error/50">
+<p class="font-label text-xs text-outline uppercase tracking-widest mb-1">Bounced</p>
+<div class="flex items-baseline gap-2">
+<span class="text-3xl font-mono font-bold text-error">106,539</span>
+<span class="text-error/60 text-xs font-mono">8.9%</span>
+</div>
+</div>
+</div>
+<!-- Data Interaction Layer -->
+<div class="bg-surface-container-lowest border border-outline-variant/10">
+<div class="p-4 flex flex-col md:flex-row justify-between items-center gap-4 border-b border-outline-variant/15">
+<div class="flex items-center gap-2">
+<span class="font-label text-xs text-outline uppercase tracking-widest px-2">Filters:</span>
+<button class="px-3 py-1 bg-surface-container-high text-xs font-mono text-on-surface hover:bg-surface-container-highest">DATE: LAST 24H <span class="material-symbols-outlined text-[10px] align-middle ml-1">expand_more</span></button>
+<button class="px-3 py-1 bg-surface-container-high text-xs font-mono text-on-surface hover:bg-surface-container-highest">TYPE: BULK <span class="material-symbols-outlined text-[10px] align-middle ml-1">expand_more</span></button>
+<button class="px-3 py-1 bg-surface-container-high text-xs font-mono text-primary hover:bg-surface-container-highest">STATUS: ALL <span class="material-symbols-outlined text-[10px] align-middle ml-1">expand_more</span></button>
+</div>
+<div class="flex items-center gap-3">
+<button class="flex items-center gap-2 text-xs font-label text-outline hover:text-on-surface transition-colors">
+<span class="material-symbols-outlined text-sm" data-icon="download">download</span> EXPORT CSV
+          </button>
+<button class="flex items-center gap-2 text-xs font-label text-outline hover:text-on-surface transition-colors">
+<span class="material-symbols-outlined text-sm" data-icon="refresh">refresh</span> REFRESH
+          </button>
+</div>
+</div>
+<!-- Technical Data Table -->
+<div class="overflow-x-auto">
+<table class="w-full text-left border-collapse">
+<thead>
+<tr class="border-b border-outline-variant/10">
+<th class="px-6 py-4 font-label text-[10px] text-outline uppercase tracking-[0.2em]">Timestamp</th>
+<th class="px-6 py-4 font-label text-[10px] text-outline uppercase tracking-[0.2em]">Entity Identifier</th>
+<th class="px-6 py-4 font-label text-[10px] text-outline uppercase tracking-[0.2em]">Verification Status</th>
+<th class="px-6 py-4 font-label text-[10px] text-outline uppercase tracking-[0.2em]">Quality Score</th>
+<th class="px-6 py-4 font-label text-[10px] text-outline uppercase tracking-[0.2em]">Protocol</th>
+<th class="px-6 py-4 font-label text-[10px] text-outline uppercase tracking-[0.2em]">Action</th>
+</tr>
+</thead>
+<tbody class="font-mono text-xs">
+<tr class="hover:bg-surface-container-low/50 transition-colors border-b border-outline-variant/5">
+<td class="px-6 py-5 text-outline/80">2023-11-24 14:02:11</td>
+<td class="px-6 py-5 text-on-surface font-medium">dev.lead_4492@enterprise.co</td>
+<td class="px-6 py-5">
+<span class="inline-flex items-center gap-1.5 px-2 py-1 bg-primary/10 text-primary border border-primary/20 text-[10px] font-bold tracking-tight">
+<span class="w-1.5 h-1.5 bg-primary rounded-full"></span> DELIVERABLE
+                </span>
+</td>
+<td class="px-6 py-5">
+<div class="flex items-center gap-2">
+<div class="flex-1 h-1.5 bg-surface-container-highest w-24">
+<div class="bg-primary h-full" style="width: 98%"></div>
+</div>
+<span class="text-primary">98%</span>
+</div>
+</td>
+<td class="px-6 py-5 text-outline">SMTP_HELO</td>
+<td class="px-6 py-5">
+<button class="text-outline hover:text-on-surface"><span class="material-symbols-outlined text-lg">more_vert</span></button>
+</td>
+</tr>
+<tr class="hover:bg-surface-container-low/50 transition-colors border-b border-outline-variant/5">
+<td class="px-6 py-5 text-outline/80">2023-11-24 14:01:58</td>
+<td class="px-6 py-5 text-on-surface font-medium">marketing-bot@spam-haus.net</td>
+<td class="px-6 py-5">
+<span class="inline-flex items-center gap-1.5 px-2 py-1 bg-error-container/20 text-error border border-error/20 text-[10px] font-bold tracking-tight">
+<span class="w-1.5 h-1.5 bg-error rounded-full"></span> BOUNCED
+                </span>
+</td>
+<td class="px-6 py-5">
+<div class="flex items-center gap-2">
+<div class="flex-1 h-1.5 bg-surface-container-highest w-24">
+<div class="bg-error h-full" style="width: 12%"></div>
+</div>
+<span class="text-error">12%</span>
+</div>
+</td>
+<td class="px-6 py-5 text-outline">DNS_MX_MISS</td>
+<td class="px-6 py-5">
+<button class="text-outline hover:text-on-surface"><span class="material-symbols-outlined text-lg">more_vert</span></button>
+</td>
+</tr>
+<tr class="hover:bg-surface-container-low/50 transition-colors border-b border-outline-variant/5">
+<td class="px-6 py-5 text-outline/80">2023-11-24 13:59:44</td>
+<td class="px-6 py-5 text-on-surface font-medium">john.doe_test@gmail.com</td>
+<td class="px-6 py-5">
+<span class="inline-flex items-center gap-1.5 px-2 py-1 bg-secondary-container/30 text-secondary border border-secondary/20 text-[10px] font-bold tracking-tight">
+<span class="w-1.5 h-1.5 bg-secondary rounded-full"></span> RISKY
+                </span>
+</td>
+<td class="px-6 py-5">
+<div class="flex items-center gap-2">
+<div class="flex-1 h-1.5 bg-surface-container-highest w-24">
+<div class="bg-secondary h-full" style="width: 55%"></div>
+</div>
+<span class="text-secondary">55%</span>
+</div>
+</td>
+<td class="px-6 py-5 text-outline">CATCH_ALL</td>
+<td class="px-6 py-5">
+<button class="text-outline hover:text-on-surface"><span class="material-symbols-outlined text-lg">more_vert</span></button>
+</td>
+</tr>
+<tr class="hover:bg-surface-container-low/50 transition-colors border-b border-outline-variant/5">
+<td class="px-6 py-5 text-outline/80">2023-11-24 13:55:02</td>
+<td class="px-6 py-5 text-on-surface font-medium">contact@fintech-surge.io</td>
+<td class="px-6 py-5">
+<span class="inline-flex items-center gap-1.5 px-2 py-1 bg-primary/10 text-primary border border-primary/20 text-[10px] font-bold tracking-tight">
+<span class="w-1.5 h-1.5 bg-primary rounded-full"></span> DELIVERABLE
+                </span>
+</td>
+<td class="px-6 py-5">
+<div class="flex items-center gap-2">
+<div class="flex-1 h-1.5 bg-surface-container-highest w-24">
+<div class="bg-primary h-full" style="width: 100%"></div>
+</div>
+<span class="text-primary">100%</span>
+</div>
+</td>
+<td class="px-6 py-5 text-outline">SMTP_HANDSHAKE</td>
+<td class="px-6 py-5">
+<button class="text-outline hover:text-on-surface"><span class="material-symbols-outlined text-lg">more_vert</span></button>
+</td>
+</tr>
+<tr class="hover:bg-surface-container-low/50 transition-colors border-b border-outline-variant/5">
+<td class="px-6 py-5 text-outline/80">2023-11-24 13:52:19</td>
+<td class="px-6 py-5 text-on-surface font-medium">user_9921_temp@mailinator.com</td>
+<td class="px-6 py-5">
+<span class="inline-flex items-center gap-1.5 px-2 py-1 bg-error-container/20 text-error border border-error/20 text-[10px] font-bold tracking-tight">
+<span class="w-1.5 h-1.5 bg-error rounded-full"></span> BOUNCED
+                </span>
+</td>
+<td class="px-6 py-5">
+<div class="flex items-center gap-2">
+<div class="flex-1 h-1.5 bg-surface-container-highest w-24">
+<div class="bg-error h-full" style="width: 0%"></div>
+</div>
+<span class="text-error">0%</span>
+</div>
+</td>
+<td class="px-6 py-5 text-outline">DISPOSABLE_MAIL</td>
+<td class="px-6 py-5">
+<button class="text-outline hover:text-on-surface"><span class="material-symbols-outlined text-lg">more_vert</span></button>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<!-- Pagination Technical Style -->
+<div class="p-4 flex justify-between items-center border-t border-outline-variant/15">
+<span class="font-mono text-[10px] text-outline">INDEX: 001 - 050 OF 1,204,429</span>
+<div class="flex gap-1">
+<button class="w-8 h-8 flex items-center justify-center bg-surface-container-high text-outline hover:text-primary transition-colors">
+<span class="material-symbols-outlined text-sm">chevron_left</span>
+</button>
+<button class="w-8 h-8 flex items-center justify-center bg-primary text-on-primary font-bold text-xs">1</button>
+<button class="w-8 h-8 flex items-center justify-center bg-surface-container-high text-on-surface font-mono text-xs hover:bg-surface-container-highest">2</button>
+<button class="w-8 h-8 flex items-center justify-center bg-surface-container-high text-on-surface font-mono text-xs hover:bg-surface-container-highest">3</button>
+<button class="w-8 h-8 flex items-center justify-center bg-surface-container-high text-outline hover:text-primary transition-colors">
+<span class="material-symbols-outlined text-sm">chevron_right</span>
+</button>
+</div>
+</div>
+</div>
+<!-- Terminal Status Monitor -->
+<div class="mt-8 grid grid-cols-1 lg:grid-cols-3 gap-6">
+<div class="lg:col-span-2 bg-surface-container-lowest p-5 border border-outline-variant/10 font-mono text-[11px] leading-relaxed relative overflow-hidden">
+<div class="absolute top-0 left-0 w-full h-1 bg-primary/20"></div>
+<div class="flex items-center gap-2 mb-4">
+<div class="flex gap-1">
+<div class="w-2 h-2 rounded-full bg-outline/30"></div>
+<div class="w-2 h-2 rounded-full bg-outline/30"></div>
+<div class="w-2 h-2 rounded-full bg-outline/30"></div>
+</div>
+<span class="text-outline uppercase tracking-widest text-[9px] ml-2">Live Validator Stream — Node 0x442</span>
+</div>
+<div class="space-y-1">
+<p><span class="text-primary">[OK]</span> Connection established with MX cluster US-EAST-1</p>
+<p><span class="text-outline">[INFO]</span> Batch 9942 processing... 78% complete</p>
+<p><span class="text-primary">[OK]</span> Verification successful for user_karl@enterprise.com (Latency: 142ms)</p>
+<p><span class="text-secondary">[WARN]</span> Potential catch-all detected at domain: startup-hub.io</p>
+<p><span class="text-error">[FAIL]</span> DNS Resolution failure for tx_992_node.local</p>
+<p><span class="text-primary">[OK]</span> Writing 50 results to DB cluster main_history...</p>
+</div>
+</div>
+<div class="bg-surface-container-low p-6 flex flex-col justify-center border border-outline-variant/10">
+<h4 class="font-headline font-bold text-lg mb-2">Usage Limit</h4>
+<div class="space-y-4">
+<div>
+<div class="flex justify-between text-[10px] font-mono text-outline mb-1">
+<span>MONTHLY QUOTA</span>
+<span>85.4%</span>
+</div>
+<div class="h-2 bg-surface-container-highest w-full overflow-hidden">
+<div class="h-full bg-primary" style="width: 85.4%"></div>
+</div>
+</div>
+<p class="text-xs text-outline leading-tight">You have <span class="text-on-surface font-bold">145,571</span> validations remaining this billing cycle.</p>
+<button class="text-xs font-headline font-bold text-primary underline underline-offset-4 hover:text-primary-fixed-dim transition-colors text-left uppercase tracking-tighter">
+            Upgrade Plan
+          </button>
+</div>
+</div>
+</div>
+</main>
+</body></html>

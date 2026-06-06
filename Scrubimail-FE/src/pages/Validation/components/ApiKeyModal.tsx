@@ -53,8 +53,8 @@ const ApiKeyModal: React.FC<ApiKeyModalProps> = ({
               leaveFrom="opacity-100 scale-100"
               leaveTo="opacity-0 scale-95"
             >
-              <Dialog.Panel className="w-full max-w-xs sm:max-w-md lg:max-w-2xl mx-2 sm:mx-4 transform overflow-hidden rounded-lg sm:rounded-xl bg-white dark:bg-gray-800 shadow-xl transition-all">
-                <div className="p-3 sm:p-4 lg:p-6 border-b border-gray-200 dark:border-gray-700">
+              <Dialog.Panel className="w-full max-w-xs sm:max-w-md lg:max-w-2xl mx-2 sm:mx-4 transform overflow-hidden rounded-lg sm:rounded-xl bg-white dark:bg-[#1c2024] dark:border dark:border-[#3b4a41]/40 shadow-xl transition-all">
+                <div className="p-3 sm:p-4 lg:p-6 border-b border-gray-200 dark:border-[#3b4a41]/40">
                   <div className="flex items-center justify-between">
                     <Dialog.Title className="text-base sm:text-lg lg:text-xl font-semibold text-[#333333] dark:text-white flex items-center">
                       <Key className="w-4 h-4 sm:w-5 sm:h-5 mr-2 text-[#2ED8A3]" />
@@ -153,7 +153,7 @@ const ApiKeyModal: React.FC<ApiKeyModalProps> = ({
                   )}
                 </div>
 
-                <div className="p-3 sm:p-4 lg:p-6 border-t border-gray-200 dark:border-gray-700 flex flex-col sm:flex-row justify-end space-y-2 sm:space-y-0 sm:space-x-3">
+                <div className="p-3 sm:p-4 lg:p-6 border-t border-gray-200 dark:border-[#3b4a41]/40 flex flex-col sm:flex-row justify-end space-y-2 sm:space-y-0 sm:space-x-3">
                   <button
                     onClick={onClose}
                     className="w-full sm:w-auto px-3 sm:px-4 py-2 text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 transition-colors text-xs sm:text-sm lg:text-base"

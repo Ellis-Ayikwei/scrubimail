@@ -209,6 +209,7 @@ const AdminUsers: React.FC = () => {
     };
 
     const handleView = (user: User) => {
+        console.log("handleView", user);
         navigate(`/admin/users/${user.id}`);
     };
 

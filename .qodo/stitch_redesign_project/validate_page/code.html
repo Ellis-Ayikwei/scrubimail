@@ -1,0 +1,382 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>SCRUB_CONSOLE_V1 | Email Validation</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Epilogue:wght@400;700;900&amp;family=Inter:wght@300;400;600&amp;family=Space+Grotesk:wght@300;500;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "primary-fixed": "#47ffb8",
+                        "outline": "#84958a",
+                        "tertiary-fixed-dim": "#c6c6c7",
+                        "surface-container-lowest": "#0a0f13",
+                        "tertiary-fixed": "#e2e2e2",
+                        "primary": "#6effc0",
+                        "surface-container": "#1c2024",
+                        "surface-container-high": "#262a2f",
+                        "outline-variant": "#3b4a41",
+                        "on-primary-fixed-variant": "#005236",
+                        "on-surface-variant": "#bacbbf",
+                        "on-secondary": "#2c3138",
+                        "surface-tint": "#00e29e",
+                        "on-primary": "#003824",
+                        "secondary-fixed-dim": "#c2c7d0",
+                        "primary-container": "#00e5a0",
+                        "on-error": "#690005",
+                        "primary-fixed-dim": "#00e29e",
+                        "inverse-on-surface": "#2d3135",
+                        "inverse-primary": "#006c49",
+                        "surface-container-highest": "#31353a",
+                        "on-tertiary": "#2f3131",
+                        "on-primary-container": "#006141",
+                        "on-tertiary-fixed-variant": "#454747",
+                        "surface-variant": "#31353a",
+                        "on-surface": "#e0e3e8",
+                        "on-primary-fixed": "#002114",
+                        "secondary": "#c2c7d0",
+                        "tertiary-container": "#c9c9c9",
+                        "background": "#101418",
+                        "surface-bright": "#353a3e",
+                        "on-tertiary-fixed": "#1a1c1c",
+                        "secondary-container": "#42474f",
+                        "tertiary": "#e5e5e5",
+                        "on-secondary-fixed-variant": "#42474f",
+                        "surface": "#101418",
+                        "secondary-fixed": "#dee2ec",
+                        "on-secondary-container": "#b1b5bf",
+                        "error": "#ffb4ab",
+                        "on-background": "#e0e3e8",
+                        "surface-dim": "#101418",
+                        "on-secondary-fixed": "#171c23",
+                        "surface-container-low": "#181c20",
+                        "error-container": "#93000a",
+                        "on-tertiary-container": "#535455",
+                        "on-error-container": "#ffdad6",
+                        "inverse-surface": "#e0e3e8"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.125rem",
+                        "lg": "0.25rem",
+                        "xl": "0.5rem",
+                        "full": "0.75rem"
+                    },
+                    "fontFamily": {
+                        "headline": ["Epilogue"],
+                        "body": ["Inter"],
+                        "label": ["Space Grotesk"]
+                    }
+                },
+            },
+        }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+            vertical-align: middle;
+        }
+        .pulse-glow-emerald:active {
+            box-shadow: 0 0 15px rgba(110, 255, 192, 0.4);
+            transform: scale(0.98);
+        }
+        .highlight-glow-mint {
+            box-shadow: inset 4px 0 0 0 #6effc0;
+        }
+        .mono-data {
+            font-family: 'Space Grotesk', monospace;
+        }
+        .glass-nav {
+            background: rgba(8, 12, 16, 0.8);
+            backdrop-filter: blur(20px);
+        }
+    </style>
+</head>
+<body class="bg-background text-on-background font-body selection:bg-primary selection:text-on-primary">
+<!-- TopAppBar -->
+<header class="fixed top-0 w-full z-50 flex justify-between items-center px-6 h-16 bg-[#080C10]/80 backdrop-blur-lg border-b border-white/5">
+<div class="flex items-center gap-8">
+<span class="font-['Epilogue'] font-black tracking-tighter text-[#6effc0] text-xl">SCRUB_CONSOLE_V1</span>
+<nav class="hidden md:flex gap-6 items-center">
+<a class="text-slate-500 font-mono text-xs uppercase tracking-widest hover:text-[#6effc0] transition-colors" href="#">Network</a>
+<a class="text-[#6effc0] border-b-2 border-[#6effc0] pb-1 font-mono text-xs uppercase tracking-widest" href="#">Validation</a>
+<a class="text-slate-500 font-mono text-xs uppercase tracking-widest hover:text-[#6effc0] transition-colors" href="#">Analytics</a>
+</nav>
+</div>
+<div class="flex items-center gap-4">
+<div class="flex items-center gap-2 bg-surface-container-low px-3 py-1.5 border border-white/5">
+<span class="material-symbols-outlined text-primary text-sm" data-icon="terminal">terminal</span>
+<span class="mono-data text-[10px] text-outline">API_STABLE: 200ms</span>
+</div>
+<button class="text-on-surface-variant hover:text-primary transition-colors"><span class="material-symbols-outlined" data-icon="notifications">notifications</span></button>
+<button class="text-on-surface-variant hover:text-primary transition-colors"><span class="material-symbols-outlined" data-icon="settings">settings</span></button>
+<div class="w-8 h-8 bg-surface-container-highest border border-outline-variant flex items-center justify-center overflow-hidden">
+<img alt="User Operator Avatar" class="w-full h-full object-cover" data-alt="Portrait of a professional technical operator in a dark studio with dramatic cyan lighting highlights" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAK4SoRQyVadgjZDZlP4LadVVe-02w2syBfbuZ2RGiRtjmsXK6lxXXrsP-6kNRUoK7zQwOFcluCUFLKRtwiqdiIoU840YXfAxPLdPXJ2-vVcaIpQF2AYU9HQOOZogzzRUmxr5348Lu861kS9YVSdCZrLiaqbcFVp71QHo_Hsq2mgaB702w1I20NUCw8jZB0GSVTUuTYDhjuQVjjN7-LRX5TU5JawVF2suubHQagmVpDtB5pvwwnAcpUi6YpS6pC3LeVXdP5eHpBrtXD"/>
+</div>
+</div>
+</header>
+<!-- SideNavBar -->
+<aside class="fixed left-0 top-0 h-full w-64 bg-[#0D1117] border-r border-white/5 pt-20 flex flex-col z-40 hidden md:flex">
+<div class="px-6 py-4 border-b border-white/5 mb-4">
+<div class="flex items-center gap-3">
+<div class="w-2 h-2 rounded-full bg-primary animate-pulse"></div>
+<div>
+<p class="font-mono text-[10px] uppercase tracking-widest text-primary">NODE_01</p>
+<p class="font-mono text-[8px] text-slate-500">Operational</p>
+</div>
+</div>
+</div>
+<nav class="flex-1">
+<a class="text-slate-400 hover:text-white px-6 py-3 flex items-center gap-3 hover:bg-[#262a2f] transition-all duration-150 font-mono text-xs uppercase tracking-widest" href="#">
+<span class="material-symbols-outlined" data-icon="dashboard">dashboard</span> Dashboard
+            </a>
+<a class="bg-[#181c20] text-[#6effc0] border-l-4 border-[#6effc0] font-bold px-6 py-3 flex items-center gap-3 font-mono text-xs uppercase tracking-widest" href="#">
+<span class="material-symbols-outlined" data-icon="biotech" style="font-variation-settings: 'FILL' 1;">biotech</span> Bulk Validation
+            </a>
+<a class="text-slate-400 hover:text-white px-6 py-3 flex items-center gap-3 hover:bg-[#262a2f] transition-all duration-150 font-mono text-xs uppercase tracking-widest" href="#">
+<span class="material-symbols-outlined" data-icon="key">key</span> API Keys
+            </a>
+<a class="text-slate-400 hover:text-white px-6 py-3 flex items-center gap-3 hover:bg-[#262a2f] transition-all duration-150 font-mono text-xs uppercase tracking-widest" href="#">
+<span class="material-symbols-outlined" data-icon="terminal">terminal</span> Logs
+            </a>
+<a class="text-slate-400 hover:text-white px-6 py-3 flex items-center gap-3 hover:bg-[#262a2f] transition-all duration-150 font-mono text-xs uppercase tracking-widest" href="#">
+<span class="material-symbols-outlined" data-icon="menu_book">menu_book</span> Documentation
+            </a>
+</nav>
+<div class="p-4 border-t border-white/5">
+<a class="text-slate-400 hover:text-white px-2 py-2 flex items-center gap-3 font-mono text-[10px] uppercase tracking-widest" href="#">
+<span class="material-symbols-outlined text-sm" data-icon="help_center">help_center</span> Support
+            </a>
+<a class="text-slate-400 hover:text-white px-2 py-2 flex items-center gap-3 font-mono text-[10px] uppercase tracking-widest" href="#">
+<span class="material-symbols-outlined text-sm" data-icon="logout">logout</span> Sign Out
+            </a>
+</div>
+</aside>
+<!-- Main Canvas -->
+<main class="md:ml-64 pt-24 px-6 pb-12 min-h-screen bg-surface-container-lowest">
+<!-- Header Section -->
+<div class="max-w-6xl mx-auto mb-8 flex justify-between items-end">
+<div>
+<h1 class="font-headline font-black text-4xl tracking-tighter text-white mb-2 uppercase">Verification_Engine</h1>
+<p class="font-label text-sm text-outline-variant tracking-wider">VERSION 4.2.0 // DEEP_SMTP_INSPECTION_ACTIVE</p>
+</div>
+<div class="flex gap-4">
+<div class="text-right">
+<p class="font-label text-[10px] text-slate-500 uppercase tracking-widest">System Status</p>
+<p class="mono-data text-primary text-sm font-bold">HEALTHY [99.9%]</p>
+</div>
+</div>
+</div>
+<!-- Validation Dashboard Grid -->
+<div class="max-w-6xl mx-auto grid grid-cols-12 gap-6">
+<!-- Central Validation Console -->
+<div class="col-span-12 lg:col-span-8 space-y-6">
+<section class="bg-surface-container-low border border-white/5 p-8 relative overflow-hidden group">
+<div class="absolute top-0 right-0 p-4 opacity-10">
+<span class="material-symbols-outlined text-8xl" data-icon="shield_with_heart">shield_with_heart</span>
+</div>
+<div class="flex items-center gap-2 mb-6">
+<div class="w-1.5 h-6 bg-primary"></div>
+<h2 class="font-label text-xs font-bold uppercase tracking-[0.2em] text-on-surface-variant">Console.Input_Vector</h2>
+</div>
+<div class="relative">
+<textarea class="w-full bg-surface-container-highest border-none focus:ring-1 focus:ring-primary p-6 font-mono text-primary text-lg h-40 placeholder:text-slate-700" placeholder="ENTER TARGETS (ONE PER LINE) OR PASTE CSV DATA..."></textarea>
+<div class="absolute bottom-4 right-4 flex gap-4">
+<button class="bg-transparent border border-outline-variant text-outline hover:border-primary hover:text-primary px-6 py-2 text-xs font-mono tracking-widest uppercase transition-all">
+                                Load File
+                            </button>
+<button class="bg-primary text-on-primary px-8 py-2 text-xs font-mono font-bold tracking-[0.2em] uppercase pulse-glow-emerald">
+                                Initiate Scrub
+                            </button>
+</div>
+</div>
+<div class="mt-4 flex items-center gap-4 text-[10px] font-mono text-outline-variant uppercase">
+<span>Limit: 10,000 / batch</span>
+<span>|</span>
+<span>Auto-Detect: Enabled</span>
+<span>|</span>
+<span>Mode: Surgical_Scan</span>
+</div>
+</section>
+<!-- Precision Results Module -->
+<section class="grid grid-cols-1 md:grid-cols-2 gap-6">
+<!-- Gauge Result -->
+<div class="bg-surface-container-low border border-white/5 p-6 flex flex-col justify-between">
+<div class="flex justify-between items-start mb-8">
+<h3 class="font-label text-[10px] font-bold uppercase tracking-widest text-outline">Deliverability.Score</h3>
+<span class="material-symbols-outlined text-primary" data-icon="verified_user">verified_user</span>
+</div>
+<div class="relative flex justify-center py-6">
+<!-- SVG Gauge Simulation -->
+<svg class="w-40 h-40 transform -rotate-90">
+<circle class="text-surface-container-highest" cx="80" cy="80" fill="transparent" r="70" stroke="currentColor" stroke-width="8"></circle>
+<circle class="text-primary" cx="80" cy="80" fill="transparent" r="70" stroke="currentColor" stroke-dasharray="440" stroke-dashoffset="44" stroke-width="8"></circle>
+</svg>
+<div class="absolute inset-0 flex flex-col items-center justify-center">
+<span class="mono-data text-4xl font-bold text-white">92</span>
+<span class="mono-data text-[10px] text-primary tracking-widest">EXCELLENT</span>
+</div>
+</div>
+<p class="text-[10px] text-slate-500 font-mono mt-4">Probability of reaching inbox based on server reputation and syntax integrity.</p>
+</div>
+<!-- Tech Specs -->
+<div class="bg-surface-container-low border border-white/5 p-6">
+<h3 class="font-label text-[10px] font-bold uppercase tracking-widest text-outline mb-6 border-b border-white/5 pb-2">Technical.Report [JSON_FRAG]</h3>
+<div class="space-y-4">
+<div class="flex justify-between items-center">
+<span class="mono-data text-[11px] text-slate-400">MX_RECORDS</span>
+<span class="mono-data text-[11px] text-primary">DETECTED (3)</span>
+</div>
+<div class="flex justify-between items-center">
+<span class="mono-data text-[11px] text-slate-400">SYNTAX_CHECK</span>
+<span class="mono-data text-[11px] text-primary">VALID</span>
+</div>
+<div class="flex justify-between items-center">
+<span class="mono-data text-[11px] text-slate-400">DISPOSABLE_DOMAIN</span>
+<span class="mono-data text-[11px] text-error">FALSE</span>
+</div>
+<div class="flex justify-between items-center">
+<span class="mono-data text-[11px] text-slate-400">SMTP_CONNECTION</span>
+<span class="mono-data text-[11px] text-primary">SUCCESS</span>
+</div>
+<div class="flex justify-between items-center">
+<span class="mono-data text-[11px] text-slate-400">CATCH_ALL</span>
+<span class="mono-data text-[11px] text-slate-500">INCONCLUSIVE</span>
+</div>
+</div>
+</div>
+</section>
+<!-- Terminal Style Output -->
+<section class="bg-surface-container-lowest border border-white/5 rounded-sm overflow-hidden">
+<div class="bg-surface-container-high px-4 py-2 flex items-center justify-between border-b border-white/5">
+<div class="flex gap-1.5">
+<div class="w-2.5 h-2.5 rounded-full bg-outline-variant"></div>
+<div class="w-2.5 h-2.5 rounded-full bg-outline-variant"></div>
+<div class="w-2.5 h-2.5 rounded-full bg-outline-variant"></div>
+</div>
+<span class="mono-data text-[9px] text-outline uppercase tracking-widest">Stream.Output [live]</span>
+<span class="material-symbols-outlined text-xs text-outline" data-icon="close">close</span>
+</div>
+<div class="p-4 h-32 overflow-y-auto font-mono text-[11px] text-primary/80 leading-relaxed">
+<div class="flex gap-4 mb-1">
+<span class="text-slate-600">14:20:11.02</span>
+<span>[INFO] Connection established to smtp.gmail.com:587</span>
+</div>
+<div class="flex gap-4 mb-1">
+<span class="text-slate-600">14:20:11.45</span>
+<span>[SCAN] Analyzing header signatures for entropy...</span>
+</div>
+<div class="flex gap-4 mb-1 text-on-primary">
+<span class="text-slate-600">14:20:11.89</span>
+<span>[RESULT] user_v12@provider.net marked as VALID.</span>
+</div>
+<div class="flex gap-4">
+<span class="text-slate-600">14:20:12.11</span>
+<span class="animate-pulse">_</span>
+</div>
+</div>
+</section>
+</div>
+<!-- Stats & Progress Sidebar -->
+<div class="col-span-12 lg:col-span-4 space-y-6">
+<!-- High-Fidelity Stats -->
+<section class="bg-surface-container border border-white/5 p-6">
+<h2 class="font-label text-xs font-bold uppercase tracking-[0.2em] text-outline mb-6">Session.Metrics</h2>
+<div class="space-y-8">
+<div>
+<div class="flex justify-between items-end mb-1">
+<span class="mono-data text-[10px] text-slate-500 uppercase">Total_Cleaned</span>
+<span class="mono-data text-2xl font-bold text-white tracking-tighter">42,891</span>
+</div>
+<div class="w-full h-1 bg-surface-container-highest">
+<div class="w-3/4 h-full bg-primary shadow-[0_0_8px_#6effc0]"></div>
+</div>
+</div>
+<div class="grid grid-cols-2 gap-4">
+<div class="bg-surface-container-low p-3 border-l-2 border-primary">
+<p class="font-label text-[9px] text-outline uppercase tracking-widest mb-1">Valid_%</p>
+<p class="mono-data text-lg font-bold text-white">88.4</p>
+</div>
+<div class="bg-surface-container-low p-3 border-l-2 border-error">
+<p class="font-label text-[9px] text-outline uppercase tracking-widest mb-1">Risk_Detected</p>
+<p class="mono-data text-lg font-bold text-white">3.12</p>
+</div>
+</div>
+<div class="bg-surface-container-low p-4 flex items-center gap-4">
+<div class="flex-1">
+<p class="font-label text-[9px] text-outline uppercase tracking-widest mb-1">Avg_Latency</p>
+<p class="mono-data text-xl font-bold text-primary">142ms</p>
+</div>
+<div class="h-10 w-24">
+<!-- Sparkline Simulation -->
+<svg class="w-full h-full stroke-primary fill-none stroke-2" viewbox="0 0 100 30">
+<path d="M0,25 L10,22 L20,28 L30,10 L40,15 L50,5 L60,18 L70,12 L80,25 L90,20 L100,22"></path>
+</svg>
+</div>
+</div>
+</div>
+</section>
+<!-- Progress Tracker -->
+<section class="bg-surface-container border border-white/5 p-6 relative overflow-hidden">
+<h2 class="font-label text-xs font-bold uppercase tracking-[0.2em] text-outline mb-6">Surgical.Scan_Pipeline</h2>
+<div class="space-y-6">
+<div class="flex items-start gap-4">
+<div class="mt-1 w-4 h-4 rounded-full border border-primary flex items-center justify-center">
+<div class="w-1.5 h-1.5 rounded-full bg-primary"></div>
+</div>
+<div>
+<p class="mono-data text-[11px] font-bold text-white uppercase">Step_01: Data_Ingest</p>
+<p class="mono-data text-[9px] text-slate-500">Normalizing input strings...</p>
+</div>
+<span class="ml-auto mono-data text-[10px] text-primary">DONE</span>
+</div>
+<div class="flex items-start gap-4">
+<div class="mt-1 w-4 h-4 rounded-full border border-primary flex items-center justify-center">
+<div class="w-1.5 h-1.5 rounded-full bg-primary animate-ping"></div>
+</div>
+<div>
+<p class="mono-data text-[11px] font-bold text-white uppercase">Step_02: AI_Structural_Analysis</p>
+<p class="mono-data text-[9px] text-slate-500">Detecting pattern anomalies...</p>
+</div>
+<span class="ml-auto mono-data text-[10px] text-primary">IN_PROGRESS</span>
+</div>
+<div class="flex items-start gap-4 opacity-40">
+<div class="mt-1 w-4 h-4 rounded-full border border-outline-variant"></div>
+<div>
+<p class="mono-data text-[11px] font-bold text-white uppercase">Step_03: MX_Validation</p>
+<p class="mono-data text-[9px] text-slate-500">Querying DNS records...</p>
+</div>
+<span class="ml-auto mono-data text-[10px] text-slate-500">PENDING</span>
+</div>
+<div class="flex items-start gap-4 opacity-40">
+<div class="mt-1 w-4 h-4 rounded-full border border-outline-variant"></div>
+<div>
+<p class="mono-data text-[11px] font-bold text-white uppercase">Step_04: SMTP_Deep_Handshake</p>
+<p class="mono-data text-[9px] text-slate-500">Executing clinical server probe...</p>
+</div>
+<span class="ml-auto mono-data text-[10px] text-slate-500">PENDING</span>
+</div>
+</div>
+</section>
+<!-- Promo/Callout -->
+<div class="relative h-32 bg-surface-container border border-primary/20 overflow-hidden group p-4">
+<img alt="Cybersecurity hardware" class="absolute inset-0 w-full h-full object-cover opacity-20 group-hover:scale-105 transition-transform duration-700" data-alt="Macro photo of a glowing computer motherboard with green led lights and complex circuitry reflecting neon mint tones" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDTKgogk1LZiGWJfUZqaM9Rew78GzfxjQOFtroqchQFsA07HYj4pRKPsFxXokIobr-pvqpVPxubH5SoTZlbLvsXAl-vSkXUjFJKqmqluSFrjmsMeT2Use0EPfFT-w-oqH3Cpgz-HMGVxuAu2ZNJMYRf2XWKwzndJobS7XAyK9Ea0MF81xaSkj1G53JTrKl8gkf0HNYojdzMKAD82y7bWx6H9UY4afqa31qV0UHVhp8TdFUmNCUsKR71naMAk953ZPLHK16UKwAUztqf"/>
+<div class="relative z-10 flex flex-col justify-between h-full">
+<p class="font-headline font-bold text-xs text-primary uppercase tracking-widest">Upgrade to_Edge</p>
+<p class="font-mono text-[9px] text-white">Unlock real-time honeypot detection and 50k monthly validation credits.</p>
+<a class="inline-block text-[10px] font-bold text-primary hover:underline uppercase tracking-widest" href="#">Learn More →</a>
+</div>
+</div>
+</div>
+</div>
+</main>
+<!-- Global Layout Decorative Elements -->
+<div class="fixed inset-0 pointer-events-none border-[1px] border-white/5 m-4 z-50"></div>
+<div class="fixed top-0 left-0 w-full h-full pointer-events-none opacity-[0.03] z-0" style="background-image: radial-gradient(#6effc0 0.5px, transparent 0.5px); background-size: 20px 20px;"></div>
+</body></html>

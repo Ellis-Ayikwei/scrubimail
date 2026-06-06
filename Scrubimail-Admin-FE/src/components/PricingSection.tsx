@@ -112,7 +112,7 @@ const PricingSection: React.FC = () => {
               </ul>
               
               <Link
-                to="/onboarding"
+                to="/register"
                 className={`w-full py-3 px-6 rounded-3xl font-semibold text-center transition-all duration-200 ${
                   plan.popular
                     ? 'bg-gradient-to-r from-[#2ED8A3] to-[#004E8A] text-white hover:from-[#00C48C] hover:to-[#2ED8A3]'

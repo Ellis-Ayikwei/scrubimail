@@ -260,9 +260,9 @@ const AdminDashboard: React.FC = () => {
     ];
 
     return (
-        <div>
+        <div className="space-y-6">
             {/* Page Header */}
-            <div style={{ marginBottom: '24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                 <div>
                     <Title level={2} style={{ margin: 0 }}>Dashboard Overview</Title>
                     <Text type="secondary">Welcome back! Here's what's happening with your business today.</Text>
@@ -278,7 +278,7 @@ const AdminDashboard: React.FC = () => {
             </div>
 
             {/* Stats Grid */}
-            <Row gutter={[16, 16]} style={{ marginBottom: '24px' }}>
+            <Row gutter={[16, 16]}>
                 {statsData.map((stat, index) => (
                     <Col xs={24} sm={12} lg={6} key={index}>
                         <Card>
@@ -303,7 +303,7 @@ const AdminDashboard: React.FC = () => {
             </Row>
 
             {/* Charts Row */}
-            <Row gutter={[16, 16]} style={{ marginBottom: '24px' }}>
+            <Row gutter={[16, 16]}>
                 {/* Revenue Chart */}
                 <Col xs={24} lg={16}>
                     <Card 
@@ -332,7 +332,7 @@ const AdminDashboard: React.FC = () => {
             </Row>
 
             {/* Recent Orders and Top Products */}
-            <Row gutter={[16, 16]} style={{ marginBottom: '24px' }}>
+            <Row gutter={[16, 16]}>
                 {/* Recent Orders */}
                 <Col xs={24} lg={12}>
                     <Card 

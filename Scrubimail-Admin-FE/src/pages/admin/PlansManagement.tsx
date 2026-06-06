@@ -109,23 +109,31 @@ const PlansManagement: React.FC = () => {
     fetchPlansData();
   }, []);
 
+  const toFeaturesArray = (features: any): string[] => {
+    if (Array.isArray(features)) return features.filter(Boolean);
+    if (typeof features === 'string') return features.split('\n').map((f: string) => f.trim()).filter(Boolean);
+    return [];
+  };
+
   const handleCreatePlan = async (values: any) => {
     try {
-      const response = await axiosInstance.post('/admin/plans/', values);
+      const payload = { ...values, features: toFeaturesArray(values.features) };
+      const response = await axiosInstance.post('/admin/plans/', payload);
       setPlans(prev => [response.data, ...prev]);
       setShowPlanModal(false);
       form.resetFields();
       message.success('Plan created successfully');
     } catch (err: any) {
-      message.error('Failed to create plan');
+      message.error(err.message || 'Failed to create plan');
     }
   };
 
   const handleUpdatePlan = async (values: any) => {
     if (!editingPlan) return;
     try {
-      const response = await axiosInstance.put(`/admin/plans/${editingPlan.id}/`, values);
-      setPlans(prev => prev.map(plan => 
+      const payload = { ...values, features: toFeaturesArray(values.features) };
+      const response = await axiosInstance.put(`/admin/plans/${editingPlan.id}/`, payload);
+      setPlans(prev => prev.map(plan =>
         plan.id === editingPlan.id ? response.data : plan
       ));
       setShowPlanModal(false);
@@ -133,7 +141,7 @@ const PlansManagement: React.FC = () => {
       form.resetFields();
       message.success('Plan updated successfully');
     } catch (err: any) {
-      message.error('Failed to update plan');
+      message.error(err.message || 'Failed to update plan');
     }
   };
 
@@ -147,7 +155,7 @@ const PlansManagement: React.FC = () => {
       ));
       message.success(`Plan ${!isActive ? 'activated' : 'deactivated'} successfully`);
     } catch (err: any) {
-      message.error('Failed to update plan');
+      message.error(err.message || 'Failed to update plan');
     }
   };
 
@@ -157,7 +165,7 @@ const PlansManagement: React.FC = () => {
       setPlans(prev => prev.filter(plan => plan.id !== planId));
       message.success('Plan deleted successfully');
     } catch (err: any) {
-      message.error('Failed to delete plan');
+      message.error(err.message || 'Failed to delete plan');
     }
   };
 

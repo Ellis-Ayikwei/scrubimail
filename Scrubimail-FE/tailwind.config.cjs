@@ -133,6 +133,28 @@ module.exports = {
                     light: '#2D2D2D',
                     'dark-light': 'rgba(14, 23, 38, 0.15)',
                 },
+                // Terminal design system tokens
+                surface: {
+                    DEFAULT: '#101418',
+                    dim: '#101418',
+                    bright: '#353a3e',
+                    container: {
+                        DEFAULT: '#1c2024',
+                        low: '#181c20',
+                        high: '#262a2f',
+                        highest: '#31353a',
+                        lowest: '#0a0f13',
+                    },
+                },
+                neon: {
+                    DEFAULT: '#6effc0',
+                    dim: '#00e29e',
+                    bright: '#47ffb8',
+                    container: '#00e5a0',
+                },
+                'outline-variant': '#3b4a41',
+                'on-surface': '#e0e3e8',
+                'on-surface-variant': '#bacbbf',
                 white: {
                     50: '#ffffff',
                     100: '#fefefe',
@@ -150,8 +172,11 @@ module.exports = {
                 },
             },
             fontFamily: {
-                sans: ['Charlie', 'sans-serif'], // Charlie as default font
+                sans: ['Charlie', 'sans-serif'],
                 Charlie: ['Charlie', 'sans-serif'],
+                headline: ['Epilogue', 'sans-serif'],
+                label: ['Space Grotesk', 'sans-serif'],
+                mono: ['JetBrains Mono', 'monospace'],
             },
             spacing: {
                 4.5: '18px',

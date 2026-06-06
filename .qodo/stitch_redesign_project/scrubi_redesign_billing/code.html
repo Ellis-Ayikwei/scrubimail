@@ -1,0 +1,398 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Billing &amp; Credits | Scrubi</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Epilogue:wght@400;600;700;800;900&amp;family=Inter:wght@400;500;600&amp;family=Space+Grotesk:wght@400;500;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+    tailwind.config = {
+      darkMode: "class",
+      theme: {
+        extend: {
+          colors: {
+            "surface-container-highest": "#31353a",
+            "surface-container-lowest": "#0a0f13",
+            "on-tertiary": "#2f3131",
+            "primary-fixed-dim": "#00e29e",
+            "on-background": "#e0e3e8",
+            "on-tertiary-container": "#535455",
+            "inverse-surface": "#e0e3e8",
+            "error-container": "#93000a",
+            "secondary": "#c2c7d0",
+            "on-tertiary-fixed-variant": "#454747",
+            "primary": "#6effc0",
+            "outline": "#84958a",
+            "surface-bright": "#353a3e",
+            "tertiary-fixed-dim": "#c6c6c7",
+            "surface-tint": "#00e29e",
+            "on-surface-variant": "#bacbbf",
+            "surface-container-low": "#181c20",
+            "background": "#101418",
+            "on-tertiary-fixed": "#1a1c1c",
+            "inverse-on-surface": "#2d3135",
+            "on-primary-fixed": "#002114",
+            "on-error-container": "#ffdad6",
+            "on-primary": "#003824",
+            "on-surface": "#e0e3e8",
+            "on-primary-container": "#006141",
+            "surface": "#101418",
+            "inverse-primary": "#006c49",
+            "tertiary": "#e5e5e5",
+            "primary-container": "#00e5a0",
+            "on-secondary-container": "#b1b5bf",
+            "on-secondary-fixed": "#171c23",
+            "on-primary-fixed-variant": "#005236",
+            "surface-container": "#1c2024",
+            "secondary-fixed-dim": "#c2c7d0",
+            "secondary-fixed": "#dee2ec",
+            "error": "#ffb4ab",
+            "secondary-container": "#42474f",
+            "surface-container-high": "#262a2f",
+            "outline-variant": "#3b4a41",
+            "primary-fixed": "#47ffb8",
+            "surface-variant": "#31353a",
+            "on-error": "#690005",
+            "surface-dim": "#101418",
+            "tertiary-container": "#c9c9c9",
+            "on-secondary-fixed-variant": "#42474f",
+            "on-secondary": "#2c3138",
+            "tertiary-fixed": "#e2e2e2"
+          },
+          fontFamily: {
+            "headline": ["Epilogue"],
+            "body": ["Inter"],
+            "label": ["Space Grotesk"]
+          },
+          borderRadius: {"DEFAULT": "0.125rem", "lg": "0.25rem", "xl": "0.5rem", "full": "0.75rem"},
+        },
+      },
+    }
+  </script>
+<style>
+    .material-symbols-outlined {
+      font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+    }
+    .custom-scrollbar::-webkit-scrollbar { width: 4px; }
+    .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+    .custom-scrollbar::-webkit-scrollbar-thumb { background: #3b4a41; border-radius: 10px; }
+    .glass-panel {
+      background: rgba(13, 17, 23, 0.7);
+      backdrop-filter: blur(20px);
+    }
+    .mint-glow {
+      box-shadow: 0 0 15px rgba(0, 229, 160, 0.2);
+    }
+  </style>
+</head>
+<body class="bg-[#080C10] text-on-surface font-body selection:bg-primary/30">
+<!-- SideNavBar Anchor -->
+<aside class="fixed left-0 top-0 h-full flex flex-col py-6 px-4 bg-[#0D1117] w-64 border-r border-transparent z-50">
+<div class="mb-10 px-2 flex items-center gap-3">
+<span class="text-xl font-black text-[#00E5A0] tracking-tighter font-headline">SCRUBI</span>
+</div>
+<nav class="flex-1 space-y-1">
+<div class="px-2 mb-2 text-[10px] font-label uppercase tracking-[0.2em] text-outline">Main Console</div>
+<a class="flex items-center gap-3 px-3 py-2 text-slate-500 hover:text-slate-200 transition-colors group" href="#">
+<span class="material-symbols-outlined text-xl">person</span>
+<span class="font-label text-sm tracking-tight">Profile</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 text-slate-500 hover:text-slate-200 transition-colors" href="#">
+<span class="material-symbols-outlined text-xl">key</span>
+<span class="font-label text-sm tracking-tight font-mono">API Keys</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 text-slate-500 hover:text-slate-200 transition-colors" href="#">
+<span class="material-symbols-outlined text-xl">menu_book</span>
+<span class="font-label text-sm tracking-tight">Documentation</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 text-[#00E5A0] border-l-2 border-[#00E5A0] bg-[#181c20] font-bold" href="#">
+<span class="material-symbols-outlined text-xl" style="font-variation-settings: 'FILL' 1;">payments</span>
+<span class="font-label text-sm tracking-tight">Billing</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 text-slate-500 hover:text-slate-200 transition-colors" href="#">
+<span class="material-symbols-outlined text-xl">history</span>
+<span class="font-label text-sm tracking-tight">History</span>
+</a>
+</nav>
+<div class="mt-auto space-y-1">
+<button class="w-full mb-6 py-2 px-4 bg-primary-container text-on-primary font-bold text-xs font-label rounded-sm flex items-center justify-center gap-2 hover:brightness-110 transition-all">
+<span class="material-symbols-outlined text-sm">add</span>
+        New Validation
+      </button>
+<a class="flex items-center gap-3 px-3 py-2 text-slate-500 hover:text-slate-200 transition-colors" href="#">
+<span class="material-symbols-outlined text-xl">help_outline</span>
+<span class="font-label text-sm tracking-tight">Support</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 text-slate-500 hover:text-slate-200 transition-colors" href="#">
+<span class="material-symbols-outlined text-xl">settings</span>
+<span class="font-label text-sm tracking-tight">Settings</span>
+</a>
+</div>
+</aside>
+<!-- TopNavBar Anchor -->
+<header class="fixed top-0 right-0 left-0 h-16 flex justify-between items-center z-40 bg-[#080C10]/70 backdrop-blur-xl border-b border-[#3b4a41]/15 pl-72 pr-8">
+<div class="flex items-center bg-surface-container-low rounded-sm px-3 py-1.5 w-96 border border-outline-variant/10">
+<span class="material-symbols-outlined text-outline text-lg">search</span>
+<input class="bg-transparent border-none focus:ring-0 text-xs w-full placeholder:text-outline/50 font-label" placeholder="Search validations, logs, or credits..." type="text"/>
+</div>
+<div class="flex items-center gap-6">
+<div class="flex items-center gap-4">
+<button class="text-slate-400 hover:text-[#00E5A0] transition-colors relative">
+<span class="material-symbols-outlined">account_balance_wallet</span>
+</button>
+<button class="text-slate-400 hover:text-[#00E5A0] transition-colors">
+<span class="material-symbols-outlined">terminal</span>
+</button>
+<button class="text-slate-400 hover:text-[#00E5A0] transition-colors relative">
+<span class="material-symbols-outlined">notifications</span>
+<span class="absolute top-0 right-0 w-1.5 h-1.5 bg-[#00E5A0] rounded-full"></span>
+</button>
+</div>
+<div class="h-6 w-[1px] bg-outline-variant/20"></div>
+<button class="bg-primary-container text-on-primary text-xs font-bold px-4 py-2 hover:shadow-[0_0_12px_rgba(0,229,160,0.3)] transition-all">
+        Scrub Now
+      </button>
+<div class="w-8 h-8 bg-surface-container-highest rounded-full overflow-hidden border border-outline-variant/30">
+<img alt="User profile" class="w-full h-full object-cover" data-alt="close-up portrait of a professional male developer with glasses and neutral expression in soft studio lighting" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCShuqw_Ii75_np1GQYdvE7LvafzPZ2ZbkQWDuXrFP2Jaj_vcnt6wKqPI6WLJHZNgtGGd4zBblD_s7Whk-3z_5oFZpEoCzHb_P8g5XTeFRLX6s_vW_IxElNEaIKyaRV60hquSciT-yttieiL5BPv1hu82YRZ4Y69PCFH5K8FehdkCwpjsLF3mGfDj4FdcRnRY8s8rn3Km7QtA5hjgUPKQXLa3UOVmcYePlDj-njZhexTGed9Vu3xN-Bp46gBByzeKXLodChaN06HwCF"/>
+</div>
+</div>
+</header>
+<!-- Main Content Area -->
+<main class="ml-64 pt-24 p-8 min-h-screen">
+<!-- Page Header -->
+<div class="mb-10">
+<h1 class="text-3xl font-black font-headline tracking-tighter text-on-surface mb-2">Billing &amp; Credits</h1>
+<p class="text-outline text-sm font-label max-w-xl">Manage your technical editorial subscription, monitor credit utilization, and access your invoice history.</p>
+</div>
+<!-- Top Grid: Current Plan & Usage -->
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-12">
+<!-- Current Plan Card -->
+<div class="lg:col-span-1 bg-surface-container-low p-6 flex flex-col justify-between border-l-4 border-[#00E5A0] relative overflow-hidden">
+<div class="absolute -right-4 -top-4 opacity-5 pointer-events-none">
+<span class="material-symbols-outlined text-9xl">verified_user</span>
+</div>
+<div>
+<span class="text-[10px] font-label font-bold uppercase tracking-widest text-primary mb-1 block">Active Plan</span>
+<h2 class="text-2xl font-black font-headline tracking-tight mb-4">Enterprise Scrub</h2>
+<div class="flex items-baseline gap-1 mb-6">
+<span class="text-4xl font-black font-headline">$499</span>
+<span class="text-outline text-sm font-label">/per month</span>
+</div>
+<div class="space-y-3">
+<div class="flex items-center gap-2 text-sm text-on-surface-variant font-label">
+<span class="material-symbols-outlined text-primary text-lg">check_circle</span>
+<span>Unlimited Bulk Validation</span>
+</div>
+<div class="flex items-center gap-2 text-sm text-on-surface-variant font-label">
+<span class="material-symbols-outlined text-primary text-lg">check_circle</span>
+<span>24/7 Technical Support</span>
+</div>
+<div class="flex items-center gap-2 text-sm text-on-surface-variant font-label">
+<span class="material-symbols-outlined text-primary text-lg">check_circle</span>
+<span>Custom API Integration</span>
+</div>
+</div>
+</div>
+<button class="mt-8 text-primary font-bold text-xs uppercase tracking-widest font-label flex items-center gap-2 hover:gap-3 transition-all">
+          Manage Subscription <span class="material-symbols-outlined text-sm">arrow_forward_ios</span>
+</button>
+</div>
+<!-- Usage Meter Card -->
+<div class="lg:col-span-2 bg-surface-container-low p-6 border-l-4 border-surface-container-highest">
+<div class="flex justify-between items-start mb-8">
+<div>
+<span class="text-[10px] font-label font-bold uppercase tracking-widest text-outline mb-1 block">Current Consumption</span>
+<h2 class="text-xl font-bold font-headline tracking-tight">Credit Utilization</h2>
+</div>
+<div class="text-right">
+<span class="text-2xl font-black font-headline text-primary">842,500</span>
+<span class="text-outline text-xs block font-label uppercase tracking-tighter">of 1M Credits</span>
+</div>
+</div>
+<div class="space-y-6">
+<div class="relative pt-1">
+<div class="flex mb-2 items-center justify-between">
+<div>
+<span class="text-xs font-semibold inline-block py-1 px-2 uppercase rounded-full text-primary bg-primary/10 font-label">
+                  High Usage Warning
+                </span>
+</div>
+<div class="text-right">
+<span class="text-xs font-bold inline-block text-primary font-mono">
+                  84.2%
+                </span>
+</div>
+</div>
+<div class="overflow-hidden h-2 mb-4 text-xs flex rounded bg-surface-container-highest">
+<div class="shadow-none flex flex-col text-center whitespace-nowrap text-white justify-center bg-primary mint-glow transition-all duration-1000" style="width:84.2%"></div>
+</div>
+</div>
+<div class="grid grid-cols-2 sm:grid-cols-4 gap-4">
+<div class="bg-surface-container-lowest p-3 rounded-sm">
+<span class="text-[10px] font-label text-outline uppercase block mb-1">Last Scrub</span>
+<span class="font-mono text-sm font-bold">12.04.24</span>
+</div>
+<div class="bg-surface-container-lowest p-3 rounded-sm">
+<span class="text-[10px] font-label text-outline uppercase block mb-1">Peak Rate</span>
+<span class="font-mono text-sm font-bold">450 ops/s</span>
+</div>
+<div class="bg-surface-container-lowest p-3 rounded-sm">
+<span class="text-[10px] font-label text-outline uppercase block mb-1">Renewal In</span>
+<span class="font-mono text-sm font-bold text-primary">12 Days</span>
+</div>
+<div class="bg-surface-container-lowest p-3 rounded-sm">
+<span class="text-[10px] font-label text-outline uppercase block mb-1">Data Health</span>
+<span class="font-mono text-sm font-bold text-[#00E5A0]">99.9%</span>
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- Plans Comparison Section -->
+<div class="mb-12">
+<div class="flex items-center gap-4 mb-8">
+<h3 class="text-lg font-bold font-headline tracking-tight uppercase">Scaling Infrastructure</h3>
+<div class="h-[1px] flex-1 bg-outline-variant/15"></div>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+<!-- Plan 1 -->
+<div class="bg-surface-container-low p-6 group hover:bg-surface-container-high transition-all border border-transparent hover:border-outline-variant/30">
+<h4 class="text-sm font-black font-label text-outline uppercase tracking-widest mb-2">Technical</h4>
+<p class="text-2xl font-bold font-headline mb-4">$99<span class="text-sm text-outline font-normal">/mo</span></p>
+<ul class="space-y-3 mb-8 text-sm font-label text-on-surface-variant">
+<li class="flex items-center gap-2"><span class="material-symbols-outlined text-xs text-outline">check</span> 50,000 Credits</li>
+<li class="flex items-center gap-2"><span class="material-symbols-outlined text-xs text-outline">check</span> Single API Key</li>
+<li class="flex items-center gap-2"><span class="material-symbols-outlined text-xs text-outline">check</span> Standard Latency</li>
+</ul>
+<button class="w-full border border-outline-variant/30 py-2 font-bold text-xs uppercase tracking-widest font-label hover:bg-white hover:text-black transition-all">Downgrade</button>
+</div>
+<!-- Plan 2 (Active/Premium Focus) -->
+<div class="bg-surface-container-lowest p-6 border-2 border-primary relative">
+<div class="absolute -top-3 right-4 bg-primary text-on-primary text-[10px] font-black font-label px-2 py-0.5 tracking-tighter">CURRENT ACTIVE</div>
+<h4 class="text-sm font-black font-label text-primary uppercase tracking-widest mb-2">Enterprise</h4>
+<p class="text-2xl font-bold font-headline mb-4">$499<span class="text-sm text-outline font-normal">/mo</span></p>
+<ul class="space-y-3 mb-8 text-sm font-label">
+<li class="flex items-center gap-2"><span class="material-symbols-outlined text-xs text-primary">check</span> 1,000,000 Credits</li>
+<li class="flex items-center gap-2"><span class="material-symbols-outlined text-xs text-primary">check</span> Unlimited Keys</li>
+<li class="flex items-center gap-2"><span class="material-symbols-outlined text-xs text-primary">check</span> Priority Node Access</li>
+<li class="flex items-center gap-2"><span class="material-symbols-outlined text-xs text-primary">check</span> Webhook Integration</li>
+</ul>
+<button class="w-full bg-primary-container text-on-primary py-2 font-black text-xs uppercase tracking-widest font-label cursor-default">Current Selection</button>
+</div>
+<!-- Plan 3 -->
+<div class="bg-surface-container-low p-6 group hover:bg-surface-container-high transition-all border border-transparent hover:border-outline-variant/30">
+<h4 class="text-sm font-black font-label text-outline uppercase tracking-widest mb-2">Custom Node</h4>
+<p class="text-2xl font-bold font-headline mb-4">Contact<span class="text-sm text-outline font-normal"></span></p>
+<ul class="space-y-3 mb-8 text-sm font-label text-on-surface-variant">
+<li class="flex items-center gap-2"><span class="material-symbols-outlined text-xs text-outline">check</span> Bespoke Volume</li>
+<li class="flex items-center gap-2"><span class="material-symbols-outlined text-xs text-outline">check</span> Dedicated Hardware</li>
+<li class="flex items-center gap-2"><span class="material-symbols-outlined text-xs text-outline">check</span> On-Premise Options</li>
+</ul>
+<button class="w-full border border-primary text-primary py-2 font-bold text-xs uppercase tracking-widest font-label hover:bg-primary hover:text-on-primary transition-all">Upgrade Path</button>
+</div>
+</div>
+</div>
+<!-- Billing History Table -->
+<div>
+<div class="flex items-center justify-between mb-6">
+<h3 class="text-lg font-bold font-headline tracking-tight uppercase">Billing History</h3>
+<button class="text-xs font-label text-primary flex items-center gap-1 hover:underline">
+<span class="material-symbols-outlined text-sm">download</span> Export CSV
+        </button>
+</div>
+<div class="overflow-x-auto">
+<table class="w-full border-collapse">
+<thead>
+<tr class="text-left border-b border-outline-variant/10">
+<th class="pb-4 pt-2 font-label text-[10px] uppercase tracking-widest text-outline">Reference ID</th>
+<th class="pb-4 pt-2 font-label text-[10px] uppercase tracking-widest text-outline">Cycle Date</th>
+<th class="pb-4 pt-2 font-label text-[10px] uppercase tracking-widest text-outline">Plan Segment</th>
+<th class="pb-4 pt-2 font-label text-[10px] uppercase tracking-widest text-outline text-right">Amount</th>
+<th class="pb-4 pt-2 font-label text-[10px] uppercase tracking-widest text-outline text-center">Status</th>
+<th class="pb-4 pt-2 font-label text-[10px] uppercase tracking-widest text-outline"></th>
+</tr>
+</thead>
+<tbody class="divide-y divide-outline-variant/5">
+<tr class="hover:bg-surface-container-low transition-colors group">
+<td class="py-4 font-mono text-xs text-on-surface-variant font-bold">INV-8402-991</td>
+<td class="py-4 text-xs font-label">Apr 01, 2024</td>
+<td class="py-4 text-xs font-label">Enterprise Scrub</td>
+<td class="py-4 text-xs font-mono text-right">$499.00</td>
+<td class="py-4 text-center">
+<span class="px-2 py-0.5 bg-[#00E5A0]/10 text-[#00E5A0] text-[10px] font-bold font-label uppercase tracking-tighter rounded-full">Paid</span>
+</td>
+<td class="py-4 text-right">
+<button class="material-symbols-outlined text-outline group-hover:text-primary transition-colors">description</button>
+</td>
+</tr>
+<tr class="hover:bg-surface-container-low transition-colors group">
+<td class="py-4 font-mono text-xs text-on-surface-variant font-bold">INV-8391-440</td>
+<td class="py-4 text-xs font-label">Mar 01, 2024</td>
+<td class="py-4 text-xs font-label">Enterprise Scrub</td>
+<td class="py-4 text-xs font-mono text-right">$499.00</td>
+<td class="py-4 text-center">
+<span class="px-2 py-0.5 bg-[#00E5A0]/10 text-[#00E5A0] text-[10px] font-bold font-label uppercase tracking-tighter rounded-full">Paid</span>
+</td>
+<td class="py-4 text-right">
+<button class="material-symbols-outlined text-outline group-hover:text-primary transition-colors">description</button>
+</td>
+</tr>
+<tr class="hover:bg-surface-container-low transition-colors group">
+<td class="py-4 font-mono text-xs text-on-surface-variant font-bold">INV-8211-105</td>
+<td class="py-4 text-xs font-label">Feb 01, 2024</td>
+<td class="py-4 text-xs font-label">Professional Tier</td>
+<td class="py-4 text-xs font-mono text-right">$249.00</td>
+<td class="py-4 text-center">
+<span class="px-2 py-0.5 bg-[#00E5A0]/10 text-[#00E5A0] text-[10px] font-bold font-label uppercase tracking-tighter rounded-full">Paid</span>
+</td>
+<td class="py-4 text-right">
+<button class="material-symbols-outlined text-outline group-hover:text-primary transition-colors">description</button>
+</td>
+</tr>
+<tr class="hover:bg-surface-container-low transition-colors group">
+<td class="py-4 font-mono text-xs text-on-surface-variant font-bold">INV-7901-223</td>
+<td class="py-4 text-xs font-label">Jan 01, 2024</td>
+<td class="py-4 text-xs font-label">Technical Tier</td>
+<td class="py-4 text-xs font-mono text-right">$99.00</td>
+<td class="py-4 text-center">
+<span class="px-2 py-0.5 bg-[#00E5A0]/10 text-[#00E5A0] text-[10px] font-bold font-label uppercase tracking-tighter rounded-full">Paid</span>
+</td>
+<td class="py-4 text-right">
+<button class="material-symbols-outlined text-outline group-hover:text-primary transition-colors">description</button>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+<!-- Asymmetric Graphic / Support Section -->
+<div class="mt-20 flex flex-col md:flex-row gap-8 items-center bg-surface-container-low p-8 border-l-4 border-outline-variant">
+<div class="flex-1">
+<h3 class="text-xl font-bold font-headline mb-4">Enterprise Dedicated Infrastructure</h3>
+<p class="text-on-surface-variant text-sm font-label mb-6 leading-relaxed">Your account is currently running on Node-7-Bravo. For volume exceeding 10M operations per day, please contact our Technical Editorial team for hardware allocation.</p>
+<div class="flex gap-4">
+<button class="px-6 py-2 bg-on-surface text-background font-bold text-xs font-label uppercase tracking-widest hover:brightness-90 transition-all">Contact Sales</button>
+<button class="px-6 py-2 border border-outline-variant/30 text-on-surface font-bold text-xs font-label uppercase tracking-widest hover:bg-surface-container-high transition-all">Documentation</button>
+</div>
+</div>
+<div class="w-full md:w-64 aspect-square bg-surface-container-lowest flex items-center justify-center border border-outline-variant/10 relative overflow-hidden">
+<img alt="Technical Infrastructure" class="absolute inset-0 w-full h-full object-cover opacity-40" data-alt="minimalist abstract view of server rack lights glowing mint green in a dark high-tech data center environment" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBokSqZVq-kSmi3uBO2IzxtUqmWCktPUxssmBx2-YXot5oF1CL9ST4hnZJLtI6l5Iz6dj3ZHB5FiT9m1-Vu51_de-qcM_mfeotQTpNeIBg9VB8JeEJsZzMOgswZq2wiwOy_d_mAfZjd8ujoAWQ4Rj6bA80Fpe5s86VF3F4pWNa9IDPWOtt4Wb9gxo-cUf0r7VSTrykwhg4MiKnLX5uVqL0yFz8SzNN6MHFp2RfrlIev6KebLWOzPW3-3N42wPy62X1yQIY8IfifcnXE"/>
+<div class="relative z-10 flex flex-col items-center">
+<span class="material-symbols-outlined text-primary text-5xl mb-2" style="font-variation-settings: 'FILL' 1;">terminal</span>
+<span class="font-mono text-[10px] text-primary">SC_NODE_ACTIVE</span>
+</div>
+</div>
+</div>
+</main>
+<!-- Mobile Navigation (Bottom Bar) -->
+<footer class="md:hidden fixed bottom-0 left-0 right-0 h-16 bg-[#080C10]/90 backdrop-blur-xl flex justify-around items-center px-4 border-t border-[#3b4a41]/15 z-50">
+<button class="text-slate-400 p-2"><span class="material-symbols-outlined">person</span></button>
+<button class="text-slate-400 p-2"><span class="material-symbols-outlined">key</span></button>
+<button class="text-primary border-t-2 border-primary p-2 flex flex-col items-center"><span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">payments</span></button>
+<button class="text-slate-400 p-2"><span class="material-symbols-outlined">history</span></button>
+<button class="text-slate-400 p-2"><span class="material-symbols-outlined">settings</span></button>
+</footer>
+</body></html>

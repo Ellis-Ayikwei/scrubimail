@@ -1,3 +1,6 @@
 import React from 'react';
-const ForgotPassword = () => <div className="p-8">Forgot Password: Password reset form will go here.</div>;
-export default ForgotPassword; 
+import AuthForgotPassword from './auth/ForgotPassword';
+
+const ForgotPassword = () => <AuthForgotPassword />;
+
+export default ForgotPassword;

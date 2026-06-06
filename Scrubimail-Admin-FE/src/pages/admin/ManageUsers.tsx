@@ -1,18 +1,19 @@
 import React, { useEffect, useState } from 'react';
-import { 
-  Users, 
-  Search, 
-  Filter, 
-  Download, 
-  RefreshCw, 
-  Eye, 
-  Edit, 
-  Trash2, 
-  UserCheck, 
-  UserX, 
-  Mail, 
-  Calendar, 
-  CreditCard, 
+import { useNavigate } from 'react-router-dom';
+import {
+  Users,
+  Search,
+  Filter,
+  Download,
+  RefreshCw,
+  Eye,
+  Edit,
+  Trash2,
+  UserCheck,
+  UserX,
+  Mail,
+  Calendar,
+  CreditCard,
   Activity,
   AlertTriangle,
   MoreVertical,
@@ -48,14 +49,13 @@ interface User {
 }
 
 const ManageUsers: React.FC = () => {
+  const navigate = useNavigate();
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState<string>('all');
   const [filterRole, setFilterRole] = useState<string>('all');
-  const [selectedUser, setSelectedUser] = useState<User | null>(null);
-  const [showUserModal, setShowUserModal] = useState(false);
 
   const fetchUsers = async () => {
     setLoading(true);
@@ -385,11 +385,9 @@ const ManageUsers: React.FC = () => {
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                       <div className="flex items-center space-x-2">
                         <button
-                          onClick={() => {
-                            setSelectedUser(user);
-                            setShowUserModal(true);
-                          }}
+                          onClick={() => navigate(`/admin/users/${user.id}`)}
                           className="text-blue-600 hover:text-blue-700"
+                          title="View user details"
                         >
                           <Eye className="w-4 h-4" />
                         </button>
@@ -429,114 +427,6 @@ const ManageUsers: React.FC = () => {
         </div>
       </div>
 
-      {/* User Details Modal */}
-      {showUserModal && selectedUser && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-            <div className="flex justify-between items-center mb-6">
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-                User Details
-              </h3>
-              <button
-                onClick={() => setShowUserModal(false)}
-                className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
-              >
-                ×
-              </button>
-            </div>
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div>
-                <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">Basic Information</h4>
-                <div className="space-y-2">
-                  <div>
-                    <span className="text-sm text-gray-500 dark:text-gray-400">Name:</span>
-                    <span className="ml-2 text-sm text-gray-900 dark:text-white">
-                      {selectedUser.name || 'Not provided'}
-                    </span>
-                  </div>
-                  <div>
-                    <span className="text-sm text-gray-500 dark:text-gray-400">Email:</span>
-                    <span className="ml-2 text-sm text-gray-900 dark:text-white">
-                      {selectedUser.email}
-                    </span>
-                  </div>
-                  <div>
-                    <span className="text-sm text-gray-500 dark:text-gray-400">Role:</span>
-                    <span className="ml-2 text-sm text-gray-900 dark:text-white">
-                      {getRoleBadge(selectedUser).text}
-                    </span>
-                  </div>
-                  <div>
-                    <span className="text-sm text-gray-500 dark:text-gray-400">Status:</span>
-                    <span className={`ml-2 text-sm ${
-                      selectedUser.is_active ? 'text-green-600' : 'text-red-600'
-                    }`}>
-                      {selectedUser.is_active ? 'Active' : 'Inactive'}
-                    </span>
-                  </div>
-                </div>
-              </div>
-              
-              <div>
-                <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">Activity</h4>
-                <div className="space-y-2">
-                  <div>
-                    <span className="text-sm text-gray-500 dark:text-gray-400">Total Validations:</span>
-                    <span className="ml-2 text-sm text-gray-900 dark:text-white">
-                      {selectedUser.stats?.total_validations || 0}
-                    </span>
-                  </div>
-                  <div>
-                    <span className="text-sm text-gray-500 dark:text-gray-400">API Keys:</span>
-                    <span className="ml-2 text-sm text-gray-900 dark:text-white">
-                      {selectedUser.stats?.api_keys_count || 0}
-                    </span>
-                  </div>
-                  <div>
-                    <span className="text-sm text-gray-500 dark:text-gray-400">Last Activity:</span>
-                    <span className="ml-2 text-sm text-gray-900 dark:text-white">
-                      {selectedUser.stats?.last_activity || 'Never'}
-                    </span>
-                  </div>
-                  <div>
-                    <span className="text-sm text-gray-500 dark:text-gray-400">Joined:</span>
-                    <span className="ml-2 text-sm text-gray-900 dark:text-white">
-                      {new Date(selectedUser.date_joined).toLocaleDateString()}
-                    </span>
-                  </div>
-                </div>
-              </div>
-            </div>
-            
-            {selectedUser.billing && (
-              <div className="mt-6">
-                <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">Billing Information</h4>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-3">
-                    <div className="text-sm text-gray-500 dark:text-gray-400">Plan</div>
-                    <div className="text-sm font-medium text-gray-900 dark:text-white">
-                      {selectedUser.billing.plan}
-                    </div>
-                  </div>
-                  <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-3">
-                    <div className="text-sm text-gray-500 dark:text-gray-400">Credits Remaining</div>
-                    <div className="text-sm font-medium text-gray-900 dark:text-white">
-                      {selectedUser.billing.credits_remaining.toLocaleString()}
-                    </div>
-                  </div>
-                  <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-3">
-                    <div className="text-sm text-gray-500 dark:text-gray-400">Total Credits</div>
-                    <div className="text-sm font-medium text-gray-900 dark:text-white">
-                      {selectedUser.billing.total_credits.toLocaleString()}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
     </div>
   );
 };

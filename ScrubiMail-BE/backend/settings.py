@@ -146,6 +146,7 @@ INSTALLED_APPS = [
     "apps.apikey",
     "apps.plan",
     "apps.admin",
+    "apps.changelog",
     "django_celery_results",
 ]
 
@@ -266,7 +267,7 @@ TABLE_NAME_TEMPLATE = "{table_name}"
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": [
         "backend.middle_ware.APIKeyAuthentication",
-        "rest_framework_simplejwt.authentication.JWTAuthentication",
+        "apps.Authentication.authentication.SuspensionAwareJWTAuthentication",
     ],
     "DEFAULT_PERMISSION_CLASSES": ("rest_framework.permissions.IsAuthenticated",),
     "DEFAULT_THROTTLE_CLASSES": [
@@ -440,15 +441,41 @@ PAYSTACK_WEBHOOK_SECRET = os.getenv("PAYSTACK_WEBHOOK_SECRET")
 print("Paystack WEBHOOK Key:", PAYSTACK_WEBHOOK_SECRET)
 # Paystack Configuration
 PAYSTACK_LIVE_MODE = False  # Set to True for production
-PAYSTACK_CURRENCY = "NGN"  # Default currency (Nigerian Naira)
+PAYSTACK_CURRENCY = (
+    "NGN"  # Legacy default; prefer PAYSTACK_CHARGE_CURRENCY for API calls
+)
 PAYSTACK_SUPPORTED_CURRENCIES = ["NGN", "USD", "GHS", "ZAR"]  # Supported currencies
 
-# Payment Configuration
+# Currency Paystack actually settles/charges in for this business (must match dashboard).
+# Use GHS while USD is not enabled; set to USD (and match Plan.currency) after Paystack approves USD.
+PAYSTACK_CHARGE_CURRENCY = os.getenv("PAYSTACK_CHARGE_CURRENCY", "GHS")
+
+# USD→GHS: primary source is CurrencyFreaks (see CURRENCYFREAKS_API_KEY); this is the fallback
+# if the API fails or the key is unset. Changing live/fallback rates does not update existing
+# Paystack plans (clear Plan.paystack_plan_code to recreate).
+PAYSTACK_FX_USD_TO_GHS = os.getenv("PAYSTACK_FX_USD_TO_GHS", "15.0")
+# CurrencyFreaks (https://currencyfreaks.com/) — free tier for latest rates
+CURRENCYFREAKS_API_KEY = os.getenv("CURRENCYFREAKS_API_KEY", "")
+CURRENCYFREAKS_REQUEST_TIMEOUT = int(os.getenv("CURRENCYFREAKS_REQUEST_TIMEOUT", "10"))
+# Applied to the API rate only (not to fallback): e.g. 1.05 = 5% buffer for fees/FX drift
+PAYSTACK_FX_BUFFER = os.getenv("PAYSTACK_FX_BUFFER", "1.05")
+PAYSTACK_FX_CACHE_TTL = int(os.getenv("PAYSTACK_FX_CACHE_TTL", "3600"))
+
+# Paystack minimum charge in GHS (major units); conversion must meet this.
+PAYSTACK_MIN_GHS_MAJOR = os.getenv("PAYSTACK_MIN_GHS_MAJOR", "2.00")
+
+# Frontend base (Vite default :5173). Used for email links and Paystack callback fallbacks.
+FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:3000").rstrip("/")
+
+# Paystack return URLs — default to same origin as FRONTEND_URL (override per env in production)
 PAYMENT_SUCCESS_URL = os.getenv(
-    "PAYMENT_SUCCESS_URL", "http://localhost:3000/billing?success=1"
+    "PAYMENT_SUCCESS_URL", f"{FRONTEND_URL}/billing/payment/success"
 )
 PAYMENT_CANCEL_URL = os.getenv(
-    "PAYMENT_CANCEL_URL", "http://localhost:3000/billing?canceled=1"
+    "PAYMENT_CANCEL_URL", f"{FRONTEND_URL}/billing/payment/cancelled"
+)
+PAYMENT_FAILED_URL = os.getenv(
+    "PAYMENT_FAILED_URL", f"{FRONTEND_URL}/billing/payment/failed"
 )
 
 # Paystack Features Configuration
@@ -487,9 +514,6 @@ EMAIL_USE_TLS = os.getenv("EMAIL_USE_TLS", "True") == "True"
 EMAIL_HOST_USER = os.getenv("EMAIL_HOST_USER")
 EMAIL_HOST_PASSWORD = os.getenv("EMAIL_HOST_PASSWORD")
 DEFAULT_FROM_EMAIL = os.getenv("DEFAULT_FROM_EMAIL", "noreply@scrubimail.com")
-
-# Frontend URL for email links
-FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:5173")
 
 # Prevent Heroku from running collectstatic on deploy
 if os.environ.get("DISABLE_COLLECTSTATIC", "") == "1":

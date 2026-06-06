@@ -1,30 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  Mail, 
-  Upload, 
-  CheckCircle, 
-  XCircle, 
-  AlertTriangle, 
-  Loader2, 
-  Download,
-  FileText,
-  BarChart3,
-  Zap,
-  Eye,
-  EyeOff,
-  RefreshCw,
-  Play,
-  Clock,
-  TrendingUp,
-  Key,
-  ChevronDown,
-  Copy,
-  Check
-} from 'lucide-react';
+import { Mail, Upload, AlertTriangle, Key } from 'lucide-react';
 import axiosInstance from '../../services/axiosInstance';
 import { apiKeyService, APIKey } from '../../services/apiKeyService';
-import { Dialog, Transition } from '@headlessui/react';
-import { Fragment } from 'react';
 import ValidationForm from './components/ValidationForm';
 import ValidationResults from './components/ValidationResults';
 import QuickStats from './components/QuickStats';
@@ -146,19 +123,6 @@ const Validation = () => {
     }
   };
 
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case 'completed':
-        return <CheckCircle className="w-5 h-5 text-green-600" />;
-      case 'failed':
-        return <XCircle className="w-5 h-5 text-red-600" />;
-      case 'pending':
-        return <Clock className="w-5 h-5 text-yellow-600" />;
-      default:
-        return <AlertTriangle className="w-5 h-5 text-gray-600" />;
-    }
-  };
-
   const copyApiKey = async (key: string) => {
     try {
       await navigator.clipboard.writeText(key);
@@ -175,131 +139,116 @@ const Validation = () => {
   };
 
   return (
-    <div className="min-h-screen bg-[#F8FAFC] dark:bg-gray-900">
-      <div className="max-w-7xl mx-auto px-3 sm:px-4 lg:px-6 xl:px-8 py-6 sm:py-8">
-        {/* Header */}
-        <div className="mb-6 sm:mb-8">
-          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 lg:gap-6">
-            <div className="flex-1 min-w-0">
-              <h1 className="text-2xl sm:text-3xl font-bold text-[#333333] dark:text-white mb-2 flex items-center">
-                <Mail className="w-6 h-6 sm:w-8 sm:h-8 mr-2 sm:mr-3 text-[#2ED8A3]" />
-                <span className="truncate">Email Validation</span>
-              </h1>
-              <p className="text-sm sm:text-base text-[#333333]/70 dark:text-gray-400">
-                Validate single emails or upload files for bulk validation
-              </p>
-            </div>
-            
-            {/* API Key Selector */}
-            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:gap-4 lg:flex-shrink-0">
-              <div className="text-left sm:text-right">
-                <p className="text-xs sm:text-sm text-[#333333]/70 dark:text-gray-400">Using API Key:</p>
-                <p className="text-xs sm:text-sm font-medium text-[#333333] dark:text-white truncate max-w-[200px] sm:max-w-none">
-                  {selectedApiKey ? maskApiKey(selectedApiKey.key) : 'None selected'}
-                </p>
-              </div>
-              <button
-                onClick={() => setShowApiKeyModal(true)}
-                className="flex items-center justify-center space-x-2 px-3 sm:px-4 py-2 bg-[#2ED8A3] text-white rounded-lg hover:bg-[#00C48C] transition-colors text-sm sm:text-base whitespace-nowrap"
-              >
-                <Key className="w-4 h-4" />
-                <span className="hidden sm:inline">Select API Key</span>
-                <span className="sm:hidden">Select Key</span>
-                <ChevronDown className="w-4 h-4" />
-              </button>
-            </div>
-          </div>
+    <div className="space-y-5" style={{ fontFamily: 'Inter, sans-serif' }}>
+      {/* Header */}
+      <div className="flex items-start justify-between flex-wrap gap-4">
+        <div>
+          <p className="font-['Space_Grotesk',sans-serif] uppercase tracking-[0.2em] text-[9px] text-emerald-600 dark:text-[#6effc0] mb-0.5">
+            Verification Engine
+          </p>
+          <h1 className="font-['Epilogue',sans-serif] font-black text-gray-900 dark:text-[#e0e3e8] text-2xl tracking-tight">
+            Email Validation
+          </h1>
+          <p className="font-['Space_Grotesk',sans-serif] uppercase tracking-[0.1em] text-[10px] text-gray-600 dark:text-[#bacbbf] mt-0.5">
+            VERSION 4.2.0 // DEEP_SMTP_INSPECTION_ACTIVE
+          </p>
         </div>
-
-        {error && (
-          <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4 mb-6">
-            <div className="flex">
-              <AlertTriangle className="w-5 h-5 text-red-600 dark:text-red-400 mt-0.5" />
-              <div className="ml-3">
-                <p className="text-sm text-red-600 dark:text-red-400">{error}</p>
-              </div>
-            </div>
+        <div className="flex flex-col items-end gap-2">
+          <div className="flex items-center gap-2">
+            <span className="font-['Space_Grotesk',sans-serif] uppercase tracking-[0.1em] text-[10px] text-gray-600 dark:text-[#bacbbf]">
+              API Key:
+            </span>
+            <span className="font-['JetBrains_Mono',monospace] text-[10px] text-emerald-700 dark:text-[#6effc0]">
+              {selectedApiKey ? maskApiKey(selectedApiKey.key) : 'None selected'}
+            </span>
           </div>
-        )}
-
-        {/* Mode Toggle */}
-        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-1 mb-6">
-          <div className="flex">
-            <button
-              onClick={() => setValidationMode('single')}
-              className={`flex-1 flex items-center justify-center space-x-2 px-3 sm:px-4 py-2 rounded-lg font-medium transition-all duration-200 text-sm sm:text-base ${
-                validationMode === 'single'
-                  ? 'bg-[#2ED8A3] text-white shadow-sm'
-                  : 'text-[#333333] dark:text-gray-400 hover:text-[#2ED8A3]'
-              }`}
-            >
-              <Mail className="w-4 h-4" />
-              <span>Single Email</span>
-            </button>
-            <button
-              onClick={() => setValidationMode('bulk')}
-              className={`flex-1 flex items-center justify-center space-x-2 px-3 sm:px-4 py-2 rounded-lg font-medium transition-all duration-200 text-sm sm:text-base ${
-                validationMode === 'bulk'
-                  ? 'bg-[#2ED8A3] text-white shadow-sm'
-                  : 'text-[#333333] dark:text-gray-400 hover:text-[#2ED8A3]'
-              }`}
-            >
-              <Upload className="w-4 h-4" />
-              <span>Bulk Upload</span>
-            </button>
-          </div>
+          <button
+            type="button"
+            onClick={() => setShowApiKeyModal(true)}
+            className="flex items-center gap-1.5 border border-gray-200 text-gray-600 font-mono uppercase tracking-[0.1em] text-[10px] px-3 py-1.5 rounded-sm hover:border-emerald-400 hover:text-emerald-700 transition-colors dark:border-[#3b4a41]/40 dark:text-[#bacbbf] dark:hover:border-[#6effc0]/40 dark:hover:text-[#6effc0]"
+          >
+            <Key className="w-3 h-3" /> Select Key
+          </button>
         </div>
-
-        <div className="grid lg:grid-cols-2 gap-6 sm:gap-8">
-          {/* Validation Form */}
-          <div className="space-y-4 sm:space-y-6">
-            <ValidationForm
-              validationMode={validationMode}
-              email={email}
-              setEmail={setEmail}
-              bulkFile={bulkFile}
-              setBulkFile={setBulkFile}
-              includeDetails={includeDetails}
-              setIncludeDetails={setIncludeDetails}
-              loading={loading}
-              handleSingleValidate={handleSingleValidate}
-              handleBulkUpload={handleBulkUpload}
-              bulkTaskIds={bulkTaskIds}
-              bulkStatus={bulkStatus}
-              checkBulkStatus={checkBulkStatus}
-            />
-
-            <QuickStats />
-          </div>
-
-          {/* Results */}
-          <div className="space-y-4 sm:space-y-6">
-            {result && (
-              <ValidationResults
-                result={result}
-                showDetails={showDetails}
-                setShowDetails={setShowDetails}
-                includeDetails={includeDetails}
-              />
-            )}
-
-            <HelpCard />
-          </div>
-        </div>
-
-        {/* API Key Selection Modal */}
-        <ApiKeyModal
-          isOpen={showApiKeyModal}
-          onClose={() => setShowApiKeyModal(false)}
-          apiKeys={apiKeys}
-          selectedApiKey={selectedApiKey}
-          setSelectedApiKey={setSelectedApiKey}
-          apiKeyLoading={apiKeyLoading}
-          copiedKey={copiedKey}
-          copyApiKey={copyApiKey}
-          maskApiKey={maskApiKey}
-        />
       </div>
+
+      {/* Error */}
+      {error && (
+        <div className="bg-red-50 border border-red-200 rounded-sm p-3 flex items-center gap-2 text-red-700 font-mono text-xs dark:bg-[#ff4c4c]/10 dark:border-[#ff4c4c]/30 dark:text-[#ff4c4c]">
+          <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0" />
+          {error}
+        </div>
+      )}
+
+      {/* Mode toggle */}
+      <div className="flex bg-gray-100 border border-gray-200 rounded-sm p-0.5 dark:bg-[#1c2024] dark:border-[#3b4a41]/40">
+        <button
+          type="button"
+          onClick={() => setValidationMode('single')}
+          className={`flex-1 flex items-center justify-center gap-2 py-2 font-mono uppercase tracking-[0.1em] text-[10px] rounded-sm transition-all ${
+            validationMode === 'single'
+              ? 'bg-emerald-100 text-emerald-900 border border-emerald-300 dark:bg-[#6effc0]/15 dark:text-[#6effc0] dark:border-[#6effc0]/20'
+              : 'text-gray-400 hover:text-gray-700 dark:text-[#bacbbf]/50 dark:hover:text-[#bacbbf]'
+          }`}
+        >
+          <Mail className="w-3.5 h-3.5" /> Single Email
+        </button>
+        <button
+          type="button"
+          onClick={() => setValidationMode('bulk')}
+          className={`flex-1 flex items-center justify-center gap-2 py-2 font-mono uppercase tracking-[0.1em] text-[10px] rounded-sm transition-all ${
+            validationMode === 'bulk'
+              ? 'bg-emerald-100 text-emerald-900 border border-emerald-300 dark:bg-[#6effc0]/15 dark:text-[#6effc0] dark:border-[#6effc0]/20'
+              : 'text-gray-400 hover:text-gray-700 dark:text-[#bacbbf]/50 dark:hover:text-[#bacbbf]'
+          }`}
+        >
+          <Upload className="w-3.5 h-3.5" /> Bulk Upload
+        </button>
+      </div>
+
+      <div className="grid lg:grid-cols-2 gap-5">
+        <div className="space-y-4">
+          <ValidationForm
+            validationMode={validationMode}
+            email={email}
+            setEmail={setEmail}
+            bulkFile={bulkFile}
+            setBulkFile={setBulkFile}
+            includeDetails={includeDetails}
+            setIncludeDetails={setIncludeDetails}
+            loading={loading}
+            handleSingleValidate={handleSingleValidate}
+            handleBulkUpload={handleBulkUpload}
+            bulkTaskIds={bulkTaskIds}
+            bulkStatus={bulkStatus}
+            checkBulkStatus={checkBulkStatus}
+          />
+          <QuickStats />
+        </div>
+        <div className="space-y-4">
+          {result && (
+            <ValidationResults
+              result={result}
+              showDetails={showDetails}
+              setShowDetails={setShowDetails}
+              includeDetails={includeDetails}
+            />
+          )}
+          <HelpCard />
+        </div>
+      </div>
+
+      <ApiKeyModal
+        isOpen={showApiKeyModal}
+        onClose={() => setShowApiKeyModal(false)}
+        apiKeys={apiKeys}
+        selectedApiKey={selectedApiKey}
+        setSelectedApiKey={setSelectedApiKey}
+        apiKeyLoading={apiKeyLoading}
+        copiedKey={copiedKey}
+        copyApiKey={copyApiKey}
+        maskApiKey={maskApiKey}
+      />
     </div>
   );
 };

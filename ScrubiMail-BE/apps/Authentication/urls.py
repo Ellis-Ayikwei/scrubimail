@@ -19,7 +19,9 @@ from .views import (
     TrustedDevicesView,
     RevokeTrustedDeviceView,
     RevokeAllTrustedDevicesView,
+    TokenRefreshView,
 )
+from .token_views import SuspensionAwareTokenRefreshView
 from .oauth_views import OAuthLoginView, OAuthCallbackView, OAuthProvidersView
 
 urlpatterns = [
@@ -29,6 +31,7 @@ urlpatterns = [
     path("user/", UserProfileView.as_view(), name="user-profile"),
     path("my-profile/", MyProfileView.as_view(), name="my-profile"),
     path("change-password/", PasswordChangeAPIView.as_view(), name="change-password"),
+    path("refresh_token/", TokenRefreshView.as_view(), name="refresh-token"),
     path(
         "notification-preferences/",
         NotificationPreferencesView.as_view(),

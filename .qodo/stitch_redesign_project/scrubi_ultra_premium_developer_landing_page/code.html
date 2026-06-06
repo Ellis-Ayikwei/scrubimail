@@ -1,0 +1,449 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Scrubi | Surgical Email Validation Infrastructure</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Epilogue:wght@600;700;800&amp;family=Inter:wght@300;400;500&amp;family=JetBrains+Mono:wght@400;500;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+    tailwind.config = {
+      darkMode: "class",
+      theme: {
+        extend: {
+          colors: {
+            "surface-container-low": "#0A0C10",
+            "surface-container-lowest": "#050608",
+            "primary": "#00E5A0",
+            "on-primary": "#003824",
+            "on-surface": "#F1F5F9",
+            "on-surface-variant": "#94A3B8",
+            "outline": "rgba(255, 255, 255, 0.05)",
+            "outline-variant": "rgba(0, 229, 160, 0.1)",
+          },
+          borderRadius: {
+            "none": "0",
+            "sm": "0.125rem",
+            "DEFAULT": "0.25rem",
+            "lg": "0.5rem",
+            "xl": "1rem",
+          },
+          fontFamily: {
+            "headline": ["Epilogue", "sans-serif"],
+            "body": ["Inter", "sans-serif"],
+            "mono": ["JetBrains Mono", "monospace"]
+          }
+        },
+      },
+    }
+  </script>
+<style>
+    body { 
+      background-color: #050608; 
+      color: #F1F5F9;
+      -webkit-font-smoothing: antialiased;
+    }
+    .blueprint-dots {
+      background-image: radial-gradient(rgba(0, 229, 160, 0.15) 0.5px, transparent 0.5px);
+      background-size: 32px 32px;
+    }
+    .radial-aura-top {
+      background: radial-gradient(circle at 50% -10%, rgba(0, 229, 160, 0.12) 0%, transparent 60%);
+    }
+    .radial-aura-accent {
+      background: radial-gradient(circle at 100% 50%, rgba(0, 229, 160, 0.05) 0%, transparent 40%);
+    }
+    .glass-infrastructure {
+      background: rgba(255, 255, 255, 0.02);
+      backdrop-filter: blur(20px);
+      border: 0.5px solid rgba(255, 255, 255, 0.08);
+    }
+    .surgical-line {
+      height: 1px;
+      background: linear-gradient(90deg, transparent, rgba(0, 229, 160, 0.3), transparent);
+    }
+    .headline-editorial {
+      letter-spacing: -0.04em;
+      line-height: 0.95;
+    }
+    .status-pulse {
+      animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.4; transform: scale(0.9); }
+    }
+    .scan-bar {
+      height: 2px;
+      background: linear-gradient(90deg, transparent, #00E5A0, transparent);
+      box-shadow: 0 0 15px #00E5A0;
+      animation: scan 6s linear infinite;
+    }
+    @keyframes scan {
+      0% { top: 0%; opacity: 0; }
+      5% { opacity: 1; }
+      95% { opacity: 1; }
+      100% { top: 100%; opacity: 0; }
+    }
+    .text-glow-primary {
+      text-shadow: 0 0 20px rgba(0, 229, 160, 0.4);
+    }
+    ::selection {
+      background: #00E5A0;
+      color: #003824;
+    }
+    .bento-glow {
+      position: absolute;
+      inset: -1px;
+      background: linear-gradient(45deg, transparent, rgba(0, 229, 160, 0.1), transparent);
+      z-index: -1;
+      opacity: 0;
+      transition: opacity 0.5s;
+    }
+    .glass-infrastructure:hover .bento-glow {
+      opacity: 1;
+    }
+  </style>
+</head>
+<body class="font-body blueprint-dots">
+<!-- Navigation -->
+<nav class="fixed top-0 w-full z-[100] border-b border-white/5 bg-surface-container-lowest/40 backdrop-blur-xl">
+<div class="max-w-[1600px] mx-auto px-10 py-6 flex justify-between items-center">
+<div class="flex items-center gap-12">
+<div class="text-2xl font-extrabold tracking-tighter text-white font-headline">SCRUBI<span class="text-primary text-[6px] align-top ml-0.5">TM</span></div>
+<div class="hidden lg:flex gap-8 items-center border-l border-white/10 pl-12">
+<a class="font-mono text-[9px] uppercase tracking-[0.3em] text-on-surface-variant hover:text-primary transition-all" href="#">Nodes</a>
+<a class="font-mono text-[9px] uppercase tracking-[0.3em] text-on-surface-variant hover:text-primary transition-all" href="#">Protocols</a>
+<a class="font-mono text-[9px] uppercase tracking-[0.3em] text-on-surface-variant hover:text-primary transition-all" href="#">Tier_Matrix</a>
+<a class="font-mono text-[9px] uppercase tracking-[0.3em] text-on-surface-variant hover:text-primary transition-all" href="#">Hardware_Docs</a>
+</div>
+</div>
+<div class="flex items-center gap-8">
+<span class="hidden xl:block font-mono text-[8px] text-white/40 tracking-[0.4em] uppercase">[ 40.7128° N, 74.0060° W ]</span>
+<button class="font-mono text-[9px] uppercase tracking-[0.3em] text-white/70 hover:text-white transition-colors">Access_Core</button>
+<button class="bg-white text-black px-6 py-2.5 font-mono text-[9px] uppercase tracking-[0.3em] font-bold hover:bg-primary transition-all">Initialize_v4</button>
+</div>
+</div>
+</nav>
+<main class="relative pt-32 overflow-hidden">
+<div class="radial-aura-top absolute inset-0 pointer-events-none"></div>
+<div class="radial-aura-accent absolute inset-0 pointer-events-none"></div>
+<!-- Hero Infrastructure -->
+<section class="max-w-[1600px] mx-auto px-10 grid lg:grid-cols-12 gap-16 items-start pb-40">
+<div class="lg:col-span-7 space-y-12 pt-12">
+<div class="flex items-center gap-4">
+<div class="flex items-center gap-2 border border-primary/20 px-4 py-1.5 rounded-none bg-primary/5">
+<span class="w-1 h-1 rounded-full bg-primary status-pulse"></span>
+<span class="font-mono text-[9px] uppercase tracking-[0.3em] text-primary">System: Optimal</span>
+</div>
+<span class="font-mono text-[8px] text-white/30 uppercase tracking-[0.2em]">Build_hash: 8f2a9e1</span>
+</div>
+<h1 class="text-7xl md:text-[8rem] font-headline font-extrabold headline-editorial text-white">
+        High-Fidelity<br/>
+<span class="text-primary text-glow-primary">Validation.</span>
+</h1>
+<p class="text-on-surface-variant text-xl max-w-xl leading-relaxed font-light">
+        The definitive email scrubbing engine for critical infrastructure. Zero-latency verification clusters for high-throughput engineering teams.
+      </p>
+<div class="flex flex-wrap gap-6 pt-6">
+<button class="bg-primary px-10 py-5 text-on-primary font-mono text-[10px] uppercase tracking-[0.3em] font-bold hover:scale-[1.02] transition-all shadow-[0_10px_30px_rgba(0,229,160,0.15)]">
+          Deploy_Cluster
+        </button>
+<button class="border border-white/10 px-10 py-5 font-mono text-[10px] uppercase tracking-[0.3em] hover:bg-white/5 transition-all">
+          View_Specification
+        </button>
+</div>
+</div>
+<!-- Integrated Terminal Component -->
+<div class="lg:col-span-5 pt-12">
+<div class="glass-infrastructure rounded-xl p-1 relative shadow-2xl group">
+<div class="absolute -top-3 -right-3 bg-white/5 border border-white/10 px-4 py-2 backdrop-blur-2xl z-20">
+<span class="font-mono text-[9px] text-primary flex items-center gap-2">
+<span class="w-1 h-1 bg-primary rounded-full"></span>
+LATENCY: 0.04ms
+</span>
+</div>
+<div class="bg-black/40 rounded-lg overflow-hidden border border-white/5">
+<div class="px-6 py-4 border-b border-white/5 flex justify-between items-center bg-white/[0.02]">
+<div class="flex gap-2">
+<div class="w-1.5 h-1.5 rounded-full bg-white/20"></div>
+<div class="w-1.5 h-1.5 rounded-full bg-white/20"></div>
+<div class="w-1.5 h-1.5 rounded-full bg-white/20"></div>
+</div>
+<div class="font-mono text-[8px] text-white/40 tracking-[0.4em] uppercase">Core_Validation_Probe</div>
+</div>
+<div class="p-10 font-mono text-sm leading-relaxed min-h-[400px] overflow-hidden relative">
+<!-- Live Stream Effect -->
+<div class="space-y-6 opacity-90">
+<div class="flex gap-4">
+<span class="text-white/20 select-none">L01</span>
+<span class="text-primary/70">$ scrubi probe test@infra.net</span>
+</div>
+<div class="flex gap-4">
+<span class="text-white/20 select-none">L02</span>
+<div class="text-on-surface space-y-1.5">
+<div class="text-white/40">{</div>
+<div class="pl-6"><span class="text-primary">"status"</span>: <span class="text-white font-bold">"VERIFIED"</span>,</div>
+<div class="pl-6"><span class="text-primary">"precision"</span>: <span class="text-white">0.999992</span>,</div>
+<div class="pl-6"><span class="text-primary">"provider"</span>: <span class="text-white">"AWS_SES_NODE"</span>,</div>
+<div class="pl-6"><span class="text-primary">"mx_active"</span>: <span class="text-white">true</span>,</div>
+<div class="pl-6"><span class="text-primary">"scrub_id"</span>: <span class="text-white/60">"x82_921_aa"</span></div>
+<div class="text-white/40">}</div>
+</div>
+</div>
+<div class="flex gap-4 pt-4 border-t border-white/5">
+<span class="text-white/20 select-none">L09</span>
+<span class="text-white/40 italic">// Awaiting next packet...</span>
+</div>
+</div>
+<!-- Coordinate Overlay -->
+<div class="absolute bottom-4 right-6 font-mono text-[7px] text-white/10 uppercase tracking-widest">
+        SECURE_TUNNEL: 128.0.0.1
+      </div>
+</div>
+</div>
+</div>
+</div>
+</section>
+<!-- Technical Specs Bar -->
+<div class="surgical-line"></div>
+<section class="bg-surface-container-low/20">
+<div class="max-w-[1600px] mx-auto px-10 grid grid-cols-2 lg:grid-cols-4 divide-x divide-white/5 border-x border-white/5">
+<div class="py-16 px-10">
+<div class="font-mono text-3xl font-bold text-white mb-2 tracking-tighter">12.8M</div>
+<div class="font-mono text-[9px] uppercase tracking-[0.3em] text-white/40">Packet_Operations/hr</div>
+</div>
+<div class="py-16 px-10">
+<div class="font-mono text-3xl font-bold text-white mb-2 tracking-tighter">99.998%</div>
+<div class="font-mono text-[9px] uppercase tracking-[0.3em] text-white/40">Accuracy_Coefficient</div>
+</div>
+<div class="py-16 px-10">
+<div class="font-mono text-3xl font-bold text-white mb-2 tracking-tighter">&lt; 12ms</div>
+<div class="font-mono text-[9px] uppercase tracking-[0.3em] text-white/40">Edge_Response_TTFB</div>
+</div>
+<div class="py-16 px-10">
+<div class="flex items-center gap-3 mb-2">
+<div class="w-2.5 h-2.5 rounded-none bg-primary status-pulse"></div>
+<span class="font-mono text-3xl font-bold text-white tracking-tighter">Global</span>
+</div>
+<div class="font-mono text-[9px] uppercase tracking-[0.3em] text-white/40">Node_Distribution</div>
+</div>
+</div>
+</section>
+<div class="surgical-line mb-32"></div>
+<!-- Bento Box Capabilities -->
+<section class="max-w-[1600px] mx-auto px-10 py-20">
+<div class="mb-24 flex justify-between items-end">
+<div class="space-y-4">
+<div class="font-mono text-[9px] uppercase tracking-[0.5em] text-primary">Technical_Capabilities</div>
+<h2 class="text-5xl md:text-6xl font-headline font-extrabold headline-editorial text-white">Surgical Infrastructure.</h2>
+</div>
+<div class="hidden md:block font-mono text-[9px] text-white/30 uppercase tracking-[0.4em] text-right">
+      MODULE: ALPHA_V4<br/>
+      REVISION: 2024.01
+    </div>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-12 grid-rows-2 gap-4 h-full md:h-[600px]">
+<!-- Large Bento: Core Engine -->
+<div class="md:col-span-7 md:row-span-2 glass-infrastructure p-12 relative overflow-hidden flex flex-col justify-between group">
+<div class="bento-glow"></div>
+<div>
+<div class="w-12 h-12 mb-10 flex items-center justify-center border border-primary/30 text-primary">
+<span class="material-symbols-outlined text-3xl">terminal</span>
+</div>
+<h3 class="font-mono text-lg uppercase tracking-widest text-white mb-6">Autonomous_Scrubbing_Protocol</h3>
+<p class="text-white/50 text-sm leading-relaxed max-w-md">Layer-7 inspection using proprietary SMTP-Handshake patterns to identify honeypots, spamtrap infrastructure, and ephemeral MX clusters without ever leaving a footprint.</p>
+</div>
+<div class="pt-10 border-t border-white/5 flex items-center justify-between">
+<div class="flex gap-4">
+<div class="h-12 w-32 bg-white/5 border border-white/10 flex items-center justify-center font-mono text-[8px] text-white/40">GRAPH_DATA_FLOW</div>
+<div class="h-12 w-32 bg-white/5 border border-white/10 flex items-center justify-center font-mono text-[8px] text-white/40">PACKET_METRICS</div>
+</div>
+<span class="font-mono text-[10px] text-primary">v4.1 ACTIVE</span>
+</div>
+</div>
+<!-- Medium Bento: Edge Nodes -->
+<div class="md:col-span-5 glass-infrastructure p-10 relative group">
+<div class="bento-glow"></div>
+<div class="flex justify-between items-start mb-8">
+<div class="text-primary"><span class="material-symbols-outlined text-3xl">public</span></div>
+<div class="font-mono text-[8px] text-white/30 uppercase tracking-[0.3em]">Module_02</div>
+</div>
+<h3 class="font-mono text-sm uppercase tracking-widest text-white mb-4">Anycast_Edge_Network</h3>
+<p class="text-white/50 text-xs leading-relaxed">Requests are routed to the nearest secure cluster. Currently spanning 24 global regions for sub-15ms validation cycles.</p>
+</div>
+<!-- Small Bento: API -->
+<div class="md:col-span-5 glass-infrastructure p-10 relative group">
+<div class="bento-glow"></div>
+<div class="flex justify-between items-start mb-8">
+<div class="text-primary"><span class="material-symbols-outlined text-3xl">code_blocks</span></div>
+<div class="font-mono text-[8px] text-white/30 uppercase tracking-[0.3em]">Module_03</div>
+</div>
+<h3 class="font-mono text-sm uppercase tracking-widest text-white mb-4">Meta_Extraction_v2</h3>
+<p class="text-white/50 text-xs leading-relaxed">Deep SMTP telemetry including role detection, provider categorization, and risk scoring in a single JSON packet.</p>
+</div>
+</div>
+</section>
+<!-- Multi-Layer Scan Flow -->
+<section class="max-w-[1600px] mx-auto px-10 py-40">
+<div class="glass-infrastructure rounded-none p-16 md:p-32 relative overflow-hidden bg-black/20">
+<div class="grid lg:grid-cols-2 gap-32 items-center">
+<div class="space-y-16">
+<h2 class="text-5xl font-headline font-bold text-white headline-editorial">Precision Lifecycle.</h2>
+<div class="space-y-16">
+<div class="group relative">
+<div class="flex items-center gap-8">
+<span class="font-mono text-[10px] text-primary/40 group-hover:text-primary transition-colors">0100</span>
+<div class="h-[0.5px] flex-grow bg-white/10"></div>
+</div>
+<div class="pl-12 pt-4">
+<h4 class="font-mono text-xs uppercase tracking-widest text-white mb-3">Syntax_Parse_Sanitization</h4>
+<p class="text-white/40 text-sm font-light max-w-sm">Strict RFC compliance filtering with enhanced sanitization algorithms for edge-case injections.</p>
+</div>
+</div>
+<div class="group relative">
+<div class="flex items-center gap-8">
+<span class="font-mono text-[10px] text-primary/40 group-hover:text-primary transition-colors">0101</span>
+<div class="h-[0.5px] flex-grow bg-white/10"></div>
+</div>
+<div class="pl-12 pt-4">
+<h4 class="font-mono text-xs uppercase tracking-widest text-white mb-3">DNS_MX_Verification</h4>
+<p class="text-white/40 text-sm font-light max-w-sm">Parallelized DNS lookups across redundant recursive resolvers for maximum reliability.</p>
+</div>
+</div>
+<div class="group relative">
+<div class="flex items-center gap-8">
+<span class="font-mono text-[10px] text-primary/40 group-hover:text-primary transition-colors">0110</span>
+<div class="h-[0.5px] flex-grow bg-white/10"></div>
+</div>
+<div class="pl-12 pt-4">
+<h4 class="font-mono text-xs uppercase tracking-widest text-white mb-3">Surgical_SMTP_Check</h4>
+<p class="text-white/40 text-sm font-light max-w-sm">Ephemeral socket connection with proprietary handshake signaling to verify mailbox existence.</p>
+</div>
+</div>
+</div>
+</div>
+<div class="hidden lg:block relative h-[600px] border border-white/10 bg-black/40 p-4">
+<div class="scan-bar absolute top-0 left-0 w-full z-10"></div>
+<img alt="Server Hardware" class="w-full h-full object-cover opacity-20 grayscale brightness-125" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBjxbHBhF4JfSzc8wgx3_PLeAWlpnXXjceAOLM8-MiehJZwfsBZkMssjREW-ygE7XvGt0TuN8zDJXoU0QWg9M1-Mlb4KgUnvbzARar8K0yTcthEkOU8i-c0PpsZIJQnpgjTd_Yl29Q1azt8lPk-1u3UlxaxWwPpEfhkvt34YIjtUE7umk2GI-dQJvptBSp_9q4WKc8hPV16UQvIxx7gACo5uUG_Qoh3TQEcxE2PMAVdONuCTlHGMcr_-AfikRnR-i4xAS7oLMr38CEC"/>
+<div class="absolute inset-0 bg-gradient-to-t from-surface-container-lowest to-transparent"></div>
+<!-- Technical Metadata Overlay -->
+<div class="absolute bottom-8 left-8 space-y-2 font-mono text-[8px] text-white/30 uppercase tracking-[0.2em]">
+<p>HARDWARE_ID: SCRB_NODE_TX_09</p>
+<p>TEMP_CORE: 32.4°C</p>
+<p>STATUS: OPTIMIZED</p>
+</div>
+</div>
+</div>
+</div>
+</section>
+<!-- Infrastructure Tier Matrix -->
+<section class="max-w-[1600px] mx-auto px-10 py-40">
+<div class="text-center mb-32 space-y-8">
+<h2 class="text-6xl font-headline font-extrabold headline-editorial text-white">Capacity Matrix.</h2>
+<div class="inline-flex p-1.5 border border-white/10 rounded-none bg-white/[0.02]">
+<button class="bg-white/10 border border-white/20 px-10 py-3 font-mono text-[9px] uppercase tracking-widest text-white">Standard</button>
+<button class="px-10 py-3 font-mono text-[9px] uppercase tracking-widest text-white/40 hover:text-white transition-colors">Annual_Enterprise</button>
+</div>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-1">
+<!-- Tier 0 -->
+<div class="glass-infrastructure p-12 flex flex-col border-opacity-40">
+<div class="font-mono text-[9px] uppercase tracking-[0.3em] text-white/30 mb-8">Node_Dev</div>
+<div class="font-headline text-5xl font-bold mb-16 text-white">$0</div>
+<div class="space-y-6 mb-20 flex-grow font-mono text-[10px] text-white/40">
+<div class="flex items-center gap-4"><span class="w-1 h-1 bg-white/20"></span> 1,000_PROBES/MO</div>
+<div class="flex items-center gap-4"><span class="w-1 h-1 bg-white/20"></span> PUBLIC_RESOURCES</div>
+<div class="flex items-center gap-4"><span class="w-1 h-1 bg-white/20"></span> BASIC_SPEC</div>
+</div>
+<button class="w-full py-5 border border-white/10 font-mono text-[9px] uppercase tracking-[0.4em] hover:bg-white/5 transition-all">Provision</button>
+</div>
+<!-- Tier 1 (Professional - Highlighted) -->
+<div class="glass-infrastructure p-12 flex flex-col relative border-primary/30 shadow-[0_30px_100px_rgba(0,229,160,0.08)] bg-primary/[0.01]">
+<div class="absolute top-0 right-0 p-4 font-mono text-[8px] text-primary uppercase tracking-[0.2em] font-bold">Recommended</div>
+<div class="font-mono text-[9px] uppercase tracking-[0.3em] text-primary mb-8">Node_Production</div>
+<div class="font-headline text-5xl font-bold mb-16 text-white">$49</div>
+<div class="space-y-6 mb-20 flex-grow font-mono text-[10px] text-white/80">
+<div class="flex items-center gap-4 text-primary"><span class="w-1 h-1 bg-primary"></span> 50,000_PROBES/MO</div>
+<div class="flex items-center gap-4"><span class="w-1 h-1 bg-primary"></span> 99.9%_NODE_SLO</div>
+<div class="flex items-center gap-4"><span class="w-1 h-1 bg-primary"></span> ANYCAST_ROUTING</div>
+<div class="flex items-center gap-4"><span class="w-1 h-1 bg-primary"></span> PRIORITY_IO</div>
+</div>
+<button class="w-full py-5 bg-primary font-mono text-[9px] uppercase tracking-[0.4em] font-bold text-on-primary hover:brightness-110 transition-all">Select_Node</button>
+</div>
+<!-- Tier 2 -->
+<div class="glass-infrastructure p-12 flex flex-col">
+<div class="font-mono text-[9px] uppercase tracking-[0.3em] text-white/30 mb-8">Node_Enterprise</div>
+<div class="font-headline text-5xl font-bold mb-16 text-white">$199</div>
+<div class="space-y-6 mb-20 flex-grow font-mono text-[10px] text-white/40">
+<div class="flex items-center gap-4"><span class="w-1 h-1 bg-white/20"></span> 500,000_PROBES/MO</div>
+<div class="flex items-center gap-4"><span class="w-1 h-1 bg-white/20"></span> ADVANCED_ANALYTICS</div>
+<div class="flex items-center gap-4"><span class="w-1 h-1 bg-white/20"></span> DEDICATED_VPN</div>
+</div>
+<button class="w-full py-5 border border-white/10 font-mono text-[9px] uppercase tracking-[0.4em] hover:bg-white/5 transition-all">Provision</button>
+</div>
+<!-- Tier 3 -->
+<div class="glass-infrastructure p-12 flex flex-col">
+<div class="font-mono text-[9px] uppercase tracking-[0.3em] text-white/30 mb-8">Node_Custom</div>
+<div class="font-headline text-5xl font-bold mb-16 text-white">QUOTE</div>
+<div class="space-y-6 mb-20 flex-grow font-mono text-[10px] text-white/40">
+<div class="flex items-center gap-4"><span class="w-1 h-1 bg-white/20"></span> UNLIMITED_IO</div>
+<div class="flex items-center gap-4"><span class="w-1 h-1 bg-white/20"></span> ON_PREM_BINARIES</div>
+<div class="flex items-center gap-4"><span class="w-1 h-1 bg-white/20"></span> 100%_SLO_GUARANTEE</div>
+</div>
+<button class="w-full py-5 border border-white/10 font-mono text-[9px] uppercase tracking-[0.4em] hover:bg-white/5 transition-all">Talk_To_Ops</button>
+</div>
+</div>
+</section>
+</main>
+<!-- Footer -->
+<footer class="border-t border-white/5 bg-surface-container-lowest py-24">
+<div class="max-w-[1600px] mx-auto px-10">
+<div class="grid grid-cols-1 md:grid-cols-12 gap-16 mb-32">
+<div class="md:col-span-5 space-y-12">
+<div class="text-3xl font-extrabold tracking-tighter text-white font-headline">SCRUBI</div>
+<p class="font-mono text-[9px] text-white/30 uppercase tracking-[0.3em] leading-loose max-w-sm">
+        Surgical precision email infrastructure.<br/>
+        Building for the world's most demanding engineering teams.<br/>
+        Est. 2024 Terminal Operations.
+      </p>
+<div class="flex gap-8">
+<span class="material-symbols-outlined text-white/20 hover:text-primary transition-colors cursor-pointer text-xl">terminal</span>
+<span class="material-symbols-outlined text-white/20 hover:text-primary transition-colors cursor-pointer text-xl">hub</span>
+<span class="material-symbols-outlined text-white/20 hover:text-primary transition-colors cursor-pointer text-xl">monitoring</span>
+</div>
+</div>
+<div class="md:col-span-2 space-y-10">
+<h5 class="font-mono text-[9px] uppercase tracking-[0.4em] text-white">System</h5>
+<ul class="space-y-4 font-mono text-[9px] uppercase tracking-widest text-white/40">
+<li><a class="hover:text-primary transition-colors" href="#">Internal_API</a></li>
+<li><a class="hover:text-primary transition-colors" href="#">Edge_Status</a></li>
+<li><a class="hover:text-primary transition-colors" href="#">Release_Logs</a></li>
+</ul>
+</div>
+<div class="md:col-span-2 space-y-10">
+<h5 class="font-mono text-[9px] uppercase tracking-[0.4em] text-white">Trust</h5>
+<ul class="space-y-4 font-mono text-[9px] uppercase tracking-widest text-white/40">
+<li><a class="hover:text-primary transition-colors" href="#">Security_Audit</a></li>
+<li><a class="hover:text-primary transition-colors" href="#">Privacy_Layer</a></li>
+<li><a class="hover:text-primary transition-colors" href="#">Compliance</a></li>
+</ul>
+</div>
+<div class="md:col-span-3 space-y-10">
+<h5 class="font-mono text-[9px] uppercase tracking-[0.4em] text-white">Packet_Updates</h5>
+<div class="flex border-b border-white/10 pb-4 group">
+<input class="bg-transparent border-none focus:ring-0 font-mono text-[10px] uppercase tracking-widest w-full text-white placeholder:text-white/20" placeholder="DEV@SYSTEM.ORG" type="email"/>
+<button class="text-primary/50 group-hover:text-primary transition-all">
+<span class="material-symbols-outlined">arrow_forward</span>
+</button>
+</div>
+</div>
+</div>
+<div class="flex flex-col md:flex-row justify-between items-center gap-8 pt-10 border-t border-white/5">
+<div class="font-mono text-[8px] text-white/20 tracking-[0.6em] uppercase">SYSTEM_STATE: OPERATIONAL_v4.2.1</div>
+<div class="font-mono text-[8px] text-white/20 tracking-[0.4em] uppercase">© 2024 ALL_BITS_RESERVED</div>
+</div>
+</div>
+</footer>
+</body></html>

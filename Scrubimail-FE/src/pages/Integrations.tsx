@@ -219,186 +219,80 @@ var result = await response.Content.ReadAsStringAsync();`,
   };
 
   return (
-    <div className="min-h-screen bg-white dark:bg-gray-900">
-      
-      {/* Hero Section */}
-      <section className="py-24 bg-gradient-to-br from-[#F4F5F7] to-white dark:from-gray-900 dark:to-gray-800">
-        <div className="w-full mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center">
-            <h1 className="text-5xl md:text-6xl font-bold text-[#333333] dark:text-white mb-6">
-              Easy Integration
-            </h1>
-            <p className="text-xl text-[#333333]/70 dark:text-gray-300 mb-8 max-w-3xl mx-auto">
-              Integrate with your favorite programming languages and frameworks in minutes. 
-              Our RESTful API works seamlessly with any technology stack.
-            </p>
-            <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <Link
-                to="/api-docs"
-                className="inline-flex items-center px-8 py-4 bg-gradient-to-r from-[#2ED8A3] to-[#004E8A] text-white font-semibold rounded-lg hover:from-[#00C48C] hover:to-[#2ED8A3] transition-all duration-200 shadow-lg hover:shadow-xl"
-              >
-                <BookOpen className="w-5 h-5 mr-2" />
-                View Full Documentation
-              </Link>
-              {!isAuthenticated && <Link
-                to="/register"
-                className="inline-flex items-center px-8 py-4 border-2 border-[#004E8A] text-[#004E8A] dark:text-[#2ED8A3] font-semibold rounded-lg hover:bg-[#004E8A] hover:text-white dark:hover:bg-[#2ED8A3] transition-all duration-200"
-              >
-                Get API Key
-                <ArrowRight className="w-5 h-5 ml-2" />
-              </Link>}
-            </div>
-          </div>
+    <div className="app-bg min-h-screen" style={{ fontFamily: 'Inter, sans-serif' }}>
+      <TopBar />
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-12 space-y-8">
+        {/* Header */}
+        <div>
+          <p className="font-['Space_Grotesk',sans-serif] uppercase tracking-[0.2em] text-[9px] text-[#6effc0] mb-1">SDK Reference</p>
+          <h1 className="font-['Epilogue',sans-serif] font-black text-[#e0e3e8] text-3xl tracking-tight mb-2">Integrations</h1>
+          <p className="font-['Space_Grotesk',sans-serif] uppercase tracking-[0.1em] text-[10px] text-[#bacbbf]">Native SDK examples for every major language and platform</p>
         </div>
-      </section>
 
-      {/* Language Grid */}
-      <section className="py-24 bg-white dark:bg-gray-900">
-        <div className="w-full mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-16">
-            <h2 className="text-4xl font-bold text-[#333333] dark:text-white mb-4">
-              Supported Languages & Frameworks
-            </h2>
-            <p className="text-xl text-[#333333]/70 dark:text-gray-300 max-w-2xl mx-auto">
-              Choose your preferred language and get started in minutes with our comprehensive code examples.
-            </p>
-          </div>
-          
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
-            {languages.map((language, index) => (
-              <div key={index} className="bg-[#F4F5F7] dark:bg-gray-800 rounded-xl p-8 hover:shadow-lg transition-all duration-200">
-                <div className="flex items-center mb-6">
-                  <div className="w-16 h-16 rounded-lg flex items-center justify-center mr-4">
-                    <img src={language.icon} alt={language.name} className="w-8 h-8" />
+        {/* Language cards */}
+        <div className="space-y-4">
+          {languages.map((lang) => (
+            <div key={lang.name} className="bg-[#1c2024] border border-[#3b4a41]/40 rounded-sm overflow-hidden">
+              {/* Card header */}
+              <div className="flex items-center justify-between px-5 py-4 border-b border-[#3b4a41]/30">
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 bg-[#101418] border border-[#3b4a41]/40 rounded-sm flex items-center justify-center overflow-hidden">
+                    <img src={lang.icon} alt={lang.name} className="w-5 h-5 object-contain" onError={(e) => { (e.target as HTMLImageElement).style.display='none'; }} />
                   </div>
                   <div>
-                    <h3 className="text-2xl font-bold text-[#333333] dark:text-white">{language.name}</h3>
-                    <p className="text-[#333333]/70 dark:text-gray-400">{language.description}</p>
+                    <p className="font-['Epilogue',sans-serif] font-bold text-[#e0e3e8] text-sm tracking-tight">{lang.name}</p>
+                    <p className="font-mono text-[10px] text-[#bacbbf]/60">{lang.description}</p>
                   </div>
                 </div>
-                
-                <div className="bg-gray-900 rounded-lg p-4 mb-6 relative">
-                  <div className="flex justify-between items-center mb-3">
-                    <span className="text-gray-400 text-sm font-mono">{language.name}</span>
-                    <button
-                      onClick={() => copyToClipboard(language.code, language.name)}
-                      className="flex items-center text-gray-400 hover:text-white transition-colors duration-200"
-                    >
-                      {copiedCode === language.name ? (
-                        <Check className="w-4 h-4 mr-1" />
-                      ) : (
-                        <Copy className="w-4 h-4 mr-1" />
-                      )}
-                      {copiedCode === language.name ? 'Copied!' : 'Copy'}
-                    </button>
-                  </div>
-                  <pre className="text-sm text-green-400 overflow-x-auto">
-                    <code>{language.code}</code>
-                  </pre>
-                </div>
-                
-                <div className="flex items-center justify-between">
-                  <a
-                    href={language.docs}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center text-[#2ED8A3] hover:text-[#00C48C] transition-colors duration-200"
-                  >
-                    <BookOpen className="w-4 h-4 mr-2" />
-                    View Documentation
-                    <ExternalLink className="w-4 h-4 ml-1" />
+                <div className="flex items-center gap-2">
+                  <a href={lang.docs} target="_blank" rel="noopener noreferrer"
+                    className="flex items-center gap-1.5 border border-[#3b4a41]/40 text-[#bacbbf] font-mono uppercase tracking-[0.1em] text-[9px] px-3 py-1.5 rounded-sm hover:border-[#6effc0]/40 hover:text-[#6effc0] transition-colors">
+                    <ExternalLink className="w-3 h-3" /> Docs
                   </a>
-                  <Link
-                    to="/register"
-                    className="inline-flex items-center px-4 py-2 bg-[#2ED8A3] text-white rounded-lg hover:bg-[#00C48C] transition-colors duration-200"
-                  >
-                    Get Started
-                    <ArrowRight className="w-5 h-5 ml-2" />
-                  </Link>
                 </div>
               </div>
-            ))}
-          </div>
+              {/* Code block */}
+              <div className="relative">
+                <div className="flex items-center justify-between px-4 py-2 border-b border-[#3b4a41]/20" style={{ backgroundColor: '#0a0f13' }}>
+                  <div className="flex gap-1.5">
+                    <div className="w-1.5 h-1.5 rounded-full bg-[#3b4a41]/40" />
+                    <div className="w-1.5 h-1.5 rounded-full bg-[#3b4a41]/40" />
+                    <div className="w-1.5 h-1.5 rounded-full bg-[#3b4a41]/40" />
+                  </div>
+                  <span className="font-mono text-[9px] text-[#3b4a41] uppercase tracking-[0.2em]">{lang.name.toLowerCase()}.snippet</span>
+                  <button
+                    onClick={() => { navigator.clipboard.writeText(lang.code); setCopiedCode(lang.name); setTimeout(() => setCopiedCode(null), 2000); }}
+                    className="flex items-center gap-1 text-[#3b4a41] hover:text-[#6effc0] transition-colors font-mono text-[9px] uppercase tracking-[0.1em]"
+                  >
+                    {copiedCode === lang.name ? <><Check className="w-3 h-3 text-[#6effc0]" /> Copied</> : <><Copy className="w-3 h-3" /> Copy</>}
+                  </button>
+                </div>
+                <pre className="p-4 font-mono text-xs text-[#6effc0]/80 overflow-x-auto max-h-52 leading-relaxed" style={{ backgroundColor: '#0a0f13' }}>
+                  <code>{lang.code}</code>
+                </pre>
+              </div>
+            </div>
+          ))}
         </div>
-      </section>
 
-      {/* Quick Start Section */}
-      <section className="py-24 bg-[#F4F5F7] dark:bg-gray-800">
-        <div className="w-full mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-16">
-            <h2 className="text-4xl font-bold text-[#333333] dark:text-white mb-4">
-              Get Started in 3 Steps
-            </h2>
-            <p className="text-xl text-[#333333]/70 dark:text-gray-300 max-w-2xl mx-auto">
-              From signup to your first API call in under 5 minutes.
-            </p>
-          </div>
-          
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            <div className="text-center">
-              <div className="w-16 h-16 bg-gradient-to-r from-[#2ED8A3] to-[#004E8A] rounded-full flex items-center justify-center text-white text-2xl font-bold mx-auto mb-4">
-                1
-              </div>
-              <h3 className="text-xl font-semibold text-[#333333] dark:text-white mb-2">
-                Sign Up & Get API Key
-              </h3>
-              <p className="text-[#333333]/70 dark:text-gray-400">
-                Create your account and receive your unique API key instantly
-              </p>
-            </div>
-            <div className="text-center">
-              <div className="w-16 h-16 bg-gradient-to-r from-[#2ED8A3] to-[#004E8A] rounded-full flex items-center justify-center text-white text-2xl font-bold mx-auto mb-4">
-                2
-              </div>
-              <h3 className="text-xl font-semibold text-[#333333] dark:text-white mb-2">
-                Choose Your Language
-              </h3>
-              <p className="text-[#333333]/70 dark:text-gray-400">
-                Pick from 8+ programming languages with ready-to-use code examples
-              </p>
-            </div>
-            <div className="text-center">
-              <div className="w-16 h-16 bg-gradient-to-r from-[#2ED8A3] to-[#004E8A] rounded-full flex items-center justify-center text-white text-2xl font-bold mx-auto mb-4">
-                3
-              </div>
-              <h3 className="text-xl font-semibold text-[#333333] dark:text-white mb-2">
-                Start Validating
-              </h3>
-              <p className="text-[#333333]/70 dark:text-gray-400">
-                Make your first API call and get instant email validation results
-              </p>
+        {/* CTA */}
+        {!isAuthenticated && (
+          <div className="border border-[#6effc0]/20 rounded-sm p-8 text-center" style={{ background: 'radial-gradient(circle at 50% 50%, rgba(110,255,192,0.04) 0%, transparent 60%)' }}>
+            <p className="font-['Space_Grotesk',sans-serif] uppercase tracking-[0.2em] text-[9px] text-[#6effc0] mb-3">Get Started</p>
+            <h2 className="font-['Epilogue',sans-serif] font-black text-[#e0e3e8] text-2xl tracking-tight mb-3">Ready to integrate?</h2>
+            <p className="font-mono text-xs text-[#bacbbf]/60 mb-6">Create a free account and get your API key to start validating emails in minutes.</p>
+            <div className="flex items-center justify-center gap-3">
+              <Link to="/register" className="bg-[#6effc0] text-[#003824] font-mono uppercase tracking-[0.1em] text-[10px] font-bold px-6 py-3 rounded-sm hover:brightness-105 transition-all">
+                Get API Key
+              </Link>
+              <Link to="/api-docs" className="border border-[#3b4a41]/40 text-[#bacbbf] font-mono uppercase tracking-[0.1em] text-[10px] px-6 py-3 rounded-sm hover:border-[#6effc0]/40 hover:text-[#6effc0] transition-all">
+                View Docs
+              </Link>
             </div>
           </div>
-        </div>
-      </section>
-
-      {/* CTA Section */}
-      <section className="py-24 bg-gradient-to-r from-[#2ED8A3] to-[#004E8A]">
-        <div className="w-full mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <h2 className="text-4xl font-bold text-white mb-4">
-            Ready to Integrate?
-          </h2>
-          <p className="text-xl text-white/90 mb-8 max-w-2xl mx-auto">
-            Join thousands of developers who trust Scrubimail for their email validation needs.
-          </p>
-          <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <Link
-              to="/onboarding"
-              className="inline-flex items-center px-8 py-4 bg-white text-[#004E8A] font-semibold rounded-3xl hover:bg-gray-100 transition-all duration-200 shadow-lg"
-            >
-              <Zap className="w-5 h-5 mr-2" />
-              Start Free Trial
-            </Link>
-            <Link
-              to="/api-docs"
-              className="inline-flex items-center px-8 py-4 border-2 border-white text-white font-semibold rounded-3xl hover:bg-white hover:text-[#004E8A] transition-all duration-200"
-            >
-              <Terminal className="w-5 h-5 mr-2" />
-              View API Docs
-            </Link>
-          </div>
-        </div>
-      </section>
+        )}
+      </div>
+      <Footer />
     </div>
   );
 };

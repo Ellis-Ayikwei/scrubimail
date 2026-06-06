@@ -35,17 +35,90 @@
     url('./assets/fonts/charlie-display.ttf')
 } */
 
+/* ─── Terminal theme tokens ──────────────────────────────────────────────── */
+@layer base {
+    :root {
+        --sm-bg:        #f8f9fa;
+        --sm-surface:   #ffffff;
+        --sm-inner:     #f1f3f5;
+        --sm-border:    rgba(0,0,0,0.10);
+        --sm-border-solid: #e5e7eb;
+        --sm-text:      #111827;
+        --sm-muted:     #4b5563;
+        --sm-faint:     #9ca3af;
+        --sm-dot:       rgba(0,0,0,0.05);
+        --sm-aura:      radial-gradient(circle at 50% -10%, rgba(110,255,192,0.08) 0%, transparent 60%);
+    }
+    .dark {
+        --sm-bg:        #080C10;
+        --sm-surface:   #1c2024;
+        --sm-inner:     #101418;
+        --sm-border:    rgba(59,74,65,0.40);
+        --sm-border-solid: #3b4a41;
+        --sm-text:      #e0e3e8;
+        --sm-muted:     #bacbbf;
+        --sm-faint:     #3b4a41;
+        --sm-dot:       #1c2024;
+        --sm-aura:      radial-gradient(circle at 50% -10%, rgba(110,255,192,0.10) 0%, transparent 60%);
+    }
+}
+
+/* ─── Semantic utility classes ───────────────────────────────────────────── */
+@layer utilities {
+    /* Full-page dot-grid background — use instead of inline DOT_BG style */
+    .app-bg {
+        background-color: var(--sm-bg);
+        background-image: radial-gradient(circle at 2px 2px, var(--sm-dot) 1px, transparent 0);
+        background-size: 40px 40px;
+        min-height: 100vh;
+    }
+    /* Card / panel surface */
+    .app-surface {
+        background-color: var(--sm-surface);
+    }
+    /* Inner panel (inputs, code blocks) */
+    .app-inner {
+        background-color: var(--sm-inner);
+    }
+    /* Text helpers */
+    .app-text    { color: var(--sm-text);  }
+    .app-muted   { color: var(--sm-muted); }
+    .app-faint   { color: var(--sm-faint); }
+    /* Border helper */
+    .app-border  { border-color: var(--sm-border-solid); }
+}
+
+/* ─── Light-mode overrides for hardcoded dark terminal hex values ────────── */
+/* These fire when .dark is NOT on <html>, flipping every hardcoded card/bg  */
+:root:not(.dark) .bg-\[\#080C10\]  { background-color: #f8f9fa   !important; }
+:root:not(.dark) .bg-\[\#0a0f13\]  { background-color: #f5f7fa   !important; }
+:root:not(.dark) .bg-\[\#0d1117\]  { background-color: #f0f2f5   !important; }
+:root:not(.dark) .bg-\[\#101418\]  { background-color: #f1f3f5   !important; }
+:root:not(.dark) .bg-\[\#181c20\]  { background-color: #fafafa   !important; }
+:root:not(.dark) .bg-\[\#1c2024\]  { background-color: #ffffff   !important; }
+:root:not(.dark) .bg-\[\#060818\]  { background-color: #f8f9fa   !important; }
+
+:root:not(.dark) .border-\[\#3b4a41\]           { border-color: #e5e7eb   !important; }
+:root:not(.dark) .border-\[\#3b4a41\]\/40       { border-color: rgba(229,231,235,0.6) !important; }
+:root:not(.dark) .border-\[\#3b4a41\]\/20       { border-color: rgba(229,231,235,0.4) !important; }
+:root:not(.dark) .border-\[\#3b4a41\]\/30       { border-color: rgba(229,231,235,0.5) !important; }
+
+:root:not(.dark) .text-\[\#e0e3e8\]  { color: #111827 !important; }
+:root:not(.dark) .text-\[\#bacbbf\]  { color: #4b5563 !important; }
+:root:not(.dark) .text-\[\#3b4a41\]  { color: #9ca3af !important; }
+
+/* Placeholder colours */
+:root:not(.dark) .placeholder-\[\#3b4a41\]::placeholder { color: #9ca3af !important; }
+
+/* ─── Legacy dark-mode body background ──────────────────────────────────── */
 @layer components {
     html {
         @apply scroll-smooth;
     }
 
     body {
-        @apply bg-[#fafafa] font-sans;
-    }
-
-    body.dark {
-        @apply bg-[#060818];
+        background-color: var(--sm-bg);
+        @apply font-sans;
     }
 
     /* Reduce font sizes in main content area (but not sidebar) */

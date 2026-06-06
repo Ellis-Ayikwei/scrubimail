@@ -9,6 +9,7 @@ const Validation = lazy(() => import('../pages/Validation/index'));
 const History = lazy(() => import('../pages/History'));
 const ApiKeys = lazy(() => import('../pages/APIKeys'));
 const Billing = lazy(() => import('../pages/Billing'));
+const BillingPaymentOutcome = lazy(() => import('../pages/BillingPaymentOutcome'));
 const Profile = lazy(() => import('../pages/Profile'));
 const ApiDocs = lazy(() => import('../pages/ApiDocs'));
 const Integrations = lazy(() => import('../pages/Integrations'));
@@ -21,10 +22,9 @@ const Features = lazy(() => import('../pages/Features'));
 const Analytics = lazy(() => import('../pages/Analytics'));
 const BulkUpload = lazy(() => import('../pages/BulkUpload'));
 const Notifications = lazy(() => import('../pages/Notifications'));
-const Onboarding = lazy(() => import('../pages/Onboarding'));
 const NotFound = lazy(() => import('../pages/404'));
 const ServerError = lazy(() => import('../pages/500'));
-const Login = lazy(() => import('../pages/auth/Login'));
+const Login = lazy(() => import('../pages/auth/MultiStepLogin'));
 const Register = lazy(() => import('../pages/auth/Register'));
 const ForgotPassword = lazy(() => import('../pages/auth/ForgotPassword'));
 const ResetPassword = lazy(() => import('../pages/auth/ResetPassword'));
@@ -32,6 +32,7 @@ const OAuthCallback = lazy(() => import('../pages/auth/OAuthCallback'));
 const SSO = lazy(() => import('../pages/auth/SSO'));
 
 const MultiStepLogin = lazy(() => import('../pages/auth/MultiStepLogin'));
+const Changelog = lazy(() => import('../pages/Changelog'));
 const TOTPSetup = lazy(() => import('../pages/Security/TOTPSetup'));
 const PrivacyPolicy = lazy(() => import('../pages/legal/PrivacyPolicy'));
 const TermsOfService = lazy(() => import('../pages/legal/TermsOfService'));
@@ -57,6 +58,11 @@ const routes = [
     {
         path: '/blog',
         element: <Blog />,
+        layout: 'flexible',
+    },
+    {
+        path: '/changelog',
+        element: <Changelog />,
         layout: 'flexible',
     },
     {
@@ -193,6 +199,15 @@ const routes = [
         layout: 'default',
     },
     {
+        path: '/billing/payment/:outcome',
+        element: (
+            <ProtectedRoute>
+                <BillingPaymentOutcome />
+            </ProtectedRoute>
+        ),
+        layout: 'default',
+    },
+    {
         path: '/profile',
         element: (
             <ProtectedRoute>
@@ -242,13 +257,6 @@ const routes = [
         ),
         layout: 'default',
     },
-    {
-        path: '/onboarding',
-        element: <Onboarding />,
-        layout: 'default',
-    },
-
-    
 
     // Error pages
     {

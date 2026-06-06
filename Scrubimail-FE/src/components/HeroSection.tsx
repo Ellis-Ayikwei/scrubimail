@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
+import { motion } from 'framer-motion';
 import { ArrowRight, Code, Mail, Shield, BarChart3, CheckCircle, XCircle } from 'lucide-react';
 
 const HeroSection: React.FC = () => {
@@ -81,7 +82,7 @@ const HeroSection: React.FC = () => {
                   />
                 </div>
                 <Link
-                  to={`/onboarding${ctaEmail ? `?email=${encodeURIComponent(ctaEmail)}` : ''}`}
+                  to={`/register${ctaEmail ? `?email=${encodeURIComponent(ctaEmail)}` : ''}`}
                   className="inline-flex items-center justify-center px-4 sm:px-6 lg:px-10 py-3 sm:py-2 bg-gradient-to-r from-[#10B981] to-[#059669] text-white font-bold rounded-2xl sm:rounded-full hover:from-[#059669] hover:to-[#10B981] transition-all duration-200 shadow-xl hover:shadow-2xl transform text-sm sm:text-base lg:text-lg whitespace-nowrap"
                 >
                   <span className="hidden lg:inline">Start validating for free</span>
@@ -118,6 +119,78 @@ const HeroSection: React.FC = () => {
                 alt="Email Validation Dashboard on MacBook Air"
                 className="w-full h-auto max-w-4xl mx-auto drop-shadow-2xl"
               />
+              
+              {/* Floating Nodes Overlay - Inside laptop screen area */}
+              <div className="absolute top-[8%] left-[6%] right-[6%] bottom-[25%] pointer-events-none">
+                <div className="relative w-full h-full">
+                  {/* Floating Nodes */}
+                  {[
+                    { x: 20, y: 30, size: 16, color: 'rgb(16, 185, 129)' },
+                    { x: 60, y: 50, size: 24, color: 'rgb(30, 58, 138)' },
+                    { x: 80, y: 70, size: 20, color: 'rgb(16, 185, 129)' },
+                    { x: 40, y: 80, size: 16, color: 'rgb(30, 58, 138)' },
+                    { x: 70, y: 20, size: 20, color: 'rgb(16, 185, 129)' },
+                  ].map((node, i) => (
+                    <motion.div
+                      key={i}
+                      className="absolute rounded-full"
+                      style={{
+                        left: `${node.x}%`,
+                        top: `${node.y}%`,
+                        width: `${node.size}px`,
+                        height: `${node.size}px`,
+                        backgroundColor: node.color,
+                      }}
+                      animate={{
+                        scale: [1, 1.2, 1],
+                        opacity: [0.5, 1, 0.5],
+                      }}
+                      transition={{
+                        duration: 2 + i * 0.5,
+                        repeat: Infinity,
+                        delay: i * 0.3,
+                      }}
+                    />
+                  ))}
+
+                  {/* Connection Lines */}
+                  <svg className="absolute inset-0 w-full h-full opacity-30 pointer-events-none">
+                    <motion.line
+                      x1="20%"
+                      y1="30%"
+                      x2="60%"
+                      y2="50%"
+                      stroke="#10B981"
+                      strokeWidth="1"
+                      initial={{ pathLength: 0, opacity: 0 }}
+                      animate={{ pathLength: 1, opacity: 0.5 }}
+                      transition={{ duration: 2, repeat: Infinity, repeatType: "reverse" }}
+                    />
+                    <motion.line
+                      x1="60%"
+                      y1="50%"
+                      x2="80%"
+                      y2="70%"
+                      stroke="#1E3A8A"
+                      strokeWidth="1"
+                      initial={{ pathLength: 0, opacity: 0 }}
+                      animate={{ pathLength: 1, opacity: 0.5 }}
+                      transition={{ duration: 2, delay: 0.5, repeat: Infinity, repeatType: "reverse" }}
+                    />
+                    <motion.line
+                      x1="80%"
+                      y1="70%"
+                      x2="40%"
+                      y2="80%"
+                      stroke="#10B981"
+                      strokeWidth="1"
+                      initial={{ pathLength: 0, opacity: 0 }}
+                      animate={{ pathLength: 1, opacity: 0.5 }}
+                      transition={{ duration: 2, delay: 1, repeat: Infinity, repeatType: "reverse" }}
+                    />
+                  </svg>
+                </div>
+              </div>
             </div>
 
             {/* Floating elements around laptop - hidden on mobile */}

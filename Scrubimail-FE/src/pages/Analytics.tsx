@@ -1,281 +1,344 @@
-import React, { useState, useEffect } from 'react';
-import { 
-  BarChart3, 
-  TrendingUp, 
-  Mail, 
-  CheckCircle, 
-  XCircle, 
-  AlertTriangle,
-  Calendar,
-  Download,
-  Filter,
-  RefreshCw
-} from 'lucide-react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { RefreshCw, TrendingUp, TrendingDown, Download } from 'lucide-react';
+import { validationService, ValidationAnalytics } from '../services/validationService';
+import { billingService, UsageStats } from '../services/billingService';
+import axiosInstance from '../services/axiosInstance';
+
+const CARD = 'bg-[#1c2024] border border-[#3b4a41]/40 rounded-sm';
+const LABEL = "font-['Space_Grotesk',sans-serif] uppercase tracking-[0.1em] text-[10px] text-[#bacbbf]";
+const MONO = "font-['JetBrains_Mono',monospace]";
+
+const DAYS_MAP: Record<string, number> = { '7d': 7, '30d': 30, '90d': 90 };
+
+const scoreStatus = (score: number) =>
+  score >= 80 ? 'DELIVERABLE' : score >= 50 ? 'RISKY' : 'BOUNCED';
+
+const statusStyle = (s: string) =>
+  s === 'DELIVERABLE'
+    ? 'bg-[#6effc0]/10 text-[#6effc0] border-[#6effc0]/20'
+    : s === 'BOUNCED'
+    ? 'bg-[#ff4c4c]/10 text-[#ff4c4c] border-[#ff4c4c]/20'
+    : 'bg-[#f59e0b]/10 text-[#f59e0b] border-[#f59e0b]/20';
+
+const Skeleton: React.FC<{ className?: string }> = ({ className = '' }) => (
+  <div className={`bg-[#31353a] rounded animate-pulse ${className}`} />
+);
 
 const Analytics: React.FC = () => {
-  const [dateRange, setDateRange] = useState('7d');
-  const [loading, setLoading] = useState(false);
+  const [dateRange, setDateRange] = useState('30d');
+  const [analytics, setAnalytics] = useState<ValidationAnalytics | null>(null);
+  const [usage, setUsage] = useState<UsageStats | null>(null);
+  const [recentHistory, setRecentHistory] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  // Mock data for analytics
-  const stats = {
-    totalValidations: 15247,
-    validEmails: 12891,
-    invalidEmails: 2356,
-    accuracyRate: 98.5,
-    avgResponseTime: 0.23
-  };
+  const fetchAll = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    const days = DAYS_MAP[dateRange] ?? 30;
+    try {
+      const [a, u, h] = await Promise.all([
+        validationService.getValidationAnalytics({ start_date: undefined, end_date: undefined }).catch(() => null),
+        billingService.getUsageStats().catch(() => null),
+        axiosInstance.get('/history/', { params: { page_size: 10 } }).then(r => r.data?.results ?? []).catch(() => []),
+      ]);
+      // Re-fetch analytics with the selected days param
+      const aWithDays = await axiosInstance
+        .get('/analytics/', { params: { days } })
+        .then(r => r.data)
+        .catch(() => a);
+      if (aWithDays) setAnalytics(aWithDays);
+      else if (a) setAnalytics(a);
+      if (u) setUsage(u);
+      setRecentHistory(h);
+    } catch (e: any) {
+      setError(e?.message ?? 'Failed to load analytics');
+    } finally {
+      setLoading(false);
+    }
+  }, [dateRange]);
 
-  const chartData = [
-    { date: '2024-01-01', valid: 120, invalid: 15, risky: 8 },
-    { date: '2024-01-02', valid: 98, invalid: 22, risky: 5 },
-    { date: '2024-01-03', valid: 156, invalid: 18, risky: 12 },
-    { date: '2024-01-04', valid: 142, invalid: 31, risky: 9 },
-    { date: '2024-01-05', valid: 189, invalid: 25, risky: 14 },
-    { date: '2024-01-06', valid: 167, invalid: 19, risky: 7 },
-    { date: '2024-01-07', valid: 203, invalid: 28, risky: 11 }
+  useEffect(() => { fetchAll(); }, [fetchAll]);
+
+  const overview = analytics?.overview;
+  const daily = analytics?.daily_stats ?? [];
+  const topDomains = (analytics as any)?.top_domains ?? [];
+
+  const totalV  = overview?.total_validations ?? 0;
+  const validV  = daily.reduce((s, d) => s + (d.valid_count ?? 0), 0);
+  const invalidV = daily.reduce((s, d) => s + (d.invalid_count ?? 0), 0);
+  const riskyV  = Math.max(0, totalV - validV - invalidV);
+  const successRate = overview?.success_rate ?? 0;
+  const avgScore = overview?.avg_score ?? 0;
+
+  const statCards = [
+    { label: 'Total Validations', value: totalV.toLocaleString(),         color: 'text-[#e0e3e8]' },
+    { label: 'Deliverable',       value: validV.toLocaleString(),          color: 'text-[#6effc0]' },
+    { label: 'Invalid / Bounce',  value: invalidV.toLocaleString(),        color: 'text-[#ff4c4c]' },
+    { label: 'Success Rate',      value: `${successRate.toFixed(1)}%`,     color: 'text-[#6effc0]' },
+    { label: 'Avg Score',         value: Math.round(avgScore).toString(),  color: 'text-[#bacbbf]' },
   ];
 
+  // Normalise chart — use daily_stats, fallback to usage.daily_usage
+  const chartRows = daily.length > 0
+    ? daily.map(d => ({
+        date: d.date,
+        valid: d.valid_count ?? 0,
+        invalid: d.invalid_count ?? 0,
+        risky: Math.max(0, (d as any).total - (d.valid_count ?? 0) - (d.invalid_count ?? 0)),
+      }))
+    : (usage?.daily_usage ?? []).map(d => ({
+        date: d.date,
+        valid: d.validations,
+        invalid: 0,
+        risky: 0,
+      }));
+
+  const maxBar = Math.max(...chartRows.map(d => d.valid + d.invalid + d.risky), 1);
+
+  const exportCSV = () => {
+    const rows = [
+      ['email', 'status', 'score', 'date'],
+      ...recentHistory.map(r => [
+        r.email,
+        scoreStatus(r.score ?? 0),
+        r.score ?? '',
+        r.created_at ?? '',
+      ]),
+    ];
+    const csv = rows.map(r => r.join(',')).join('\n');
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `analytics-${dateRange}.csv`;
+    a.click();
+  };
+
   return (
-    <div className="min-h-screen bg-[#F8FAFC] dark:bg-gray-900">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        
-        {/* Header */}
-        <div className="flex items-center justify-between mb-8">
-          <div>
-            <h1 className="text-3xl font-bold text-[#333333] dark:text-white mb-2 flex items-center">
-              <BarChart3 className="w-8 h-8 mr-3 text-[#10B981]" />
-              Usage Analytics
-            </h1>
-            <p className="text-[#333333]/70 dark:text-gray-400">
-              Track your email validation performance and usage patterns
-            </p>
+    <div className="space-y-5" style={{ fontFamily: 'Inter, sans-serif' }}>
+
+      {/* Header */}
+      <div className="flex items-start justify-between flex-wrap gap-4">
+        <div>
+          <p className={`${LABEL} text-[#6effc0] mb-0.5`} style={{ letterSpacing: '0.2em', fontSize: 9 }}>API Usage</p>
+          <h1 className="font-['Epilogue',sans-serif] font-black text-[#e0e3e8] text-2xl tracking-tight">Analytics</h1>
+          <p className={`${LABEL} mt-0.5`}>Track email validation performance and usage patterns</p>
+        </div>
+        <div className="flex items-center gap-2">
+          <select
+            value={dateRange}
+            onChange={e => setDateRange(e.target.value)}
+            className="bg-[#1c2024] border border-[#3b4a41]/40 rounded-sm px-3 py-2 text-[#bacbbf] font-mono text-xs focus:border-[#6effc0]/50 focus:outline-none"
+          >
+            <option value="7d">Last 7 days</option>
+            <option value="30d">Last 30 days</option>
+            <option value="90d">Last 90 days</option>
+          </select>
+          <button
+            onClick={fetchAll}
+            disabled={loading}
+            className="p-2 border border-[#3b4a41]/40 rounded-sm text-[#bacbbf] hover:text-[#6effc0] hover:border-[#6effc0]/40 transition-colors disabled:opacity-40"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
+          </button>
+        </div>
+      </div>
+
+      {error && (
+        <div className="bg-[#ff4c4c]/10 border border-[#ff4c4c]/30 rounded-sm p-3 font-mono text-xs text-[#ff4c4c]">
+          {error}
+        </div>
+      )}
+
+      {/* Stat cards */}
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
+        {statCards.map(({ label, value, color }) => (
+          <div key={label} className={`${CARD} p-4`}>
+            <p className={LABEL}>{label}</p>
+            {loading
+              ? <Skeleton className="h-7 w-20 mt-1" />
+              : <p className={`${MONO} text-2xl font-bold mt-1 ${color}`}>{value}</p>
+            }
           </div>
-          
-          <div className="flex items-center space-x-4">
-            <select
-              value={dateRange}
-              onChange={(e) => setDateRange(e.target.value)}
-              className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-3xl bg-white dark:bg-gray-800 text-[#333333] dark:text-white focus:ring-2 focus:ring-[#10B981] focus:border-transparent"
-            >
-              <option value="7d">Last 7 days</option>
-              <option value="30d">Last 30 days</option>
-              <option value="90d">Last 90 days</option>
-              <option value="1y">Last year</option>
-            </select>
-            
-            <button
-              onClick={() => setLoading(true)}
-              className="flex items-center space-x-2 px-4 py-2 bg-[#10B981] text-white rounded-3xl hover:bg-[#059669] transition-colors"
-            >
-              <RefreshCw className="w-4 h-4" />
-              <span>Refresh</span>
-            </button>
-            
-            <button className="flex items-center space-x-2 px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-3xl text-[#333333] dark:text-white hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
-              <Download className="w-4 h-4" />
-              <span>Export</span>
-            </button>
+        ))}
+      </div>
+
+      {/* Bar chart — real daily_stats */}
+      <div className={`${CARD} overflow-hidden`}>
+        <div className="flex items-center justify-between px-5 py-3 border-b border-[#3b4a41]/30">
+          <p className={LABEL}>Validation Volume</p>
+          <div className="flex items-center gap-4">
+            {[['Valid', '#6effc0'], ['Invalid', '#ff4c4c'], ['Risky', '#f59e0b']].map(([l, c]) => (
+              <div key={l} className="flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full" style={{ backgroundColor: c }} />
+                <span className="font-mono text-[9px] text-[#bacbbf]/60 uppercase tracking-[0.1em]">{l}</span>
+              </div>
+            ))}
           </div>
         </div>
-
-        {/* Stats Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 mb-8">
-          <div className="bg-white dark:bg-gray-800 rounded-3xl p-6 border border-gray-200 dark:border-gray-700">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-500 dark:text-gray-400">Total Validations</p>
-                <p className="text-2xl font-bold text-[#333333] dark:text-white">{stats.totalValidations.toLocaleString()}</p>
-              </div>
-              <Mail className="w-8 h-8 text-[#10B981]" />
-            </div>
-            <div className="mt-2">
-              <span className="text-sm text-green-600 dark:text-green-400">↗ +12.5%</span>
-              <span className="text-sm text-gray-500 dark:text-gray-400 ml-2">vs last period</span>
-            </div>
-          </div>
-
-          <div className="bg-white dark:bg-gray-800 rounded-3xl p-6 border border-gray-200 dark:border-gray-700">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-500 dark:text-gray-400">Valid Emails</p>
-                <p className="text-2xl font-bold text-[#333333] dark:text-white">{stats.validEmails.toLocaleString()}</p>
-              </div>
-              <CheckCircle className="w-8 h-8 text-[#10B981]" />
-            </div>
-            <div className="mt-2">
-              <span className="text-sm text-green-600 dark:text-green-400">↗ +8.3%</span>
-              <span className="text-sm text-gray-500 dark:text-gray-400 ml-2">vs last period</span>
-            </div>
-          </div>
-
-          <div className="bg-white dark:bg-gray-800 rounded-3xl p-6 border border-gray-200 dark:border-gray-700">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-500 dark:text-gray-400">Invalid Emails</p>
-                <p className="text-2xl font-bold text-[#333333] dark:text-white">{stats.invalidEmails.toLocaleString()}</p>
-              </div>
-              <XCircle className="w-8 h-8 text-[#EF4444]" />
-            </div>
-            <div className="mt-2">
-              <span className="text-sm text-red-600 dark:text-red-400">↘ -3.1%</span>
-              <span className="text-sm text-gray-500 dark:text-gray-400 ml-2">vs last period</span>
-            </div>
-          </div>
-
-          <div className="bg-white dark:bg-gray-800 rounded-3xl p-6 border border-gray-200 dark:border-gray-700">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-500 dark:text-gray-400">Accuracy Rate</p>
-                <p className="text-2xl font-bold text-[#333333] dark:text-white">{stats.accuracyRate}%</p>
-              </div>
-              <TrendingUp className="w-8 h-8 text-[#10B981]" />
-            </div>
-            <div className="mt-2">
-              <span className="text-sm text-green-600 dark:text-green-400">↗ +0.2%</span>
-              <span className="text-sm text-gray-500 dark:text-gray-400 ml-2">vs last period</span>
-            </div>
-          </div>
-
-          <div className="bg-white dark:bg-gray-800 rounded-3xl p-6 border border-gray-200 dark:border-gray-700">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-500 dark:text-gray-400">Avg Response</p>
-                <p className="text-2xl font-bold text-[#333333] dark:text-white">{stats.avgResponseTime}s</p>
-              </div>
-              <AlertTriangle className="w-8 h-8 text-yellow-500" />
-            </div>
-            <div className="mt-2">
-              <span className="text-sm text-green-600 dark:text-green-400">↘ -0.05s</span>
-              <span className="text-sm text-gray-500 dark:text-gray-400 ml-2">faster</span>
-            </div>
-          </div>
-        </div>
-
-        {/* Charts Section */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-          
-          {/* Validation Trends Chart */}
-          <div className="bg-white dark:bg-gray-800 rounded-3xl p-6 border border-gray-200 dark:border-gray-700">
-            <h3 className="text-lg font-semibold text-[#333333] dark:text-white mb-4">Validation Trends</h3>
-            <div className="h-64 flex items-end justify-between space-x-2">
-              {chartData.map((day, index) => (
-                <div key={index} className="flex flex-col items-center space-y-1 flex-1">
-                  <div className="flex flex-col items-center space-y-1 w-full">
-                    <div 
-                      className="w-full bg-[#10B981] rounded-t-md"
-                      style={{ height: `${(day.valid / 250) * 100}px` }}
-                    ></div>
-                    <div 
-                      className="w-full bg-[#EF4444] rounded-none"
-                      style={{ height: `${(day.invalid / 250) * 50}px` }}
-                    ></div>
-                    <div 
-                      className="w-full bg-yellow-500 rounded-b-md"
-                      style={{ height: `${(day.risky / 250) * 30}px` }}
-                    ></div>
-                  </div>
-                  <span className="text-xs text-gray-500 dark:text-gray-400">
-                    {new Date(day.date).getDate()}
-                  </span>
-                </div>
+        <div className="p-5">
+          {loading ? (
+            <div className="flex items-end gap-2 h-32">
+              {Array.from({ length: 10 }).map((_, i) => (
+                <Skeleton key={i} className="flex-1" style={{ height: `${30 + Math.random() * 70}%` } as any} />
               ))}
             </div>
-            <div className="flex items-center justify-center space-x-6 mt-4">
-              <div className="flex items-center space-x-2">
-                <div className="w-3 h-3 bg-[#10B981] rounded-full"></div>
-                <span className="text-sm text-gray-600 dark:text-gray-400">Valid</span>
-              </div>
-              <div className="flex items-center space-x-2">
-                <div className="w-3 h-3 bg-[#EF4444] rounded-full"></div>
-                <span className="text-sm text-gray-600 dark:text-gray-400">Invalid</span>
-              </div>
-              <div className="flex items-center space-x-2">
-                <div className="w-3 h-3 bg-yellow-500 rounded-full"></div>
-                <span className="text-sm text-gray-600 dark:text-gray-400">Risky</span>
-              </div>
-            </div>
-          </div>
-
-          {/* Top Domains */}
-          <div className="bg-white dark:bg-gray-800 rounded-3xl p-6 border border-gray-200 dark:border-gray-700">
-            <h3 className="text-lg font-semibold text-[#333333] dark:text-white mb-4">Top Email Domains</h3>
-            <div className="space-y-4">
-              {[
-                { domain: 'gmail.com', count: 4521, percentage: 35 },
-                { domain: 'outlook.com', count: 2834, percentage: 22 },
-                { domain: 'yahoo.com', count: 1923, percentage: 15 },
-                { domain: 'company.com', count: 1456, percentage: 11 },
-                { domain: 'hotmail.com', count: 987, percentage: 8 }
-              ].map((domain, index) => (
-                <div key={index} className="flex items-center justify-between">
-                  <div className="flex items-center space-x-3">
-                    <div className="w-2 h-2 bg-[#10B981] rounded-full"></div>
-                    <span className="text-[#333333] dark:text-white font-medium">{domain.domain}</span>
-                  </div>
-                  <div className="flex items-center space-x-3">
-                    <div className="w-24 bg-gray-200 dark:bg-gray-700 rounded-full h-2">
-                      <div 
-                        className="bg-[#10B981] h-2 rounded-full"
-                        style={{ width: `${domain.percentage}%` }}
-                      ></div>
+          ) : chartRows.length === 0 ? (
+            <p className="font-mono text-xs text-[#3b4a41] text-center py-10">No data for this period</p>
+          ) : (
+            <div className="flex items-end gap-1.5 h-32">
+              {chartRows.map((d, i) => {
+                const total = d.valid + d.invalid + d.risky || 1;
+                const h = (total / maxBar) * 100;
+                return (
+                  <div key={i} className="flex-1 flex flex-col gap-0.5 items-stretch" style={{ height: '100%' }}>
+                    <div className="flex flex-col justify-end flex-1 gap-px">
+                      {d.risky > 0  && <div className="w-full rounded-sm" style={{ height: `${(d.risky  / total) * h}%`, minHeight: 2, backgroundColor: '#f59e0b', opacity: 0.8 }} />}
+                      {d.invalid > 0 && <div className="w-full rounded-sm" style={{ height: `${(d.invalid / total) * h}%`, minHeight: 2, backgroundColor: '#ff4c4c', opacity: 0.8 }} />}
+                      {d.valid > 0  && <div className="w-full rounded-sm" style={{ height: `${(d.valid  / total) * h}%`, minHeight: 2, backgroundColor: '#6effc0', opacity: 0.8 }} />}
                     </div>
-                    <span className="text-sm text-gray-500 dark:text-gray-400 w-12 text-right">
-                      {domain.count}
-                    </span>
+                    <p className="font-mono text-[7px] text-[#3b4a41] text-center mt-1">
+                      {new Date(d.date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })}
+                    </p>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Detail grid */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+
+        {/* Email status breakdown */}
+        <div className={CARD}>
+          <div className="px-4 py-3 border-b border-[#3b4a41]/30">
+            <p className={LABEL}>Email Status Breakdown</p>
+          </div>
+          <div className="p-4 space-y-3">
+            {[
+              { label: 'Deliverable',        count: validV,   color: '#6effc0' },
+              { label: 'Invalid / Bounce',   count: invalidV, color: '#ff4c4c' },
+              { label: 'Risky / Catch-All',  count: riskyV,   color: '#f59e0b' },
+            ].map(({ label, count, color }) => {
+              const pct = totalV > 0 ? Math.round((count / totalV) * 100) : 0;
+              return (
+                <div key={label}>
+                  <div className="flex justify-between mb-1">
+                    <span className="font-mono text-[10px] text-[#bacbbf]">{label}</span>
+                    {loading
+                      ? <Skeleton className="h-3 w-10" />
+                      : <span className="font-mono text-[10px]" style={{ color }}>{pct}% · {count.toLocaleString()}</span>
+                    }
+                  </div>
+                  <div className="w-full h-1.5 bg-[#101418] rounded-full overflow-hidden">
+                    <div className="h-full rounded-full transition-all duration-700" style={{ width: loading ? '0%' : `${pct}%`, backgroundColor: color }} />
                   </div>
                 </div>
-              ))}
-            </div>
+              );
+            })}
           </div>
         </div>
 
-        {/* Recent Activity */}
-        <div className="bg-white dark:bg-gray-800 rounded-3xl p-6 border border-gray-200 dark:border-gray-700">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-semibold text-[#333333] dark:text-white">Recent Validation Activity</h3>
-            <button className="text-[#10B981] hover:text-[#059669] text-sm font-medium">
-              View All
-            </button>
+        {/* Top domains */}
+        <div className={CARD}>
+          <div className="px-4 py-3 border-b border-[#3b4a41]/30">
+            <p className={LABEL}>Top Domains</p>
           </div>
-          
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b border-gray-200 dark:border-gray-700">
-                  <th className="text-left py-3 px-4 text-sm font-medium text-gray-500 dark:text-gray-400">Time</th>
-                  <th className="text-left py-3 px-4 text-sm font-medium text-gray-500 dark:text-gray-400">Type</th>
-                  <th className="text-left py-3 px-4 text-sm font-medium text-gray-500 dark:text-gray-400">Count</th>
-                  <th className="text-left py-3 px-4 text-sm font-medium text-gray-500 dark:text-gray-400">Status</th>
-                  <th className="text-left py-3 px-4 text-sm font-medium text-gray-500 dark:text-gray-400">Duration</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-                {[
-                  { time: '2 min ago', type: 'Bulk Upload', count: 1500, status: 'completed', duration: '45s' },
-                  { time: '15 min ago', type: 'Single Validation', count: 1, status: 'completed', duration: '0.2s' },
-                  { time: '32 min ago', type: 'API Call', count: 250, status: 'completed', duration: '12s' },
-                  { time: '1 hour ago', type: 'Bulk Upload', count: 5000, status: 'failed', duration: '2m 15s' },
-                  { time: '2 hours ago', type: 'Single Validation', count: 1, status: 'completed', duration: '0.3s' }
-                ].map((activity, index) => (
-                  <tr key={index}>
-                    <td className="py-3 px-4 text-sm text-gray-600 dark:text-gray-400">{activity.time}</td>
-                    <td className="py-3 px-4 text-sm text-[#333333] dark:text-white">{activity.type}</td>
-                    <td className="py-3 px-4 text-sm text-[#333333] dark:text-white">{activity.count.toLocaleString()}</td>
-                    <td className="py-3 px-4">
-                      <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${
-                        activity.status === 'completed' 
-                          ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
-                          : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
-                      }`}>
-                        {activity.status}
-                      </span>
-                    </td>
-                    <td className="py-3 px-4 text-sm text-gray-600 dark:text-gray-400">{activity.duration}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          <div className="p-4 space-y-2">
+            {loading ? (
+              Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-6 w-full" />)
+            ) : topDomains.length === 0 ? (
+              <p className="font-mono text-xs text-[#3b4a41] py-4 text-center">No domain data</p>
+            ) : (
+              topDomains.slice(0, 8).map((d: any) => (
+                <div key={d.domain} className="flex items-center justify-between">
+                  <span className="font-mono text-[10px] text-[#bacbbf] truncate">{d.domain}</span>
+                  <div className="flex items-center gap-3 flex-shrink-0">
+                    <span className="font-mono text-[10px] text-[#3b4a41]">{d.count.toLocaleString()}</span>
+                    <span className="font-mono text-[10px] text-[#6effc0]">{Math.round(d.avg_score)}</span>
+                  </div>
+                </div>
+              ))
+            )}
           </div>
+        </div>
+      </div>
+
+      {/* Credits usage strip */}
+      {(usage || loading) && (
+        <div className={`${CARD} p-4`}>
+          <div className="flex items-center justify-between mb-3">
+            <p className={LABEL}>Credit Usage — This Month</p>
+            {!loading && usage && (
+              <span className="font-mono text-[10px] text-[#bacbbf]">
+                {usage.this_month?.credits_used?.toLocaleString() ?? 0} credits used
+              </span>
+            )}
+          </div>
+          {loading ? (
+            <Skeleton className="h-2 w-full" />
+          ) : usage ? (
+            (() => {
+              const used = usage.this_month?.credits_used ?? 0;
+              const total = (usage.total_validations ?? 0) > 0 ? usage.total_validations : used || 1;
+              const pct = Math.min((used / total) * 100, 100);
+              return (
+                <div className="w-full h-2 bg-[#101418] rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-[#6effc0] rounded-full transition-all duration-700"
+                    style={{ width: `${pct}%` }}
+                  />
+                </div>
+              );
+            })()
+          ) : null}
+        </div>
+      )}
+
+      {/* Recent validations table */}
+      <div className={`${CARD} overflow-hidden`}>
+        <div className="flex items-center justify-between px-4 py-3 border-b border-[#3b4a41]/30">
+          <p className={LABEL}>Recent Validations</p>
+          <button
+            onClick={exportCSV}
+            disabled={loading || recentHistory.length === 0}
+            className="flex items-center gap-1 font-mono text-[9px] text-[#6effc0] hover:underline disabled:opacity-40 uppercase tracking-[0.1em]"
+          >
+            <Download className="w-3 h-3" /> Export CSV
+          </button>
+        </div>
+        <div className="divide-y divide-[#3b4a41]/20">
+          {loading ? (
+            Array.from({ length: 5 }).map((_, i) => (
+              <div key={i} className="flex items-center gap-4 px-4 py-3">
+                <Skeleton className="h-3 flex-1" />
+                <Skeleton className="h-3 w-20" />
+                <Skeleton className="h-3 w-8" />
+                <Skeleton className="h-3 w-16" />
+              </div>
+            ))
+          ) : recentHistory.length === 0 ? (
+            <p className="font-mono text-xs text-[#3b4a41] text-center py-8">No recent validations</p>
+          ) : (
+            recentHistory.map((r, i) => {
+              const status = scoreStatus(r.score ?? 0);
+              const ts = r.created_at
+                ? new Date(r.created_at).toLocaleString('en-GB', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })
+                : '—';
+              return (
+                <div key={i} className="flex items-center gap-4 px-4 py-3 hover:bg-[#262a2f] transition-colors text-xs font-mono">
+                  <span className="flex-1 text-[#e0e3e8] truncate">{r.email}</span>
+                  <span className={`px-2 py-0.5 rounded-sm uppercase tracking-[0.08em] text-[9px] border flex-shrink-0 ${statusStyle(status)}`}>
+                    {status}
+                  </span>
+                  <span className="text-[#bacbbf] w-8 text-center flex-shrink-0">{r.score ?? '—'}</span>
+                  <span className="text-[#3b4a41] w-28 text-right flex-shrink-0 hidden sm:block">{ts}</span>
+                </div>
+              );
+            })
+          )}
         </div>
       </div>
     </div>

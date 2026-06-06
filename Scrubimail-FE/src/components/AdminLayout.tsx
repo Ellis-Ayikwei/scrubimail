@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { IRootState } from '../store';
-import { toggleSidebar } from '../store/themeConfigSlice';
+import { toggleSidebar, toggleTheme } from '../store/themeConfigSlice';
 import useAuthUser from 'react-auth-kit/hooks/useAuthUser';
 import useSignOut from 'react-auth-kit/hooks/useSignOut';
 import IconMenu from './Icon/IconMenu';
@@ -205,7 +205,6 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
                                 onClick={() => {
                                     const newTheme = themeConfig.theme === 'dark' ? 'light' : 'dark';
                                     dispatch(toggleTheme(newTheme));
-                                    localStorage.setItem('theme', newTheme);
                                 }}
                                 className="p-2 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
                             >

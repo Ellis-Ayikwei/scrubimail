@@ -4,6 +4,7 @@ import store, { AppDispatch, IRootState } from './store';
 import { toggleAnimation, toggleLayout, toggleLocale, toggleMenu, toggleNavbar, toggleRTL, toggleSemidark, toggleTheme } from './store/themeConfigSlice';
 import useAuthUser from 'react-auth-kit/hooks/useAuthUser';
 import { fetchDrafts } from './store/slices/draftRequestsSlice';
+import { ConfigProvider, theme as antTheme } from 'antd';
 
 interface AuthUser {
     user: {
@@ -39,13 +40,15 @@ function App({ children }: PropsWithChildren) {
     }, [themeConfig.theme]);
 
     return (
-        <div
-            className={`${(store.getState().themeConfig.sidebar && 'toggle-sidebar') || ''} ${themeConfig.menu} ${themeConfig.layout} ${
-                themeConfig.rtlClass
-            } main-section antialiased relative font-nunito text-sm font-normal`}
-        >
-            {children}
-        </div>
+        <ConfigProvider theme={{ algorithm: themeConfig.theme === 'dark' ? antTheme.darkAlgorithm : antTheme.defaultAlgorithm }}>
+            <div
+                className={`${(store.getState().themeConfig.sidebar && 'toggle-sidebar') || ''} ${themeConfig.menu} ${themeConfig.layout} ${
+                    themeConfig.rtlClass
+                } main-section antialiased relative font-nunito text-sm font-normal`}
+            >
+                {children}
+            </div>
+        </ConfigProvider>
     );
 }
 

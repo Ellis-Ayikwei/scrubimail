@@ -108,8 +108,19 @@ authAxiosInstance.interceptors.response.use(
         return response;
     },
     (error) => {
-        console.error('Response interceptor error:', error);
-        return Promise.reject(error);
+        // Extract the actual server error message so callers get readable errors
+        const serverData = error.response?.data;
+        const message =
+            serverData?.detail ||
+            serverData?.message ||
+            serverData?.error ||
+            (typeof serverData === 'string' ? serverData : null) ||
+            error.message ||
+            'An unexpected error occurred';
+        const normalized = new Error(message) as any;
+        normalized.response = error.response;   // preserve response for status checks
+        normalized.status = error.response?.status;
+        return Promise.reject(normalized);
     }
 );
 

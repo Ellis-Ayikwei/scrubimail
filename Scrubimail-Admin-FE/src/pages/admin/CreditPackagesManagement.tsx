@@ -43,6 +43,18 @@ import dayjs from 'dayjs';
 const { Title, Text } = Typography;
 const { TextArea } = Input;
 
+function parseMoney(value: unknown): number {
+  if (value === null || value === undefined || value === '') return NaN;
+  if (typeof value === 'number') return Number.isFinite(value) ? value : NaN;
+  const n = Number.parseFloat(String(value).replace(/,/g, ''));
+  return Number.isFinite(n) ? n : NaN;
+}
+
+function formatUsd(value: unknown): string {
+  const n = parseMoney(value);
+  return Number.isFinite(n) ? n.toFixed(2) : '0.00';
+}
+
 const CreditPackagesManagement: React.FC = () => {
   const [packages, setPackages] = useState<CreditPackage[]>([]);
   const [purchases, setPurchases] = useState<CreditPackagePurchase[]>([]);
@@ -102,11 +114,14 @@ const CreditPackagesManagement: React.FC = () => {
     const mostPopularId = Object.keys(purchaseCounts).reduce((a, b) => 
       purchaseCounts[Number(a)] > purchaseCounts[Number(b)] ? a : b, '0'
     );
-    const mostPopular = pkgList.find(p => p.id === Number(mostPopularId)) || null;
+    const mostPopular = pkgList.find(p => p.id === mostPopularId) || null;
 
     const totalRevenue = purchases
       .filter(p => p.status === 'completed')
-      .reduce((sum, p) => sum + p.amount_paid, 0);
+      .reduce((sum, p) => {
+        const n = parseMoney(p.amount_paid);
+        return sum + (Number.isFinite(n) ? n : 0);
+      }, 0);
 
     setStats({
       totalRevenue,
@@ -131,7 +146,7 @@ const CreditPackagesManagement: React.FC = () => {
     setModalVisible(true);
   };
 
-  const handleDelete = async (id: number) => {
+  const handleDelete = async (id: string) => {
     try {
       await billingService.deleteCreditPackage(id);
       message.success('Package deleted successfully');
@@ -184,21 +199,25 @@ const CreditPackagesManagement: React.FC = () => {
     {
       title: 'Price',
       key: 'price',
-      render: (_, record) => (
+      render: (_, record) => {
+        const priceN = parseMoney(record?.price);
+        const origN = parseMoney(record?.original_price);
+        return (
         <Space direction="vertical" size={0}>
           <Text className="text-lg font-bold text-gray-900">
-            ${record.price.toFixed(2)}
+            ${Number.isFinite(priceN) ? priceN.toFixed(2) : '0.00'}
           </Text>
-          {record.original_price > record.price && (
+          {Number.isFinite(origN) && Number.isFinite(priceN) && origN > priceN && (
             <Text delete className="text-sm text-gray-500">
-              ${record.original_price.toFixed(2)}
+              ${origN.toFixed(2)}
             </Text>
           )}
           {record.discount_percentage > 0 && (
             <Tag color="red">-{record.discount_percentage}%</Tag>
           )}
         </Space>
-      ),
+        );
+      },
     },
     {
       title: 'Status',
@@ -276,7 +295,7 @@ const CreditPackagesManagement: React.FC = () => {
       title: 'Amount',
       dataIndex: 'amount_paid',
       key: 'amount_paid',
-      render: (amount) => `$${amount.toFixed(2)}`,
+      render: (amount) => `$${formatUsd(amount)}`,
     },
     {
       title: 'Promo Code',

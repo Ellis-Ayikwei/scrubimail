@@ -26,6 +26,7 @@ urlpatterns = [
             [
                 # Admin API endpoints
                 path("admin/", include("apps.admin.urls")),
+                path("admin/changelog/", include("apps.changelog.admin_urls")),
                 # Django admin interface (separate from API)
                 path("django-admin/", admin.site.urls),
                 # Media files under API prefix
@@ -35,6 +36,7 @@ urlpatterns = [
                 path("plans/", include("apps.plan.urls")),
                 path("", include("apps.apikey.urls")),
                 path("auth/", include("apps.Authentication.urls")),
+                path("changelog/", include("apps.changelog.urls")),
             ]
         ),
     ),

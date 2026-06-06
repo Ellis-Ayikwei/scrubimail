@@ -68,21 +68,15 @@ export const LoginUser = createAsyncThunk('auth/LoginUser', async ({ email, pass
         return user;
     } catch (error: any) {
         console.error('Login error:', error);
-        
-        if (error.response && error.response.data) {
-            try {
-                const parser = new DOMParser();
-                const errorData = error.response.data;
-                const doc = parser.parseFromString(errorData, 'text/html');
-                const errorMess = doc.querySelector('body')?.innerText ?? 'An error occurred';
-                const errorMessage = errorMess.split('\n')[1];
-                return rejectWithValue(errorMessage);
-            } catch (parseError) {
-                return rejectWithValue(error.response.data?.message || 'Login failed');
-            }
-        }
-        
-        return rejectWithValue(error.message || 'Login failed');
+        const serverData = error.response?.data;
+        const message =
+            serverData?.detail ||
+            serverData?.message ||
+            serverData?.error ||
+            (typeof serverData === 'string' ? serverData : null) ||
+            error.message ||
+            'Login failed. Please try again.';
+        return rejectWithValue(message);
     }
 });
 
@@ -160,7 +154,7 @@ const authSlice = createSlice({
             })
             .addCase(LoginUser.rejected, (state, action) => {
                 state.loading = false;
-                state.error = action.error.message ?? ERROR_MESSAGES.LOGIN_FAILED;
+                state.error = (action.payload as string) ?? action.error.message ?? ERROR_MESSAGES.LOGIN_FAILED;
                 state.message = null;
             })
             .addCase(LogoutUser.pending, (state) => {

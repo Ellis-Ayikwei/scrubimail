@@ -84,7 +84,7 @@ class TOTPService {
         const deviceInfo = getDeviceInfo();
         console.log("the  topt verify");
         
-        const response = await authAxiosInstance.post('/login-with-totp/', {
+        const axiosResponse = await authAxiosInstance.post('/login-with-totp/', {
             email,
             password,
             totp_token: totpToken,
@@ -98,10 +98,8 @@ class TOTPService {
             remember_me: rememberMe,
         });
 
-        console.log("the response", response);
-
-        
-        return response;
+        // Expose JSON body + headers (tokens are on response headers)
+        return axiosResponse;
     }
 }
 

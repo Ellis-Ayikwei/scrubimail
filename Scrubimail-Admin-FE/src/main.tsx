@@ -23,6 +23,7 @@ import './i18n';
 // Router
 import { RouterProvider } from 'react-router-dom';
 import router from './router/index';
+import App from './App';
 
 // Redux
 import AuthProvider from 'react-auth-kit';
@@ -96,9 +97,11 @@ ReactDOM.createRoot(document.getElementById('root') as HTMLElement).render(
                     <DatesProvider settings={{ locale: 'en' }}>
                         <Provider store={store}>
                             <AuthProvider store={authStore}>
-                                {/* <PersistGate loading={null} persistor={persistor}> */}
-                                <RouterProvider router={router} />
-                                {/* </PersistGate> */}
+                                <App>
+                                    {/* <PersistGate loading={null} persistor={persistor}> */}
+                                    <RouterProvider router={router} />
+                                    {/* </PersistGate> */}
+                                </App>
                             </AuthProvider>
                         </Provider>
                     </DatesProvider>
