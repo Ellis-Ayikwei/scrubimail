@@ -14,6 +14,9 @@ from pathlib import Path
 import os
 from dotenv import load_dotenv
 from decouple import config, Csv
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
@@ -118,21 +121,6 @@ OAUTH_PROVIDERS_CONFIG = {
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = _DEBUG_MODE
-
-CORS_ALLOWED_ORIGINS = config(
-    "CORS_ALLOWED_ORIGINS",
-    default="http://localhost:3000,http://localhost:5173,http://192.168.100.12:5173",
-    cast=Csv(),
-)
-CORS_ALLOWED_ORIGIN_REGEXES = config(
-    "CORS_ALLOWED_ORIGIN_REGEXES",
-    default=r"^https://.*\.pages\.dev$,^https://.*\.scrubimail\.com$",
-    cast=Csv(),
-)
-
-ALLOWED_HOSTS = os.getenv("ALLOWED_HOSTS", "*").split(",")
-if ALLOWED_HOSTS == ["*"]:
-    ALLOWED_HOSTS = ["*"]
 
 
 # Application definition
@@ -351,6 +339,22 @@ SIMPLE_JWT = {
 # including in production where DEBUG is False.
 CORS_ALLOW_CREDENTIALS = True
 
+CORS_ALLOWED_ORIGINS = config(
+    "CORS_ALLOWED_ORIGINS",
+    default="http://localhost:3000,http://localhost:5173,http://192.168.100.12:5173",
+    cast=Csv(),
+)
+CORS_ALLOWED_ORIGIN_REGEXES = config(
+    "CORS_ALLOWED_ORIGIN_REGEXES",
+    default=r"^https://.*\.pages\.dev$,^https://.*\.scrubimail\.com$",
+    cast=Csv(),
+)
+
+ALLOWED_HOSTS = os.getenv("ALLOWED_HOSTS", "*").split(",")
+if ALLOWED_HOSTS == ["*"]:
+    ALLOWED_HOSTS = ["*"]
+
+
 if DEBUG:
     CORS_ALLOW_ALL_ORIGINS = True
     CORS_ALLOWED_ORIGINS = [
@@ -402,6 +406,10 @@ CORS_EXPOSE_HEADERS = [
 #         },
 #     },
 # }
+
+logger.info(f"CORS_ALLOWED_ORIGINS: {CORS_ALLOWED_ORIGINS}")
+
+logger.info(f"ALLOWED_HOSTS: {ALLOWED_HOSTS}")
 
 CHANNEL_LAYERS = {
     "default": {
