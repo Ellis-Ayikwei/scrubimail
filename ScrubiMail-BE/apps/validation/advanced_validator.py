@@ -19,6 +19,11 @@ try:
 except Exception:  # pragma: no cover - allow use outside Django
     _django_settings = None
 
+try:
+    from django.core.cache import cache as _django_cache
+except Exception:  # pragma: no cover - allow use outside Django
+    _django_cache = None
+
 logger = logging.getLogger(__name__)
 
 
@@ -173,12 +178,26 @@ class AdvancedEmailValidator:
 
     # ------------------------------------------------------------------ cache
     def _get_cached(self, key: str) -> Optional[Any]:
+        """Read from the shared Django cache (Redis), falling back to the
+        in-process dict if the cache backend is unavailable."""
+        if _django_cache is not None:
+            try:
+                val = _django_cache.get(f"emailval:{key}")
+                if val is not None:
+                    return val
+            except Exception:
+                pass  # Redis down / misconfigured -> fall through to dict
         entry = _domain_cache.get(key)
         if entry and time.time() - entry["ts"] < _cache_ttl:
             return entry["val"]
         return None
 
     def _set_cached(self, key: str, value: Any) -> None:
+        if _django_cache is not None:
+            try:
+                _django_cache.set(f"emailval:{key}", value, timeout=_cache_ttl)
+            except Exception:
+                pass  # degrade to the in-process dict below
         _domain_cache[key] = {"val": value, "ts": time.time()}
 
     # ----------------------------------------------------------------- syntax

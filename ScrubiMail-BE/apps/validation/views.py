@@ -230,8 +230,12 @@ class BulkEmailValidationView(APIView):
             validation_records = []
             details = request.query_params.get("details", "false").lower() == "true"
 
+            # This path runs inline in the HTTP request, so it must stay fast:
+            # deep=False skips the multi-second SMTP probe. For SMTP-verified
+            # bulk, route through the Celery task (bulk_validate_emails_task)
+            # and poll BulkJobStatusView instead.
             def validate_one(email_addr):
-                return email_addr, validator.validate_email(email_addr)
+                return email_addr, validator.validate_email(email_addr, deep=False)
 
             # Validate emails in parallel (up to 5 concurrent)
             with ThreadPoolExecutor(max_workers=5) as executor:

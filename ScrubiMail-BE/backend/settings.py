@@ -172,6 +172,29 @@ CELERY_TASK_SERIALIZER = "json"
 CELERY_RESULT_SERIALIZER = "json"
 CELERY_TIMEZONE = "UTC"
 
+# Cache Configuration
+# Shared cache for DNS/MX and domain-reputation lookups so validation hits are
+# shared across all web/worker processes and survive restarts (vs. a per-process
+# in-memory cache). Uses Django 5.x's built-in Redis backend (no extra dep).
+# Falls back to local-memory if CACHE_REDIS_URL isn't set; the validator also
+# degrades gracefully to an in-process cache if Redis is unreachable.
+CACHE_REDIS_URL = os.getenv("CACHE_REDIS_URL") or os.getenv("REDIS_URL")
+if CACHE_REDIS_URL:
+    CACHES = {
+        "default": {
+            "BACKEND": "django.core.cache.backends.redis.RedisCache",
+            "LOCATION": CACHE_REDIS_URL,
+            "KEY_PREFIX": "scrubimail",
+        }
+    }
+else:
+    CACHES = {
+        "default": {
+            "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+            "LOCATION": "scrubimail-locmem",
+        }
+    }
+
 MIDDLEWARE = [
     # 'backend.middle_ware.ConditionalSlashMiddleware',
     "corsheaders.middleware.CorsMiddleware",
