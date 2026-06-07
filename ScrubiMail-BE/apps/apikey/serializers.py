@@ -79,9 +79,11 @@ class APIKeySerializer(serializers.ModelSerializer):
         """Return user information"""
         if obj.user:
             return {
-                'id': obj.user.id,
-                'email': obj.user.email,
-                'name': getattr(obj.user, 'name', None) or getattr(obj.user, 'first_name', None) or None
+                "id": obj.user.id,
+                "email": obj.user.email,
+                "name": getattr(obj.user, "name", None)
+                or getattr(obj.user, "first_name", None)
+                or None,
             }
         return None
 
@@ -103,7 +105,8 @@ class APIKeySerializer(serializers.ModelSerializer):
 
 class APIKeyCreateSerializer(serializers.ModelSerializer):
     """Serializer for creating new API keys with additional options"""
-    user_id = serializers.IntegerField(required=False, write_only=True)
+
+    user_id = serializers.UUIDField(required=True, write_only=True)
 
     class Meta:
         model = APIKey
