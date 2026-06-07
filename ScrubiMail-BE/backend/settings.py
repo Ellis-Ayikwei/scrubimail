@@ -515,6 +515,25 @@ EMAIL_HOST_USER = os.getenv("EMAIL_HOST_USER")
 EMAIL_HOST_PASSWORD = os.getenv("EMAIL_HOST_PASSWORD")
 DEFAULT_FROM_EMAIL = os.getenv("DEFAULT_FROM_EMAIL", "noreply@scrubimail.com")
 
+# Email Validation Configuration
+# SMTP mailbox probing. Outbound port 25 is blocked on most cloud hosts
+# (AWS/GCP/Azure); leave VALIDATION_SMTP_ENABLED=False there so probes report
+# "unknown" instead of being attempted. When enabled, HELO/MAIL FROM must use
+# a real domain with proper PTR + SPF to avoid harming sender reputation.
+VALIDATION_SMTP_ENABLED = os.getenv("VALIDATION_SMTP_ENABLED", "False") == "True"
+VALIDATION_SMTP_TIMEOUT = int(os.getenv("VALIDATION_SMTP_TIMEOUT", 3))
+VALIDATION_SMTP_STARTTLS = os.getenv("VALIDATION_SMTP_STARTTLS", "True") == "True"
+VALIDATION_SMTP_HELO_HOST = os.getenv("VALIDATION_SMTP_HELO_HOST", "scrubimail.com")
+VALIDATION_SMTP_MAIL_FROM = os.getenv(
+    "VALIDATION_SMTP_MAIL_FROM", "verify@scrubimail.com"
+)
+# Optional external disposable-domain feed (one domain per line). Merged with
+# the bundled baseline list. Point this at a maintained 100k+ domain feed in
+# production and refresh it on a schedule.
+VALIDATION_DISPOSABLE_DOMAINS_FILE = os.getenv(
+    "VALIDATION_DISPOSABLE_DOMAINS_FILE", None
+)
+
 # Prevent Heroku from running collectstatic on deploy
 if os.environ.get("DISABLE_COLLECTSTATIC", "") == "1":
     STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"

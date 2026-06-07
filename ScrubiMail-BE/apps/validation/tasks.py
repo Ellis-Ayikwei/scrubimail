@@ -19,8 +19,9 @@ def validate_email_task(self, email_validation_id):
         validation = EmailValidation.objects.get(id=email_validation_id)
         email = validation.email
 
-        # Use the advanced validator
-        result = validator.validate_email(email)
+        # Async/background path: run full SMTP verification (deep) since
+        # multi-second latency is acceptable here, unlike the realtime API.
+        result = validator.validate_email(email, deep=True)
 
         # Update validation record
         validation.status = "completed"

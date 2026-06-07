@@ -23,16 +23,25 @@ logger = logging.getLogger(__name__)
 
 
 def _conf(name: str, default: Any) -> Any:
-    """Read a validation setting from Django settings with a safe fallback."""
+    """Read a validation setting from Django settings with a safe fallback.
+
+    Accessing the lazy settings object raises ImproperlyConfigured when Django
+    isn't configured (e.g. standalone use/tests), so swallow any error and fall
+    back to the default.
+    """
     if _django_settings is not None:
-        return getattr(_django_settings, name, default)
+        try:
+            return getattr(_django_settings, name, default)
+        except Exception:
+            return default
     return default
 
 
-# Module-level DNS resolver with short timeouts
+# Module-level DNS resolver with short timeouts. Kept tight so a single slow
+# lookup can't blow the realtime p99 budget (worst case ~lifetime seconds).
 _dns_resolver = dns.resolver.Resolver()
-_dns_resolver.timeout = 3        # per-query timeout
-_dns_resolver.lifetime = 5       # total resolution lifetime
+_dns_resolver.timeout = 2        # per-query timeout
+_dns_resolver.lifetime = 3       # total resolution lifetime
 
 # Simple TTL cache for domain DNS/reputation results
 _domain_cache: Dict[str, Dict[str, Any]] = {}
@@ -667,7 +676,9 @@ class AdvancedEmailValidator:
         smtp_result = validation_results.get("smtp", {})
         smtp_status = smtp_result.get("status", "unknown")
         if smtp_status == "undeliverable":
-            score -= 40
+            # A confirmed mailbox rejection is the strongest negative signal
+            # short of invalid syntax — make it decisively "Invalid".
+            score -= 55
             deductions.append("Mailbox does not exist")
             explanations.append("Mail server rejected the recipient (user unknown)")
         elif smtp_status == "deliverable":
@@ -727,9 +738,19 @@ class AdvancedEmailValidator:
         }
 
     # -------------------------------------------------------------- pipeline
-    def validate_email(self, email: str) -> ValidationResult:
-        """Complete email validation pipeline"""
+    def validate_email(self, email: str, deep: Optional[bool] = None) -> ValidationResult:
+        """Complete email validation pipeline.
+
+        `deep` controls SMTP mailbox probing — the only slow (multi-second),
+        network-bound stage:
+          * deep=False  -> never probe SMTP. Realtime path: ~20-50ms cold,
+            sub-ms cached. Use this for interactive/realtime validation.
+          * deep=True   -> probe SMTP (subject to VALIDATION_SMTP_ENABLED).
+            Use for async/bulk jobs where multi-second latency is acceptable.
+          * deep=None   -> fall back to the VALIDATION_SMTP_ENABLED setting.
+        """
         start_time = time.time()
+        do_smtp = self.smtp_enabled if deep is None else (deep and self.smtp_enabled)
 
         try:
             # Step 1: Syntax validation
@@ -751,10 +772,19 @@ class AdvancedEmailValidator:
             # Step 2: DNS/MX validation
             dns_result = self.check_dns_mx(domain)
 
-            # Step 3: SMTP handshake
+            # Step 3: SMTP handshake (skipped on the realtime path — it is the
+            # only multi-second, network-bound stage and yields no signal on
+            # cloud hosts where port 25 is blocked).
             mx_records = dns_result.get("mx_records", [])
             a_records = dns_result.get("a_records", [])
-            if mx_records:
+            if not do_smtp:
+                smtp_result = {
+                    "valid": False,
+                    "status": "skipped",
+                    "catch_all": False,
+                    "greylisting": False,
+                }
+            elif mx_records:
                 smtp_result = self.smtp_handshake(email, domain, mx_records)
             elif a_records:
                 # Fallback to A record as implicit MX (RFC 5321 §5.1).

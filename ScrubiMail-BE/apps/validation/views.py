@@ -54,9 +54,11 @@ class SingleEmailValidationView(APIView):
             )
 
         if real_time:
-            # Perform real-time validation
+            # Perform real-time validation. deep=False guarantees the SMTP
+            # probe (the only multi-second stage) is skipped, keeping this
+            # interactive path at ~20-50ms cold / sub-ms cached.
             validator = AdvancedEmailValidator()
-            result = validator.validate_email(email)
+            result = validator.validate_email(email, deep=False)
 
             # Create validation record
             validation = EmailValidation.objects.create(
