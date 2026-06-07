@@ -118,7 +118,9 @@ OAUTH_PROVIDERS_CONFIG = {
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = _DEBUG_MODE
 
-ALLOWED_HOSTS = os.getenv("ALLOWED_HOSTS", "*")
+ALLOWED_HOSTS = os.getenv("ALLOWED_HOSTS", "*").split(",")
+if ALLOWED_HOSTS == ["*"]:
+    ALLOWED_HOSTS = ["*"]
 
 
 # Application definition
