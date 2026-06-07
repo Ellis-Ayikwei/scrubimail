@@ -116,9 +116,9 @@ OAUTH_PROVIDERS_CONFIG = {
 }
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = os.get_inheritable("DEBUG", "True").lower() == "true"
+DEBUG = os.getenv("DEBUG", "True").lower() == "true"
 
-ALLOWED_HOSTS = os.get_inheritable("ALLOWED_HOSTS", "*")
+ALLOWED_HOSTS = os.getenv("ALLOWED_HOSTS", "*")
 
 
 # Application definition
