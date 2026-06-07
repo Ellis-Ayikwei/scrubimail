@@ -346,9 +346,13 @@ SIMPLE_JWT = {
     "AUTH_HEADER_TYPES": ("Bearer",),
 }
 
+# Always required: the frontend sends requests with credentials (withCredentials),
+# so the browser requires Access-Control-Allow-Credentials: true on every response,
+# including in production where DEBUG is False.
+CORS_ALLOW_CREDENTIALS = True
+
 if DEBUG:
     CORS_ALLOW_ALL_ORIGINS = True
-    CORS_ALLOW_CREDENTIALS = True
     CORS_ALLOWED_ORIGINS = [
         "http://localhost:3000",
         "http://192.168.100.12:5173",
