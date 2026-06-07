@@ -131,6 +131,20 @@ class UserSerializer(serializers.ModelSerializer):
             "is_active",
         )
 
+    def get_name(self, obj):
+        """Combine first_name and last_name to create full name"""
+        first = obj.first_name.strip() if obj.first_name else ""
+        last = obj.last_name.strip() if obj.last_name else ""
+
+        if first and last:
+            return f"{first} {last}"
+        elif first:
+            return first
+        elif last:
+            return last
+        else:
+            return obj.email.split("@")[0] if obj.email else "Unknown User"
+
     def get_roles(self, obj):
         return [group.name for group in obj.groups.all()]
 
@@ -148,6 +162,7 @@ class UserSerializer(serializers.ModelSerializer):
 
 class AdminUserSerializer(serializers.ModelSerializer):
     """Full admin serializer — all fields writable for admin panel PATCH."""
+
     groups = GroupSerializer(many=True, read_only=True)
     user_permissions = serializers.SerializerMethodField(read_only=True)
     roles = serializers.SerializerMethodField(read_only=True)
@@ -185,7 +200,7 @@ class AdminUserSerializer(serializers.ModelSerializer):
         """Combine first_name and last_name to create full name"""
         first = obj.first_name.strip() if obj.first_name else ""
         last = obj.last_name.strip() if obj.last_name else ""
-        
+
         if first and last:
             return f"{first} {last}"
         elif first:
@@ -193,7 +208,7 @@ class AdminUserSerializer(serializers.ModelSerializer):
         elif last:
             return last
         else:
-            return obj.email.split('@')[0] if obj.email else "Unknown User"
+            return obj.email.split("@")[0] if obj.email else "Unknown User"
 
     def get_roles(self, obj):
         return [group.name for group in obj.groups.all()]
@@ -201,6 +216,7 @@ class AdminUserSerializer(serializers.ModelSerializer):
     def get_user_permissions(self, obj):
         perms = obj.get_user_permissions() | obj.get_group_permissions()
         from django.contrib.auth.models import Permission
+
         permissions = Permission.objects.filter(
             codename__in=[p.split(".")[-1] for p in perms]
         )
