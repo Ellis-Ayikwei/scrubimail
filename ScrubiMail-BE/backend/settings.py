@@ -472,7 +472,15 @@ print(
 )
 print(f"EMAIL_USE_TLS: {EMAIL_USE_TLS}")
 print("=========================")
-
+print("=== CORS Configuration ===")
+print(f"CORS_ALLOWED_ORIGINS: {CORS_ALLOWED_ORIGINS}")
+print(f"CORS_ALLOWED_ORIGIN_REGEXES: {CORS_ALLOWED_ORIGIN_REGEXES}")
+print("=========================")
+print("=== ALLOWED_HOSTS ===")
+print(f"ALLOWED_HOSTS: {ALLOWED_HOSTS}")
+print("=========================")
+print("=== DEBUG ===")
+print(f"DEBUG: {DEBUG}")
 
 APPEND_SLASH = False
 
