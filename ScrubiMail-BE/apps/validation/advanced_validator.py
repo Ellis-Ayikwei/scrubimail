@@ -52,6 +52,14 @@ _dns_resolver.lifetime = 3       # total resolution lifetime
 _domain_cache: Dict[str, Dict[str, Any]] = {}
 _cache_ttl = 300  # 5 minutes
 
+# SMTP egress circuit breaker. Outbound port 25 is blocked on most cloud hosts,
+# so the first connect just burns the full timeout. We trip the breaker only
+# after several CONSECUTIVE total failures (systemic block) — a single slow MX
+# on an otherwise-working host must not disable verification for every domain.
+# Any successful connection resets the counter.
+_smtp_egress_blocked_until = 0.0
+_smtp_consecutive_failures = 0
+
 # Disposable-domain blocklist, loaded once from the bundled baseline plus an
 # optional external feed (VALIDATION_DISPOSABLE_DOMAINS_FILE).
 _DISPOSABLE_BASELINE = os.path.join(
@@ -175,6 +183,13 @@ class AdvancedEmailValidator:
             "VALIDATION_SMTP_MAIL_FROM", "verify@scrubimail.com"
         )
         self.smtp_use_starttls = bool(_conf("VALIDATION_SMTP_STARTTLS", True))
+        # Circuit breaker: trip after this many consecutive total failures,
+        # then skip SMTP for this many seconds. Set threshold high (or TTL to 0)
+        # on a host with reliable port-25 egress.
+        self.smtp_failure_threshold = int(
+            _conf("VALIDATION_SMTP_FAILURE_THRESHOLD", 3)
+        )
+        self.smtp_block_ttl = int(_conf("VALIDATION_SMTP_BLOCK_TTL", 600))
 
     # ------------------------------------------------------------------ cache
     def _get_cached(self, key: str) -> Optional[Any]:
@@ -429,6 +444,7 @@ class AdvancedEmailValidator:
 
         `status` is one of: deliverable | undeliverable | unknown | skipped
         """
+        global _smtp_egress_blocked_until, _smtp_consecutive_failures
         results = {
             "valid": False,
             "status": "unknown",
@@ -441,11 +457,21 @@ class AdvancedEmailValidator:
 
         if not self.smtp_enabled:
             results["status"] = "skipped"
+            results["sub_status"] = "no_smtp_check"
             return results
 
         if not mx_records:
             results["status"] = "unknown"
+            results["sub_status"] = "no_mx_record"
             results["error"] = "No MX records available"
+            return results
+
+        # Circuit breaker: if we recently found port 25 unreachable from this
+        # host, don't waste seconds re-timing-out — return unknown immediately.
+        if time.time() < _smtp_egress_blocked_until:
+            results["status"] = "unknown"
+            results["sub_status"] = "smtp_egress_blocked"
+            results["error"] = "SMTP egress recently unreachable (circuit open)"
             return results
 
         connection_succeeded = False
@@ -476,10 +502,14 @@ class AdvancedEmailValidator:
                 if code in (250, 251):
                     results["valid"] = True
                     results["status"] = "deliverable"
+                    results["sub_status"] = "mailbox_exists"
                 elif code in (450, 451, 452, 421):
                     # Temporary failure / greylisting — indeterminate.
                     results["greylisting"] = code == 450
                     results["status"] = "unknown"
+                    results["sub_status"] = (
+                        "greylisted" if code == 450 else "antispam_block"
+                    )
                 elif code in (550, 551, 553, 554):
                     lowered = message_str.lower()
                     if any(
@@ -497,12 +527,15 @@ class AdvancedEmailValidator:
                     ):
                         results["ndr_patterns"].append(lowered)
                         results["status"] = "undeliverable"
+                        results["sub_status"] = "mailbox_not_found"
                     else:
                         # Policy block / anti-spam refusal — not proof the
                         # mailbox is missing.
                         results["status"] = "unknown"
+                        results["sub_status"] = "antispam_block"
                 else:
                     results["status"] = "unknown"
+                    results["sub_status"] = "unexpected_response"
 
                 try:
                     server.quit()
@@ -525,10 +558,19 @@ class AdvancedEmailValidator:
                 results["errors"].append(f"MX {mx_host}: {str(e)}")
                 continue
 
-        if not connection_succeeded:
+        if connection_succeeded:
+            # Egress works — reset the failure streak.
+            _smtp_consecutive_failures = 0
+        else:
             # Couldn't reach any MX on port 25 (commonly blocked on cloud
-            # hosts). Report unknown rather than penalizing the address.
+            # hosts). Report unknown rather than penalizing the address. Trip
+            # the breaker only after repeated failures (systemic block), so one
+            # slow MX on a healthy host doesn't disable SMTP for everything.
+            _smtp_consecutive_failures += 1
+            if _smtp_consecutive_failures >= self.smtp_failure_threshold:
+                _smtp_egress_blocked_until = time.time() + self.smtp_block_ttl
             results["status"] = "unknown"
+            results["sub_status"] = "failed_smtp_connection"
             results["error"] = "SMTP port 25 unreachable from this host"
 
         # Catch-all detection only when the mailbox itself looked deliverable.
@@ -740,21 +782,85 @@ class AdvancedEmailValidator:
 
         score = max(0, min(100, score))
 
-        if score >= 80:
-            verdict = "Valid"
-        elif score >= 50:
-            verdict = "Risky"
-        elif score >= 20:
-            verdict = "Invalid"
-        else:
-            verdict = "High Risk"
+        # ZeroBounce-style classification. The status — not the raw score — is
+        # the source of truth, and `is_valid` is true ONLY when SMTP actually
+        # confirmed the mailbox. "We couldn't verify it" is never "Valid".
+        status, sub_status = self._classify(validation_results)
+
+        # Keep the numeric score coherent with the status so we never report a
+        # confident 100 next to an unverified/unknown address.
+        ceilings = {
+            "valid": (90, 100),
+            "catch-all": (40, 70),
+            "unknown": (0, 70),
+            "do_not_mail": (0, 50),
+            "spamtrap": (0, 15),
+            "invalid": (0, 20),
+        }
+        lo, hi = ceilings.get(status, (0, 100))
+        score = max(lo, min(score, hi))
+
+        verdict = {
+            "valid": "Valid",
+            "invalid": "Invalid",
+            "catch-all": "Catch-All",
+            "unknown": "Unknown",
+            "do_not_mail": "Do Not Mail",
+            "spamtrap": "Spamtrap",
+        }.get(status, "Unknown")
 
         return {
             "score": score,
             "verdict": verdict,
+            "status": status,
+            "sub_status": sub_status,
+            "is_valid": status == "valid",
             "deductions": deductions,
             "explanations": explanations,
         }
+
+    def _classify(self, vr: Dict[str, Any]) -> tuple:
+        """Map raw signals to a ZeroBounce-style (status, sub_status).
+
+        Priority is deliberate: hard "invalid" beats everything, a confirmed
+        mailbox is "valid", and anything we could not actually verify resolves
+        to "unknown" — never to "valid".
+        """
+        syntax = vr.get("syntax", {})
+        dns = vr.get("dns", {})
+        smtp = vr.get("smtp", {})
+        rep = vr.get("reputation", {})
+        role = vr.get("role_based", {})
+        smtp_status = smtp.get("status", "unknown")
+
+        # 1. Hard-invalid: syntax, then DNS.
+        if not syntax.get("valid", False):
+            return "invalid", (
+                "possible_typo" if syntax.get("suggestions") else "bad_syntax"
+            )
+        if not dns.get("valid", False):
+            return "invalid", "no_dns_entries"
+
+        # 2. Confirmed non-existent mailbox.
+        if smtp_status == "undeliverable":
+            return "invalid", "mailbox_not_found"
+
+        # 3. Toxic / do-not-mail signals.
+        if rep.get("spam_trap_risk", 0) > 0.5:
+            return "spamtrap", "spamtrap_detected"
+        if rep.get("is_disposable", False):
+            return "do_not_mail", "disposable"
+        if role.get("is_role_based", False):
+            return "do_not_mail", "role_based"
+
+        # 4. Confirmed deliverable.
+        if smtp_status == "deliverable":
+            if smtp.get("catch_all", False):
+                return "catch-all", "accept_all"
+            return "valid", "mailbox_exists"
+
+        # 5. Everything else = we could not verify the mailbox.
+        return "unknown", smtp.get("sub_status") or "no_smtp_check"
 
     # -------------------------------------------------------------- pipeline
     def validate_email(self, email: str, deep: Optional[bool] = None) -> ValidationResult:
@@ -782,7 +888,15 @@ class AdvancedEmailValidator:
                     breakdown={"syntax": syntax_result},
                     suggestions=syntax_result.get("suggestions", []),
                     warnings=[],
-                    metadata={"validation_time": time.time() - start_time},
+                    metadata={
+                        "validation_time": time.time() - start_time,
+                        "status": "invalid",
+                        "sub_status": (
+                            "possible_typo"
+                            if syntax_result.get("suggestions")
+                            else "bad_syntax"
+                        ),
+                    },
                 )
 
             local_part = syntax_result["local_part"]
@@ -847,19 +961,30 @@ class AdvancedEmailValidator:
                 warnings.append("Catch-all domain detected")
             if reputation_result.get("spam_trap_risk", 0) > 0.5:
                 warnings.append("Potential spam trap detected")
-            if smtp_result.get("status") == "unknown":
+            if risk_result["status"] == "unknown":
                 warnings.append(
-                    "Mailbox could not be verified via SMTP (probe inconclusive)"
+                    "Mailbox not confirmed — SMTP verification was inconclusive "
+                    "or not performed (status: unknown, not 'valid')"
+                )
+            elif risk_result["status"] == "catch-all":
+                warnings.append(
+                    "Catch-all domain — accepts all addresses, so the specific "
+                    "mailbox cannot be confirmed"
                 )
 
             return ValidationResult(
-                is_valid=risk_result["score"] >= 50,
+                # Strict, ZeroBounce-style: only a SMTP-confirmed mailbox is valid.
+                is_valid=risk_result["is_valid"],
                 score=risk_result["score"],
                 verdict=risk_result["verdict"],
                 breakdown=validation_results,
                 suggestions=syntax_result.get("suggestions", []),
                 warnings=warnings,
-                metadata={"validation_time": time.time() - start_time},
+                metadata={
+                    "validation_time": time.time() - start_time,
+                    "status": risk_result["status"],
+                    "sub_status": risk_result["sub_status"],
+                },
             )
 
         except Exception as e:
@@ -871,5 +996,9 @@ class AdvancedEmailValidator:
                 breakdown={"error": str(e)},
                 suggestions=[],
                 warnings=[f"Validation error: {str(e)}"],
-                metadata={"validation_time": time.time() - start_time},
+                metadata={
+                    "validation_time": time.time() - start_time,
+                    "status": "unknown",
+                    "sub_status": "exception_occurred",
+                },
             )

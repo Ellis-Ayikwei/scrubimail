@@ -9,7 +9,10 @@ import {
   TrendingUp,
   BarChart3,
   Shield,
-  Server
+  Server,
+  Ban,
+  HelpCircle,
+  Network,
 } from 'lucide-react';
 import {
   VAL_CARD,
@@ -35,7 +38,28 @@ const ValidationResults: React.FC<ValidationResultsProps> = ({
 }) => {
   const isValid = result.is_valid;
   const verdict = result.verdict || (isValid ? 'Valid' : 'Invalid');
+  const verificationStatus: string | undefined = result.verification_status;
+  const subStatus: string | undefined = result.sub_status;
   const score = typeof result.score === 'number' ? result.score : null;
+
+  // ZeroBounce-style verdict → icon + tone. Covers the new vocabulary
+  // (Valid / Invalid / Catch-All / Unknown / Do Not Mail / Spamtrap) plus the
+  // legacy Risky / High Risk labels.
+  const VERDICT_META: Record<
+    string,
+    { Icon: typeof CheckCircle; cls: string; chip: string }
+  > = {
+    Valid: { Icon: CheckCircle, cls: 'text-emerald-600 dark:text-[#6effc0]', chip: 'bg-emerald-50 border-emerald-200 text-emerald-800 dark:bg-[#6effc0]/10 dark:border-[#6effc0]/25 dark:text-[#6effc0]' },
+    Invalid: { Icon: XCircle, cls: 'text-red-600 dark:text-[#ff4c4c]', chip: 'bg-red-50 border-red-200 text-red-800 dark:bg-[#ff4c4c]/10 dark:border-[#ff4c4c]/25 dark:text-[#ff4c4c]' },
+    'Catch-All': { Icon: Network, cls: 'text-amber-600 dark:text-[#f59e0b]', chip: 'bg-amber-50 border-amber-200 text-amber-800 dark:bg-[#f59e0b]/10 dark:border-[#f59e0b]/25 dark:text-[#f59e0b]' },
+    Unknown: { Icon: HelpCircle, cls: 'text-gray-500 dark:text-[#bacbbf]', chip: 'bg-gray-100 border-gray-200 text-gray-700 dark:bg-white/5 dark:border-white/10 dark:text-[#bacbbf]' },
+    'Do Not Mail': { Icon: Ban, cls: 'text-rose-600 dark:text-rose-400', chip: 'bg-rose-50 border-rose-200 text-rose-800 dark:bg-rose-500/10 dark:border-rose-500/25 dark:text-rose-300' },
+    Spamtrap: { Icon: AlertTriangle, cls: 'text-red-600 dark:text-[#ff4c4c]', chip: 'bg-red-50 border-red-200 text-red-800 dark:bg-[#ff4c4c]/10 dark:border-[#ff4c4c]/25 dark:text-[#ff4c4c]' },
+    Risky: { Icon: AlertTriangle, cls: 'text-amber-600 dark:text-[#f59e0b]', chip: 'bg-amber-50 border-amber-200 text-amber-800 dark:bg-[#f59e0b]/10 dark:border-[#f59e0b]/25 dark:text-[#f59e0b]' },
+    'High Risk': { Icon: AlertTriangle, cls: 'text-red-600 dark:text-[#ff4c4c]', chip: 'bg-red-50 border-red-200 text-red-800 dark:bg-[#ff4c4c]/10 dark:border-[#ff4c4c]/25 dark:text-[#ff4c4c]' },
+  };
+  const meta = VERDICT_META[verdict] ?? (isValid ? VERDICT_META.Valid : VERDICT_META.Unknown);
+  const VerdictIcon = meta.Icon;
 
   const scoreClass =
     score === null
@@ -95,14 +119,15 @@ const ValidationResults: React.FC<ValidationResultsProps> = ({
         {/* Header verdict */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            {isValid ? (
-              <CheckCircle className="w-4 h-4 text-emerald-600 dark:text-[#6effc0]" />
-            ) : (
-              <XCircle className="w-4 h-4 text-red-600 dark:text-[#ff4c4c]" />
-            )}
+            <VerdictIcon className={`w-4 h-4 ${meta.cls}`} />
             <span className="font-['Epilogue',sans-serif] font-bold text-gray-900 dark:text-[#e0e3e8] text-sm">
               {verdict}
             </span>
+            {subStatus && (
+              <span className={`font-mono text-[9px] px-2 py-0.5 rounded-sm uppercase tracking-[0.1em] border ${meta.chip}`}>
+                {subStatus.replace(/_/g, ' ')}
+              </span>
+            )}
             {includeDetails && (
               <span className="font-mono text-[9px] px-2 py-0.5 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-sm uppercase tracking-[0.1em] dark:bg-[#6effc0]/10 dark:border-[#6effc0]/20 dark:text-[#6effc0]">
                 Detailed
@@ -114,10 +139,30 @@ const ValidationResults: React.FC<ValidationResultsProps> = ({
           )}
         </div>
 
+        {/* Mailbox-not-confirmed notice (Unknown / Catch-All are NOT "valid") */}
+        {(verdict === 'Unknown' || verdict === 'Catch-All') && (
+          <div className="flex items-start gap-2 bg-gray-50 border border-gray-200 rounded-sm p-3 dark:bg-white/[0.02] dark:border-white/10">
+            {verdict === 'Catch-All' ? (
+              <Network className="w-3.5 h-3.5 mt-0.5 flex-shrink-0 text-amber-600 dark:text-[#f59e0b]" />
+            ) : (
+              <HelpCircle className="w-3.5 h-3.5 mt-0.5 flex-shrink-0 text-gray-500 dark:text-[#bacbbf]" />
+            )}
+            <p className="font-mono text-[10px] leading-relaxed text-gray-600 dark:text-[#bacbbf]/70">
+              {verdict === 'Catch-All'
+                ? 'Domain accepts all addresses — the specific mailbox cannot be confirmed.'
+                : 'Mailbox not confirmed — SMTP verification was inconclusive or not performed.'}
+            </p>
+          </div>
+        )}
+
         {/* Summary rows */}
         <div className={`${VAL_INSET} rounded-sm px-4 py-2`}>
           <Row label="Email" value={<span className="truncate max-w-[200px] block">{result.email}</span>} />
-          <Row label="Status" value={result.status} />
+          <Row label="Verdict" value={<span className={meta.cls}>{verdict}</span>} />
+          {verificationStatus && (
+            <Row label="Status" value={<span className={meta.cls}>{verificationStatus}</span>} />
+          )}
+          {subStatus && <Row label="Sub Status" value={subStatus} />}
           {score !== null && (
             <Row label="Score" value={<span className={scoreClass}>{score} / 100</span>} />
           )}

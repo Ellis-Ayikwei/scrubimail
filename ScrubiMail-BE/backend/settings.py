@@ -573,6 +573,38 @@ EMAIL_HOST_USER = os.getenv("EMAIL_HOST_USER")
 EMAIL_HOST_PASSWORD = os.getenv("EMAIL_HOST_PASSWORD")
 DEFAULT_FROM_EMAIL = os.getenv("DEFAULT_FROM_EMAIL", "noreply@scrubimail.com")
 
+# ============================================================================
+# Email Validation Configuration
+# ============================================================================
+# SMTP mailbox verification is what produces ZeroBounce-style "valid" answers.
+# It REQUIRES a host with outbound port 25 open + a PTR record matching the
+# HELO host + SPF on the MAIL FROM domain. Cloud hosts (AWS/GCP/Azure/Heroku)
+# block port 25, so leave this OFF there and run it on a dedicated egress
+# worker. The realtime web path never does SMTP (stays fast); the Celery
+# (deep) path does. Without SMTP, unconfirmable mailboxes return status
+# "unknown", never "valid".
+VALIDATION_SMTP_ENABLED = os.getenv("VALIDATION_SMTP_ENABLED", "False") == "True"
+VALIDATION_SMTP_TIMEOUT = int(os.getenv("VALIDATION_SMTP_TIMEOUT", 3))
+VALIDATION_SMTP_STARTTLS = os.getenv("VALIDATION_SMTP_STARTTLS", "True") == "True"
+# MUST be a real domain you control: HELO host needs a matching PTR record,
+# MAIL FROM domain needs SPF, or major providers will tarpit/refuse the probe.
+VALIDATION_SMTP_HELO_HOST = os.getenv("VALIDATION_SMTP_HELO_HOST", "scrubimail.com")
+VALIDATION_SMTP_MAIL_FROM = os.getenv(
+    "VALIDATION_SMTP_MAIL_FROM", "verify@scrubimail.com"
+)
+# Circuit breaker: after this many consecutive total SMTP failures, skip SMTP
+# for BLOCK_TTL seconds (returns "unknown" instantly instead of timing out).
+# On a reliable egress host you can raise the threshold or set TTL to 0.
+VALIDATION_SMTP_FAILURE_THRESHOLD = int(
+    os.getenv("VALIDATION_SMTP_FAILURE_THRESHOLD", 3)
+)
+VALIDATION_SMTP_BLOCK_TTL = int(os.getenv("VALIDATION_SMTP_BLOCK_TTL", 600))
+# Optional external disposable-domain feed (one domain per line), merged with
+# the bundled baseline. Point at a maintained 100k+ feed in production.
+VALIDATION_DISPOSABLE_DOMAINS_FILE = os.getenv(
+    "VALIDATION_DISPOSABLE_DOMAINS_FILE", None
+)
+
 # Prevent Heroku from running collectstatic on deploy
 if os.environ.get("DISABLE_COLLECTSTATIC", "") == "1":
     STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"

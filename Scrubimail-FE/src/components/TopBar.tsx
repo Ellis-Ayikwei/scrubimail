@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
-import { Menu, Search, Bell, ChevronDown, User, LogOut, Settings, Zap, Sun, Moon } from 'lucide-react';
+import { Menu, Search, Bell, ChevronDown, User, LogOut, Settings, Sun, Moon } from 'lucide-react';
 import useIsAuthenticated from 'react-auth-kit/hooks/useIsAuthenticated';
 import useAuthUser from 'react-auth-kit/hooks/useAuthUser';
 import useSignOut from 'react-auth-kit/hooks/useSignOut';
@@ -159,11 +159,12 @@ const TopBar: React.FC = () => {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-14">
           {/* Logo */}
-          <Link to="/" className="flex items-center gap-2">
-            <div className="w-7 h-7 bg-[#00e5a0] flex items-center justify-center rounded-sm">
-              <Zap className="w-4 h-4 text-[#003824]" strokeWidth={2.5} />
-            </div>
-            <span className="text-[#6effc0] font-headline font-black tracking-tighter text-lg">Scrubi</span>
+          <Link to="/" className="flex items-center" aria-label="ScrubiMail home">
+            <img
+              src="/assets/images/scrubimail-logo-full.png"
+              alt="ScrubiMail"
+              className="h-7 w-auto brightness-0 invert"
+            />
           </Link>
 
           {/* Nav links */}
