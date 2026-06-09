@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useSearchParams, useNavigate } from 'react-router-dom';
+import Logo from '../../components/Logo';
 import {
   Mail,
   Lock,
@@ -109,10 +110,7 @@ const ResetPassword = () => {
         <div className="flex-1 flex items-center justify-center px-4 relative z-10">
           <div className="w-full max-w-md text-center">
             <Link to="/" className="inline-flex items-center gap-2 mb-8">
-              <div className="w-8 h-8 bg-[#6effc0] flex items-center justify-center rounded-sm">
-                <Mail className="w-4 h-4 text-[#003824]" />
-              </div>
-              <span className="font-['Epilogue',sans-serif] font-black text-[#6effc0] text-lg tracking-tight">ScrubiMail</span>
+              <Logo tone="white" className="h-7 w-auto" />
             </Link>
             <div className="flex justify-center mb-4">
               <div className="w-12 h-12 bg-[#6effc0]/10 border border-[#6effc0]/30 flex items-center justify-center rounded-sm">
@@ -181,10 +179,7 @@ const ResetPassword = () => {
           {/* Logo */}
           <div className="text-center mb-8">
             <Link to="/" className="inline-flex items-center gap-2 mb-4">
-              <div className="w-8 h-8 bg-[#6effc0] flex items-center justify-center rounded-sm">
-                <Mail className="w-4 h-4 text-[#003824]" />
-              </div>
-              <span className="font-['Epilogue',sans-serif] font-black text-[#6effc0] text-lg tracking-tight">ScrubiMail</span>
+              <Logo tone="white" className="h-7 w-auto" />
             </Link>
             <p className="font-['Space_Grotesk',sans-serif] uppercase tracking-[0.2em] text-[9px] text-[#6effc0] mb-1">Security Reset</p>
             <h1 className="font-['Epilogue',sans-serif] font-black text-[#e0e3e8] text-2xl tracking-tight">Reset your password</h1>

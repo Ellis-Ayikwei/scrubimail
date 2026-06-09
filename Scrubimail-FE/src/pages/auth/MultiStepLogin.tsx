@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useDispatch } from 'react-redux';
+import Logo from '../../components/Logo';
 import {
   Mail,
   Lock,
@@ -368,11 +369,8 @@ Connecting to scrubi-terminal-1...
       <div className="relative z-10 w-full max-w-md">
         {/* Brand */}
         <div className="text-center mb-8">
-          <Link to="/" className="inline-flex items-center gap-2 mb-5">
-            <div className="w-8 h-8 bg-[#6effc0] flex items-center justify-center rounded-sm">
-              <Zap className="w-4 h-4 text-[#003824]" strokeWidth={2.5} />
-            </div>
-            <span className="font-['Epilogue',sans-serif] font-black tracking-tighter text-[#6effc0] text-xl">Scrubi</span>
+          <Link to="/" className="inline-flex items-center mb-5" aria-label="ScrubiMail home">
+            <Logo tone="white" className="h-8 w-auto" />
           </Link>
           <h1 className="font-['Epilogue',sans-serif] font-bold text-[#e0e3e8] text-2xl tracking-tight mb-1">
             {steps[currentStep].title}

@@ -4,6 +4,7 @@ import PerfectScrollbar from 'react-perfect-scrollbar';
 import { NavLink, useLocation, Link } from 'react-router-dom';
 import { AppDispatch, IRootState } from '../store';
 import { toggleSidebar } from '../store/themeConfigSlice';
+import Logo from './Logo';
 import {
   BarChart3,
   CheckCircle,
@@ -93,13 +94,8 @@ const Sidebar = () => {
     >
       {/* Logo */}
       <div className="flex items-center justify-between px-4 py-4 border-b border-gray-200 dark:border-[#3b4a41]/30">
-        <NavLink to="/dashboard" className="flex items-center gap-2.5">
-          <div className="w-7 h-7 bg-emerald-500 dark:bg-[#00e5a0] flex items-center justify-center rounded-sm flex-shrink-0">
-            <Zap className="w-4 h-4 text-white dark:text-[#003824]" strokeWidth={2.5} />
-          </div>
-          <span className="text-emerald-700 dark:text-[#6effc0] font-headline font-black tracking-tighter text-base">
-            Scrubi
-          </span>
+        <NavLink to="/dashboard" className="flex items-center" aria-label="ScrubiMail dashboard">
+          <Logo tone="auto" className="h-7 w-auto" />
         </NavLink>
         <button
           type="button"

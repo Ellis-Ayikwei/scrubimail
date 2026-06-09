@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import Logo from '../../components/Logo';
 import {
   User,
   Mail,
@@ -116,12 +117,7 @@ const Register = () => {
           <div className="w-full max-w-md">
             <div className="text-center mb-8">
               <Link to="/" className="inline-flex items-center gap-2 mb-6">
-                <div className="w-8 h-8 bg-emerald-500 dark:bg-[#6effc0] flex items-center justify-center rounded-sm">
-                  <Mail className="w-4 h-4 text-white dark:text-[#003824]" />
-                </div>
-                <span className="font-['Epilogue',sans-serif] font-black text-emerald-700 dark:text-[#6effc0] text-lg tracking-tight">
-                  ScrubiMail
-                </span>
+                <Logo tone="auto" className="h-7 w-auto" />
               </Link>
               <div className="flex justify-center mb-4">
                 <div className="w-12 h-12 bg-emerald-50 dark:bg-[#6effc0]/10 border border-emerald-200 dark:border-[#6effc0]/30 flex items-center justify-center rounded-sm">
@@ -192,12 +188,7 @@ Content-Type: application/json
         <div className="w-full max-w-md">
           <div className="text-center mb-8">
             <Link to="/" className="inline-flex items-center gap-2 mb-4">
-              <div className="w-8 h-8 bg-emerald-500 dark:bg-[#6effc0] flex items-center justify-center rounded-sm">
-                <Mail className="w-4 h-4 text-white dark:text-[#003824]" />
-              </div>
-              <span className="font-['Epilogue',sans-serif] font-black text-emerald-700 dark:text-[#6effc0] text-lg tracking-tight">
-                ScrubiMail
-              </span>
+              <Logo tone="auto" className="h-7 w-auto" />
             </Link>
             <p className="font-['Space_Grotesk',sans-serif] uppercase tracking-[0.2em] text-[9px] text-emerald-700 dark:text-[#6effc0] mb-1">
               New Account

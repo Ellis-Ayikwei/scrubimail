@@ -9,6 +9,7 @@ import { toggleSidebar, toggleTheme } from '../store/themeConfigSlice';
 import { RootState } from '../store';
 import { LogoutUser } from '../store/authSlice';
 import { useSelector as useReduxSelector } from 'react-redux';
+import Logo from './Logo';
 
 const TopBar: React.FC = () => {
   const [userMenuOpen, setUserMenuOpen] = useState(false);
@@ -159,13 +160,7 @@ const TopBar: React.FC = () => {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-14">
           {/* Logo */}
-          <Link to="/" className="flex items-center" aria-label="ScrubiMail home">
-            <img
-              src="/assets/images/scrubimail-logo-full.png"
-              alt="ScrubiMail"
-              className="h-7 w-auto brightness-0 invert"
-            />
-          </Link>
+          <Logo to="/" tone="white" className="h-7 w-auto" />
 
           {/* Nav links */}
           <nav className="hidden lg:flex items-center gap-8">

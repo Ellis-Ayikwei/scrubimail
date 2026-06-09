@@ -1,7 +1,8 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { 
-  Mail, 
+import Logo from './Logo';
+import {
+  Mail,
   FileText, 
   DollarSign, 
   Users, 
@@ -41,11 +42,7 @@ const Footer: React.FC = () => {
           {/* Brand Section */}
           <div className="sm:col-span-2 lg:col-span-2">
             <div className="flex items-center mb-4 sm:mb-6">
-              <img 
-                src="/assets/images/scrubi mail full.png" 
-                alt="Scrubimail Logo" 
-                className="h-10 sm:h-12 w-auto"
-              />
+              <Logo to="/" tone="white" className="h-10 sm:h-12 w-auto" />
             </div>
             <p className="text-[#7d8590] text-base sm:text-lg mb-4 sm:mb-6 max-w-md">
               Emails flowing safely into inboxes. The most accurate email validation API trusted by developers worldwide.

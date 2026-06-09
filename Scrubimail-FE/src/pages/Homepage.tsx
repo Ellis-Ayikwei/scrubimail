@@ -22,6 +22,7 @@ import {
 // Existing top navigation. If your TopBar uses a named export, switch to:
 //   import { TopBar } from "../components/TopBar";
 import TopBar from "../components/TopBar";
+import Logo from "../components/Logo";
 
 /* ============================== shared bits ============================== */
 
@@ -786,13 +787,7 @@ function Footer() {
       <div className="mx-auto max-w-7xl px-5 py-14 sm:px-8">
         <div className="grid grid-cols-2 gap-8 sm:grid-cols-3 lg:grid-cols-6">
           <div className="col-span-2 lg:col-span-2">
-            <Link to="/" className="inline-flex items-center" aria-label="ScrubiMail home">
-              <img
-                src="/assets/images/scrubimail-logo-full.png"
-                alt="ScrubiMail"
-                className="h-8 w-auto dark:brightness-0 dark:invert"
-              />
-            </Link>
+            <Logo to="/" tone="auto" className="h-8 w-auto" />
             <p className="mt-4 max-w-xs text-sm leading-relaxed text-zinc-500 dark:text-zinc-400">Emails flowing safely into inboxes. Real-time email validation that protects sender reputation and improves deliverability.</p>
           </div>
           {Object.entries(FOOT).map(([group, links]) => (
