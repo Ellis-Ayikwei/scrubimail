@@ -1,0 +1,31 @@
+/* ============================================================
+   ScrubiMail — Dark mode semantic overrides
+   The product uses a GitHub-inspired dark canvas (.dark on <html>).
+   ============================================================ */
+
+.dark {
+  --surface-page:    var(--gh-bg);
+  --surface-card:    var(--gh-surface);
+  --surface-inset:   var(--gh-surface-2);
+  --surface-hover:   var(--gh-surface-2);
+
+  --text-strong:     #ffffff;
+  --text-body:       #e6edf3;
+  --text-secondary:  var(--gh-muted);
+  --text-muted:      #6e7681;
+  --text-link:       var(--teal-500);
+
+  --border-subtle:   var(--gh-border);
+  --border-default:  var(--gh-border);
+  --border-strong:   #3d444d;
+
+  --color-primary:        var(--emerald-500);
+  --color-primary-hover:  var(--emerald-600);
+  --color-primary-soft:   rgba(16, 185, 129, 0.15);
+  --color-primary-tint:   rgba(16, 185, 129, 0.10);
+
+  --color-success-soft:   rgba(0, 196, 140, 0.15);
+  --color-warning-soft:   rgba(245, 158, 11, 0.15);
+  --color-danger-soft:    rgba(255, 76, 76, 0.15);
+  --color-info-soft:      rgba(33, 150, 243, 0.15);
+}

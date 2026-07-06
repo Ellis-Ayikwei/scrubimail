@@ -1,0 +1,119 @@
+/* ============================================================
+   ScrubiMail — Color tokens
+   Source of truth: Scrubimail-FE/tailwind.config.cjs + live product code.
+   Base palettes (literal scales) first, semantic aliases after.
+   Dark-mode semantics live in tokens/dark.css (.dark scope).
+   ============================================================ */
+
+:root {
+  /* ---- Primary: ScrubiMail teal (the brand) ---- */
+  --teal-50:  #f0fdfa;
+  --teal-100: #ccfbf1;
+  --teal-200: #99f6e4;
+  --teal-300: #5eead4;
+  --teal-400: #2dd4bf;
+  --teal-500: #2ED8A3; /* DEFAULT brand teal */
+  --teal-600: #14b8a6;
+  --teal-700: #0d9488;
+  --teal-800: #0f766e;
+  --teal-900: #134e4a;
+  --teal-hover: #00C48C; /* the active hover/press teal used across the app */
+
+  /* ---- Emerald: hero / marketing gradient pair ---- */
+  --emerald-400: #34d399;
+  --emerald-500: #10B981;
+  --emerald-600: #059669;
+
+  /* ---- Secondary: coral-orange (alerts / accents) ---- */
+  --coral-50:  #fff5f2;
+  --coral-100: #ffeae0;
+  --coral-300: #ffb59e;
+  --coral-500: #FF6B35; /* DEFAULT secondary */
+  --coral-600: #e5522a;
+  --coral-700: #cc3e1f;
+
+  /* ---- Accent blues (dashboard tiles / info) ---- */
+  --blue-500:  #2196F3;
+  --blue-700:  #1976d2;
+  --navy-500:  #004E8A;
+  --navy-700:  #1E3A8A;
+
+  /* ---- Accent violet (API / integration tiles) ---- */
+  --violet-500: #8B5CF6;
+  --violet-600: #7C3AED;
+
+  /* ---- Amber (warning / history tiles) ---- */
+  --amber-500: #F59E0B;
+  --amber-600: #D97706;
+
+  /* ---- Status reds ---- */
+  --red-500: #FF4C4C; /* live invalid/danger accent */
+  --red-600: #D32F2F; /* config danger DEFAULT */
+  --red-700: #b91c1c;
+
+  /* ---- Neutral ink scale (light) ---- */
+  --gray-25:  #ffffff;
+  --gray-50:  #f9f9f9;
+  --gray-100: #f4f4f4;
+  --gray-200: #e9e9e9;
+  --gray-300: #d1d1d1;
+  --gray-400: #a3a3a3;
+  --gray-500: #6D6D6D; /* secondary text */
+  --gray-600: #525252;
+  --gray-700: #404040;
+  --gray-800: #2D2D2D; /* body text */
+  --gray-900: #171717;
+  --ink:      #0e1726; /* deepest near-black */
+
+  /* ---- GitHub-style dark palette (the product's dark mode) ---- */
+  --gh-bg:        #0d1117; /* canvas */
+  --gh-surface:   #161b22; /* card */
+  --gh-surface-2: #21262d; /* inset / hover */
+  --gh-border:    #30363d; /* hairline */
+  --gh-muted:     #7d8590; /* muted text */
+
+  /* ============================================================
+     SEMANTIC ALIASES (light mode defaults)
+     ============================================================ */
+  --color-primary:        var(--teal-500);
+  --color-primary-hover:  var(--teal-hover);
+  --color-primary-soft:   var(--teal-100);
+  --color-primary-tint:   rgba(46, 216, 163, 0.10);
+  --color-on-primary:     #ffffff;
+
+  --color-accent-blue:    var(--navy-500);
+  --color-accent-violet:  var(--violet-500);
+  --color-accent-amber:   var(--amber-500);
+
+  --color-success:        var(--teal-hover);
+  --color-success-soft:   #d8f7ec;
+  --color-warning:        var(--amber-500);
+  --color-warning-soft:   #fff0e6;
+  --color-danger:         var(--red-500);
+  --color-danger-soft:    #fee2e2;
+  --color-info:           var(--blue-500);
+  --color-info-soft:      #e3f2fd;
+
+  /* surfaces */
+  --surface-page:    var(--gray-50);
+  --surface-card:    #ffffff;
+  --surface-inset:   var(--gray-100);
+  --surface-hover:   var(--gray-100);
+
+  /* text */
+  --text-strong:     var(--gray-900);
+  --text-body:       var(--gray-800);
+  --text-secondary:  var(--gray-500);
+  --text-muted:      var(--gray-400);
+  --text-on-dark:    #ffffff;
+  --text-link:       var(--teal-hover);
+
+  /* borders */
+  --border-subtle:   var(--gray-200);
+  --border-default:  var(--gray-300);
+  --border-strong:   var(--gray-400);
+
+  /* the marketing hero gradient (emerald) */
+  --gradient-brand:  linear-gradient(90deg, var(--emerald-500), var(--emerald-600));
+  --gradient-mark:   linear-gradient(135deg, var(--teal-400), var(--teal-hover));
+}

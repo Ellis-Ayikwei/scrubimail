@@ -88,3 +88,69 @@ PY
 | `unknown` | SMTP inconclusive (timeout, greylist, blocked, or not run) | false |
 | `do_not_mail` | disposable / role-based address | false |
 | `spamtrap` | matches spam-trap indicators | false |
+
+---
+
+## CI/CD: deploy the egress worker via a self-hosted GitHub runner
+
+The egress worker is deployed to the Hetzner box by a self-hosted runner and
+Docker Compose. Files:
+- `Dockerfile` — backend image.
+- `docker-compose.smtp-egress.yml` — the worker service (consumes ONLY the
+  `smtp_validation` queue, `VALIDATION_SMTP_ENABLED=True`).
+- `.github/workflows/deploy-smtp-egress.yml` — builds & restarts on push.
+
+### One-time setup on the Hetzner box
+
+1. **Install Docker** (Engine + Compose plugin):
+   ```bash
+   curl -fsSL https://get.docker.com | sh
+   sudo usermod -aG docker $USER   # re-login after this
+   ```
+2. **Register a self-hosted GitHub Actions runner** (repo → Settings → Actions →
+   Runners → New self-hosted runner). When prompted for labels, add
+   **`smtp-egress`** (the workflow targets `[self-hosted, smtp-egress]`). Install
+   it as a service so it survives reboots:
+   ```bash
+   ./config.sh --url https://github.com/Ellis-Ayikwei/scrubimail \
+     --token <RUNNER_TOKEN> --labels smtp-egress
+   sudo ./svc.sh install && sudo ./svc.sh start
+   ```
+3. **Confirm port 25 + DNS** with `python manage.py check_smtp_egress` (the
+   workflow also runs this each deploy). See the requirements above.
+
+### Required GitHub repo secrets
+
+Set these under repo → Settings → Secrets and variables → Actions. They must
+point at the SAME Redis broker and Postgres DB the main app (Railway) uses:
+
+| Secret | Value |
+|--------|-------|
+| `DJANGO_SECRET_KEY` | same as the main app |
+| `DATABASE_URL` | shared Postgres connection string |
+| `CELERY_BROKER_URL` | shared Redis broker (e.g. `redis://…/0`) |
+| `CELERY_RESULT_BACKEND` | shared Redis backend |
+| `REDIS_URL` | shared Redis (for the cache) |
+| `CACHE_REDIS_URL` | shared Redis for DNS/reputation cache (often same as `REDIS_URL`) |
+| `VALIDATION_SMTP_HELO_HOST` | e.g. `verify.scrubimail.com` (must match PTR) |
+| `VALIDATION_SMTP_MAIL_FROM` | e.g. `verify@scrubimail.com` (domain needs SPF) |
+
+The workflow writes these into `.env.smtp-egress` on the box and runs
+`docker compose -f docker-compose.smtp-egress.yml up -d --build`.
+
+### Queue routing (already configured)
+
+`CELERY_TASK_ROUTES` sends `validate_email_task` / `bulk_validate_emails_task`
+to the **`smtp_validation`** queue. Only this egress worker consumes it; the
+Railway worker keeps consuming `default,embeddings` and never attempts SMTP.
+
+> ⚠️ The box runs **only a worker** — no web, migrations, or collectstatic.
+> The main app owns the schema; both share one DB.
+
+### Still to wire (app side)
+
+For tasks to actually reach this worker, the API must **enqueue** deep
+validations (`validate_email_task.delay(...)`) rather than validating inline.
+Today single/bulk validation runs synchronously in the request with
+`deep=False`. Decide which flow should be SMTP-verified and enqueue it to the
+`smtp_validation` queue.

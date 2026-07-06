@@ -1,0 +1,58 @@
+/* ============================================================
+   ScrubiMail — "Surgical Infrastructure" theme (v2)
+   The current live aesthetic: terminal-engineering, sharp corners,
+   Epilogue black display + Space Grotesk mono-labels, emerald→mint accent.
+   Source: Scrubimail-FE Homepage.tsx + TopBar.tsx (live marketing site).
+   These tokens layer on top of the base system; the marketing UI kit
+   uses them directly. The app dashboard still uses the v1 rounded teal set.
+   ============================================================ */
+
+:root {
+  /* ---- Fonts ---- */
+  --font-headline: "Epilogue", system-ui, sans-serif;   /* black display, tight tracking */
+  --font-label:    "Space Grotesk", system-ui, sans-serif; /* uppercase micro-labels */
+  --font-body:     "Inter", system-ui, sans-serif;      /* body copy on v2 surfaces */
+
+  /* ---- Emerald → mint accent ---- */
+  --emerald:        #10B981; /* light-mode accent (emerald-500/600) */
+  --emerald-600:    #059669;
+  --mint:           #6effc0; /* dark-mode primary accent */
+  --mint-bright:    #00e5a0; /* logo chip / solid */
+  --mint-hover:     #47ffb8;
+  --mint-ink:       #003824; /* text ON mint buttons */
+
+  /* ---- Terminal dark canvas ---- */
+  --term-bg:      #080c10; /* page (rgba 8,12,16) */
+  --term-bg-2:    #0a0f13; /* dropdowns / deep panels */
+  --term-foot:    #050608; /* footer */
+  --term-panel:   #10141a; /* glass panel solid-ish */
+  --term-surface: #1c2024; /* inputs / hover */
+  --term-card:    #262a2f; /* highlighted card */
+  --term-border:  #3b4a41; /* hairline (greenish) */
+  --term-line:    rgba(255,255,255,0.06);
+  --term-text:    #e0e3e8; /* strong text */
+  --term-body:    #94a3b8; /* body text */
+  --term-muted:   #bacbbf; /* nav / label text */
+  --term-dim:     #3b4a41; /* dimmest meta */
+
+  /* ---- Light-mode v2 surfaces (theme-aware homepage) ---- */
+  --infra-bg:       #ffffff;
+  --infra-panel:    rgba(255,255,255,0.80);
+  --infra-surface:  #f3f4f6;
+  --infra-border:   #e5e7eb;
+  --infra-text:     #111827;
+  --infra-body:     #4b5563;
+  --infra-dim:      #9ca3af;
+
+  /* ---- Sharp-corner radius (the v2 signature) ---- */
+  --radius-xs:    2px;  /* rounded-sm — used everywhere in v2 */
+  --radius-card:  4px;
+
+  /* ---- Label tracking presets ---- */
+  --ls-label:     0.3em;  /* the LABEL eyebrow */
+  --ls-label-sm:  0.1em;  /* nav + small labels */
+
+  /* ---- Surgical glow ---- */
+  --glow-emerald: 0 0 30px rgba(16,185,129,0.25);
+  --glow-mint:    0 0 30px rgba(110,255,192,0.20);
+}

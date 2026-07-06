@@ -1,0 +1,34 @@
+/* ScrubiMail webfonts — "Charlie" is the brand's geometric humanist sans.
+   Charlie Display carries headings/wordmark; Charlie Text carries body.
+   Nunito (Google Fonts) is loaded as the metric-friendly fallback the live
+   product ships in its <head>. */
+
+@font-face {
+  font-family: "Charlie Display";
+  src: url("../assets/fonts/charlie-display-light.ttf") format("truetype");
+  font-weight: 300;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Charlie Display";
+  src: url("../assets/fonts/charlie-display.ttf") format("truetype");
+  font-weight: 400 500;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Charlie Display";
+  src: url("../assets/fonts/charlie-display-bold.ttf") format("truetype");
+  font-weight: 600 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Charlie Text";
+  src: url("../assets/fonts/charlie-text.ttf") format("truetype");
+  font-weight: 400 600;
+  font-style: normal;
+  font-display: swap;
+}

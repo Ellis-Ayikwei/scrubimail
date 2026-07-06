@@ -1,0 +1,12 @@
+/* ScrubiMail Design System — global entry point.
+   Consumers link THIS file. It is an @import manifest only. */
+
+@import url("https://fonts.googleapis.com/css2?family=Nunito:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&family=Epilogue:wght@400;500;600;700;800;900&family=Space+Grotesk:wght@400;500;700&family=Inter:wght@300;400;500;600;700&display=swap");
+
+@import "./tokens/fonts.css";
+@import "./tokens/colors.css";
+@import "./tokens/dark.css";
+@import "./tokens/typography.css";
+@import "./tokens/spacing.css";
+@import "./tokens/infra.css";
+@import "./tokens/base.css";

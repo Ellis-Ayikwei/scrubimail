@@ -1,0 +1,46 @@
+# SMTP-egress Celery worker — deploy on a host with outbound port 25 open
+# (Hetzner). It consumes ONLY the `smtp_validation` queue and runs the real
+# SMTP mailbox probe (VALIDATION_SMTP_ENABLED=True). It connects to the SAME
+# Redis broker and Postgres DB as the main app (Railway), via the connection
+# strings in .env.smtp-egress.
+#
+# Usage on the box (the GitHub Actions runner does this for you):
+#   docker compose -f docker-compose.smtp-egress.yml up -d --build
+#
+# This box does NOT run web, migrations, or collectstatic — the main app owns
+# those. It is a pure worker.
+
+services:
+  smtp-egress-worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: scrubimail-smtp-egress:latest
+    restart: unless-stopped
+    env_file:
+      - .env.smtp-egress
+    environment:
+      # Force-on here so this box always does real SMTP, regardless of the
+      # value baked into the shared env.
+      VALIDATION_SMTP_ENABLED: "True"
+    command:
+      - celery
+      - -A
+      - backend
+      - worker
+      - -l
+      - INFO
+      - --concurrency=8
+      - --queues=smtp_validation
+      - --hostname=smtp-egress@%h
+    healthcheck:
+      test: ["CMD", "celery", "-A", "backend", "inspect", "ping", "-d", "smtp-egress@$${HOSTNAME}"]
+      interval: 60s
+      timeout: 15s
+      retries: 3
+      start_period: 30s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"

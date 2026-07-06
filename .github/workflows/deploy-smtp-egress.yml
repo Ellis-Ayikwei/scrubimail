@@ -1,0 +1,62 @@
+name: Deploy SMTP egress worker
+
+# Builds and (re)starts the SMTP-egress Celery worker on the Hetzner box via a
+# self-hosted runner registered there. The box needs: Docker Engine + Compose
+# plugin, outbound port 25 open, and PTR/SPF configured (see
+# ScrubiMail-BE/SMTP_EGRESS_DEPLOYMENT.md).
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "ScrubiMail-BE/**"
+      - ".github/workflows/deploy-smtp-egress.yml"
+  workflow_dispatch: {}
+
+concurrency:
+  group: smtp-egress-deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    # Matches the self-hosted runner registered on the Hetzner box
+    # (ubuntu-4gb-fsn1-1), whose labels are: self-hosted, Linux, X64,
+    # scrubimail-egress.
+    runs-on: [self-hosted, Linux, X64, scrubimail-egress]
+    defaults:
+      run:
+        working-directory: ScrubiMail-BE
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Stage env from host
+        env:
+          # The runner box owns the env; secrets are NOT injected from GitHub.
+          # This file must exist on the host and be readable by the runner user.
+          HOST_ENV_FILE: /srv/scrubimail/stack/staging/.env
+        run: |
+          if [ ! -f "$HOST_ENV_FILE" ]; then
+            echo "::error::Host env file not found: $HOST_ENV_FILE" >&2
+            exit 1
+          fi
+          umask 077
+          # Copy the host env into the compose working dir (checkout may have
+          # cleaned the workspace, so we stage it fresh each run).
+          cp "$HOST_ENV_FILE" .env.smtp-egress
+
+      - name: Build & (re)start worker
+        run: docker compose -f docker-compose.smtp-egress.yml up -d --build --remove-orphans
+
+      - name: Preflight egress check (non-blocking)
+        continue-on-error: true
+        run: |
+          docker compose -f docker-compose.smtp-egress.yml run --rm \
+            smtp-egress-worker python manage.py check_smtp_egress
+
+      - name: Status
+        run: docker compose -f docker-compose.smtp-egress.yml ps
+
+      - name: Prune dangling images
+        run: docker image prune -f

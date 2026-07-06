@@ -159,6 +159,15 @@ CELERY_ACCEPT_CONTENT = ["json"]
 CELERY_TASK_SERIALIZER = "json"
 CELERY_RESULT_SERIALIZER = "json"
 CELERY_TIMEZONE = "UTC"
+CELERY_TASK_DEFAULT_QUEUE = "default"
+# Route the SMTP mailbox-verification tasks to a dedicated queue consumed ONLY
+# by the egress worker (the Hetzner box with port 25 open). Other workers must
+# NOT consume `smtp_validation`, so they never attempt SMTP probes that would
+# just time out / return "unknown".
+CELERY_TASK_ROUTES = {
+    "apps.validation.tasks.validate_email_task": {"queue": "smtp_validation"},
+    "apps.validation.tasks.bulk_validate_emails_task": {"queue": "smtp_validation"},
+}
 
 # Cache Configuration
 # Shared cache for DNS/MX and domain-reputation lookups so validation hits are

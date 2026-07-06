@@ -1,6 +1,7 @@
 .git
 .gitignore
 .env
+.env.*
 *.pyc
 __pycache__
 .DS_Store
@@ -9,4 +10,8 @@ __pycache__
 *.sqlite3
 media
 staticfiles
-postgres_data 
+postgres_data
+venv
+node_modules
+.pytest_cache
+*.log 
