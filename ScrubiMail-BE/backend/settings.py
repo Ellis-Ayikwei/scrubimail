@@ -686,6 +686,12 @@ VALIDATION_DISPOSABLE_EXTRA_FEEDS = [
 # are processed in chunks of this size; progress is persisted after each chunk.
 VALIDATION_BULK_CHUNK_SIZE = int(os.getenv("VALIDATION_BULK_CHUNK_SIZE", 100))
 
+# Optional data-driven spam-trap domain list (one domain per line). A domain
+# here classifies as do_not_mail/spamtrap_detected. Empty by default — the
+# keyword heuristic is only a weak risk-score signal and never classifies, so
+# legitimate services (e.g. mailtrap.io) are not mislabelled as traps.
+VALIDATION_SPAMTRAP_DOMAINS_FILE = os.getenv("VALIDATION_SPAMTRAP_DOMAINS_FILE", None)
+
 # Prevent Heroku from running collectstatic on deploy
 if os.environ.get("DISABLE_COLLECTSTATIC", "") == "1":
     STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"

@@ -188,8 +188,11 @@ class AdvancedEmailValidator:
             "zoho.com",
         }
 
-        # Spam-trap indicators. Matched as whole words (\b...\b) against the
-        # domain so substrings like "test" inside "greatest" do NOT match.
+        # Spam-trap keyword indicators. Matched as whole words (\b...\b) against
+        # the domain. NOTE: this is only a WEAK risk-score signal now — it never
+        # classifies an address (real traps don't name themselves, and keyword
+        # matching flags legitimate services like mailtrap.io). Classification as
+        # a trap is data-driven only (self.spam_trap_domains below).
         self.spam_trap_patterns = [
             "spam",
             "trap",
@@ -200,6 +203,11 @@ class AdvancedEmailValidator:
         self._spam_trap_regex = re.compile(
             r"\b(" + "|".join(self.spam_trap_patterns) + r")\b"
         )
+        # Extension point for a future data-driven trap list: an optional file of
+        # known spam-trap domains (one per line). Empty by default. A domain
+        # here classifies as do_not_mail/spamtrap_detected.
+        _trap_file = _conf("VALIDATION_SPAMTRAP_DOMAINS_FILE", None)
+        self.spam_trap_domains = _load_domain_file(_trap_file) if _trap_file else set()
 
         # SMTP probe configuration (override in settings for production).
         self.smtp_enabled = bool(_conf("VALIDATION_SMTP_ENABLED", True))
@@ -746,10 +754,13 @@ class AdvancedEmailValidator:
             is_disposable = domain_lower in load_disposable_domains()
             tld_risk = any(domain_lower.endswith(tld) for tld in self.risky_tlds)
             is_free_provider = domain_lower in self.free_providers
+            # Weak keyword signal (risk score only), plus the data-driven trap
+            # list (the only thing that classifies as a trap).
             spam_trap_risk = self._detect_spam_trap_patterns(domain_lower)
+            is_spam_trap = domain_lower in self.spam_trap_domains
 
             reputation_score = self._calculate_reputation_score(
-                is_disposable, tld_risk, is_free_provider, spam_trap_risk
+                is_disposable, tld_risk, is_free_provider, spam_trap_risk, is_spam_trap
             )
 
             result = {
@@ -759,6 +770,7 @@ class AdvancedEmailValidator:
                 "is_corporate": is_free_provider,
                 "is_free_provider": is_free_provider,
                 "spam_trap_risk": spam_trap_risk,
+                "is_spam_trap": is_spam_trap,
                 "reputation_score": reputation_score,
                 "risk_level": self._get_risk_level(reputation_score),
             }
@@ -780,6 +792,7 @@ class AdvancedEmailValidator:
         tld_risk: bool,
         is_free_provider: bool,
         spam_trap_risk: float,
+        is_spam_trap: bool = False,
     ) -> int:
         score = 100
         if is_disposable:
@@ -788,8 +801,10 @@ class AdvancedEmailValidator:
             score -= 30
         if is_free_provider:
             score += 20
-        if spam_trap_risk > 0.5:
-            score -= 40
+        if is_spam_trap:
+            score -= 90  # data-driven trap: decisive
+        elif spam_trap_risk > 0.5:
+            score -= 5  # keyword heuristic: weak signal only
         return max(0, min(100, score))
 
     def _get_risk_level(self, score: int) -> str:
@@ -877,10 +892,17 @@ class AdvancedEmailValidator:
             score -= 20
             deductions.append("High-risk TLD")
             explanations.append("Top-level domain has poor reputation")
-        if reputation.get("spam_trap_risk", 0) > 0.5:
-            score -= 30
-            deductions.append("Potential spam trap")
-            explanations.append("Email pattern matches known spam trap indicators")
+        if reputation.get("is_spam_trap", False):
+            score -= 40
+            deductions.append("Known spam trap")
+            explanations.append("Domain is on the configured spam-trap list")
+        elif reputation.get("spam_trap_risk", 0) > 0.5:
+            # Weak keyword heuristic only — small deduction, never decisive.
+            score -= 5
+            deductions.append("Spam-trap keyword signal")
+            explanations.append(
+                "Domain name contains spam-trap-like keywords (low confidence)"
+            )
 
         # Role-based detection
         role_result = validation_results.get("role_based", {})
@@ -910,12 +932,14 @@ class AdvancedEmailValidator:
 
         # Keep the numeric score coherent with the status so we never report a
         # confident 100 next to an unverified/unknown address.
+        # Exactly five statuses, one naming convention (all snake_case). Spam
+        # traps are folded into do_not_mail (see _classify), so there is no
+        # sixth top-level status.
         ceilings = {
             "valid": (90, 100),
-            "catch-all": (40, 70),
+            "catch_all": (40, 70),
             "unknown": (0, 70),
             "do_not_mail": (0, 50),
-            "spamtrap": (0, 15),
             "invalid": (0, 20),
         }
         lo, hi = ceilings.get(status, (0, 100))
@@ -924,10 +948,9 @@ class AdvancedEmailValidator:
         verdict = {
             "valid": "Valid",
             "invalid": "Invalid",
-            "catch-all": "Catch-All",
+            "catch_all": "Catch-All",
             "unknown": "Unknown",
             "do_not_mail": "Do Not Mail",
-            "spamtrap": "Spamtrap",
         }.get(status, "Unknown")
 
         return {
@@ -966,9 +989,13 @@ class AdvancedEmailValidator:
         if smtp_status == "undeliverable":
             return "invalid", "mailbox_not_found"
 
-        # 3. Toxic / do-not-mail signals.
-        if rep.get("spam_trap_risk", 0) > 0.5:
-            return "spamtrap", "spamtrap_detected"
+        # 3. Toxic / do-not-mail signals. Spam-trap is folded into do_not_mail
+        # (ZeroBounce convention: sub_status=spamtrap_detected) and is DATA-DRIVEN
+        # only — a domain on the configured trap list. The keyword heuristic is a
+        # weak risk-score signal, never a classification trigger, so legitimate
+        # services like mailtrap.io are not mislabelled.
+        if rep.get("is_spam_trap", False):
+            return "do_not_mail", "spamtrap_detected"
         if rep.get("is_disposable", False):
             return "do_not_mail", "disposable"
         if role.get("is_role_based", False):
@@ -977,7 +1004,7 @@ class AdvancedEmailValidator:
         # 4. Confirmed deliverable.
         if smtp_status == "deliverable":
             if smtp.get("catch_all", False):
-                return "catch-all", "accept_all"
+                return "catch_all", "accept_all"
             return "valid", "mailbox_exists"
 
         # 5. Everything else = we could not verify the mailbox.
@@ -1080,14 +1107,14 @@ class AdvancedEmailValidator:
                 warnings.append("Role-based email detected")
             if smtp_result.get("catch_all", False):
                 warnings.append("Catch-all domain detected")
-            if reputation_result.get("spam_trap_risk", 0) > 0.5:
-                warnings.append("Potential spam trap detected")
+            if reputation_result.get("is_spam_trap", False):
+                warnings.append("Known spam trap — do not mail")
             if risk_result["status"] == "unknown":
                 warnings.append(
                     "Mailbox not confirmed — SMTP verification was inconclusive "
                     "or not performed (status: unknown, not 'valid')"
                 )
-            elif risk_result["status"] == "catch-all":
+            elif risk_result["status"] == "catch_all":
                 warnings.append(
                     "Catch-all domain — accepts all addresses, so the specific "
                     "mailbox cannot be confirmed"
