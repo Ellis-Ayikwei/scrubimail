@@ -653,6 +653,10 @@ VALIDATION_DISPOSABLE_DOMAINS_FILE = os.getenv(
     "VALIDATION_DISPOSABLE_DOMAINS_FILE", None
 )
 
+# Bulk jobs run entirely in Celery (never inline in the HTTP request). Addresses
+# are processed in chunks of this size; progress is persisted after each chunk.
+VALIDATION_BULK_CHUNK_SIZE = int(os.getenv("VALIDATION_BULK_CHUNK_SIZE", 100))
+
 # Prevent Heroku from running collectstatic on deploy
 if os.environ.get("DISABLE_COLLECTSTATIC", "") == "1":
     STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"

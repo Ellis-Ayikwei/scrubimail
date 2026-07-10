@@ -3,6 +3,7 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.decorators import action
 from django.shortcuts import get_object_or_404
+from django.urls import reverse
 from django.utils import timezone
 from django.db.models import Q, Avg, Count
 from django.db import models
@@ -205,7 +206,9 @@ class BulkEmailValidationView(APIView):
         emails = serializer.validated_data["emails"]
         user = request.user
 
-        # Check if user has enough credits
+        # Check if user has enough credits. This is an upfront guard only — the
+        # task consumes credits per processed address (never here), so the job
+        # can't over-charge and a worker restart can't double-charge.
         billing_service = BillingService()
         profile = billing_service.get_or_create_billing_profile(user)
 
@@ -218,120 +221,26 @@ class BulkEmailValidationView(APIView):
                 status=status.HTTP_402_PAYMENT_REQUIRED,
             )
 
-        # Create bulk job
+        # Create the job row and hand ALL processing to Celery. The request must
+        # never do the work inline — a large job would tie up a gunicorn worker
+        # for minutes and die on gateway timeout or deploy. Return 202 + job id
+        # immediately; the client polls BulkJobStatusView for progress.
         bulk_job = BulkValidationJob.objects.create(
             user=user, emails=emails, total_emails=len(emails), status="pending"
         )
+        bulk_validate_emails_task.delay(bulk_job.id)
 
-        # Process bulk validation directly (no Celery dependency)
-        try:
-            from concurrent.futures import ThreadPoolExecutor, as_completed
-
-            validator = AdvancedEmailValidator()
-            bulk_job.status = "processing"
-            bulk_job.save()
-
-            validation_records = []
-            details = request.query_params.get("details", "false").lower() == "true"
-
-            # This path runs inline in the HTTP request, so it must stay fast:
-            # deep=False skips the multi-second SMTP probe. For SMTP-verified
-            # bulk, route through the Celery task (bulk_validate_emails_task)
-            # and poll BulkJobStatusView instead.
-            def validate_one(email_addr):
-                return email_addr, validator.validate_email(email_addr, deep=False)
-
-            # Validate emails in parallel (up to 5 concurrent)
-            with ThreadPoolExecutor(max_workers=5) as executor:
-                futures = {executor.submit(validate_one, em): em for em in emails}
-                for future in as_completed(futures):
-                    try:
-                        email_addr, result = future.result()
-                        v = EmailValidation.objects.create(
-                            email=email_addr,
-                            user=user,
-                            status="completed",
-                            score=result.score,
-                            breakdown={
-                                "syntax": result.breakdown.get("syntax", {}),
-                                "dns": result.breakdown.get("dns", {}),
-                                "smtp": result.breakdown.get("smtp", {}),
-                                "reputation": result.breakdown.get("reputation", {}),
-                                "role_based": result.breakdown.get("role_based", {}),
-                                "risk_score": {
-                                    "score": result.score,
-                                    "verdict": result.verdict,
-                                    "is_valid": result.is_valid,
-                                },
-                            },
-                            suggestions=result.suggestions,
-                            warnings=result.warnings,
-                            metadata=result.metadata,
-                            job_type="bulk",
-                        )
-                        validation_records.append(v)
-                    except Exception:
-                        continue
-
-            bulk_job.status = "completed"
-            bulk_job.total_processed = len(validation_records)
-            bulk_job.progress = 100
-            bulk_job.save()
-
-            # Consume credits and create billing records
-            profile.consume_credits(
-                required_credits, f"Bulk email validation: {len(emails)} emails"
-            )
-
-            EmailValidationUsage.objects.create(
-                billing_profile=profile,
-                validation_request_id=str(bulk_job.id),
-                credits_consumed=required_credits,
-                cost_per_credit=0.01,
-                validation_type="bulk",
-                email_count=len(emails),
-            )
-
-            results = []
-            for v in validation_records:
-                item = {
-                    "id": v.id,
-                    "email": v.email,
-                    "status": v.status,
-                    "score": v.score,
-                    "verdict": v.breakdown.get("risk_score", {}).get("verdict"),
-                    "is_valid": v.breakdown.get("risk_score", {}).get("is_valid"),
-                    "suggestions": v.suggestions,
-                    "warnings": v.warnings,
-                    "validation_time": v.metadata.get("validation_time", 0),
-                }
-                if details:
-                    item["breakdown"] = v.breakdown
-                    item["metadata"] = v.metadata
-                results.append(item)
-
-            return Response(
-                {
-                    "job_id": bulk_job.id,
-                    "total_emails": len(emails),
-                    "status": "completed",
-                    "message": "Bulk validation completed successfully",
-                    "results": results,
-                },
-                status=status.HTTP_200_OK,
-            )
-        except Exception as e:
-            bulk_job.status = "failed"
-            bulk_job.save()
-            return Response(
-                {
-                    "job_id": bulk_job.id,
-                    "total_emails": len(emails),
-                    "status": "failed",
-                    "message": "Bulk validation failed",
-                },
-                status=status.HTTP_202_ACCEPTED,
-            )
+        status_path = reverse("bulk-job-status", args=[bulk_job.id])
+        return Response(
+            {
+                "job_id": bulk_job.id,
+                "total_emails": len(emails),
+                "status": "pending",
+                "message": "Bulk validation job accepted and queued for processing.",
+                "status_url": request.build_absolute_uri(status_path),
+            },
+            status=status.HTTP_202_ACCEPTED,
+        )
 
 
 class BulkJobStatusView(APIView):
@@ -341,10 +250,11 @@ class BulkJobStatusView(APIView):
         """Get bulk job status and progress"""
         job = get_object_or_404(BulkValidationJob, id=job_id, user=request.user)
 
-        # Get validation results for this job
-        validations = EmailValidation.objects.filter(
-            user=request.user, job_type="bulk", created_at__gte=job.created_at
-        ).order_by("-created_at")
+        # Results are linked to the job via the bulk_job FK — exact, not a fuzzy
+        # "bulk rows created after this job started" heuristic.
+        validations = EmailValidation.objects.filter(bulk_job=job).order_by(
+            "-created_at"
+        )
 
         # Calculate summary
         total_validations = validations.count()

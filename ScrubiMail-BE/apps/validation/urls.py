@@ -14,12 +14,16 @@ urlpatterns = [
     path("validate/", SingleEmailValidationView.as_view(), name="validate-email"),
     # Bulk validation
     path("validate-bulk/", BulkEmailValidationView.as_view(), name="validate-bulk"),
+    # NOTE: ids are UUIDs (Basemodel), so these converters MUST be <uuid:...> —
+    # <int:...> never matched a real id, leaving these endpoints unreachable.
     path(
-        "bulk-status/<int:job_id>/", BulkJobStatusView.as_view(), name="bulk-job-status"
+        "bulk-status/<uuid:job_id>/",
+        BulkJobStatusView.as_view(),
+        name="bulk-job-status",
     ),
     # Validation status and history
     path(
-        "status/<int:validation_id>/",
+        "status/<uuid:validation_id>/",
         ValidationStatusView.as_view(),
         name="validation-status",
     ),

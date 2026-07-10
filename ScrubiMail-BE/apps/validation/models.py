@@ -21,6 +21,16 @@ class EmailValidation(Basemodel):
     user = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.CASCADE, null=True
     )
+    # Links a per-address result to its originating bulk job so the bulk task
+    # can resume idempotently (skip already-completed addresses for this job)
+    # and the status endpoint can report real per-job progress.
+    bulk_job = models.ForeignKey(
+        "BulkValidationJob",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="validations",
+    )
     status = models.CharField(max_length=16, choices=STATUS_CHOICES, default="pending")
     score = models.IntegerField(default=0)
     breakdown = models.JSONField(default=dict)
@@ -43,6 +53,8 @@ class EmailValidation(Basemodel):
             models.Index(fields=["user", "created_at"]),
             models.Index(fields=["status", "created_at"]),
             models.Index(fields=["email"]),
+            # Supports the bulk task's resume query (completed rows per job).
+            models.Index(fields=["bulk_job", "status"]),
         ]
 
 
