@@ -59,8 +59,15 @@ _cache_ttl = 300  # 5 minutes
 # after several CONSECUTIVE total failures (systemic block) — a single slow MX
 # on an otherwise-working host must not disable verification for every domain.
 # Any successful connection resets the counter.
+#
+# Breaker state lives in the shared cache (Redis) so all gunicorn/Celery worker
+# processes trip together on their COMBINED failure count — module globals gave
+# each process its own copy, so each burned full timeouts before tripping. These
+# in-process values remain only as a fallback when Redis is unreachable.
 _smtp_egress_blocked_until = 0.0
 _smtp_consecutive_failures = 0
+_SMTP_BREAKER_BLOCK_KEY = "smtp:breaker_block"
+_SMTP_BREAKER_FAIL_KEY = "smtp:breaker_failcount"
 
 # Disposable-domain blocklist, loaded once from the bundled baseline plus an
 # optional external feed (VALIDATION_DISPOSABLE_DOMAINS_FILE).
@@ -478,6 +485,59 @@ class AdvancedEmailValidator:
             score += 10
         return min(score, 100)
 
+    # --------------------------------------------------------- circuit breaker
+    def _breaker_is_open(self) -> bool:
+        """True if the SMTP egress breaker is tripped.
+
+        Redis is the source of truth when reachable (all workers see the same
+        block); only when Redis is down do we consult the in-process timestamp.
+        """
+        if _django_cache is not None:
+            try:
+                return bool(_django_cache.get(f"emailval:{_SMTP_BREAKER_BLOCK_KEY}"))
+            except Exception:
+                pass  # Redis down -> fall back to the in-process timestamp
+        return time.time() < _smtp_egress_blocked_until
+
+    def _breaker_record_success(self) -> None:
+        """Any successful connection resets the shared (and local) failure state."""
+        global _smtp_consecutive_failures, _smtp_egress_blocked_until
+        _smtp_consecutive_failures = 0
+        _smtp_egress_blocked_until = 0.0
+        if _django_cache is not None:
+            try:
+                _django_cache.delete(f"emailval:{_SMTP_BREAKER_FAIL_KEY}")
+                _django_cache.delete(f"emailval:{_SMTP_BREAKER_BLOCK_KEY}")
+            except Exception:
+                pass
+
+    def _breaker_record_failure(self) -> None:
+        """Count a total-egress failure across all workers; trip the breaker
+        once the COMBINED count reaches the threshold."""
+        global _smtp_consecutive_failures, _smtp_egress_blocked_until
+        _smtp_consecutive_failures += 1
+        count = _smtp_consecutive_failures  # in-process fallback count
+        if _django_cache is not None:
+            try:
+                key = f"emailval:{_SMTP_BREAKER_FAIL_KEY}"
+                if _django_cache.add(key, 1, timeout=self.smtp_block_ttl):
+                    count = 1
+                else:
+                    count = int(_django_cache.incr(key))
+            except Exception:
+                count = _smtp_consecutive_failures
+        if count >= self.smtp_failure_threshold:
+            _smtp_egress_blocked_until = time.time() + self.smtp_block_ttl
+            if _django_cache is not None:
+                try:
+                    _django_cache.set(
+                        f"emailval:{_SMTP_BREAKER_BLOCK_KEY}",
+                        1,
+                        timeout=self.smtp_block_ttl,
+                    )
+                except Exception:
+                    pass
+
     # ------------------------------------------------------------------ SMTP
     def smtp_handshake(
         self, email: str, domain: str, mx_records: List[Dict]
@@ -492,7 +552,6 @@ class AdvancedEmailValidator:
 
         `status` is one of: deliverable | undeliverable | unknown | skipped
         """
-        global _smtp_egress_blocked_until, _smtp_consecutive_failures
         results = {
             "valid": False,
             "status": "unknown",
@@ -515,8 +574,9 @@ class AdvancedEmailValidator:
             return results
 
         # Circuit breaker: if we recently found port 25 unreachable from this
-        # host, don't waste seconds re-timing-out — return unknown immediately.
-        if time.time() < _smtp_egress_blocked_until:
+        # host (shared across workers via Redis), don't waste seconds
+        # re-timing-out — return unknown immediately.
+        if self._breaker_is_open():
             results["status"] = "unknown"
             results["sub_status"] = "smtp_egress_blocked"
             results["error"] = "SMTP egress recently unreachable (circuit open)"
@@ -637,16 +697,15 @@ class AdvancedEmailValidator:
                     continue
 
             if connection_succeeded:
-                # Egress works — reset the failure streak.
-                _smtp_consecutive_failures = 0
+                # Egress works — reset the shared failure streak.
+                self._breaker_record_success()
             else:
                 # Couldn't reach any MX on port 25 (commonly blocked on cloud
-                # hosts). Report unknown rather than penalizing the address. Trip
-                # the breaker only after repeated failures (systemic block), so
-                # one slow MX on a healthy host doesn't disable SMTP for all.
-                _smtp_consecutive_failures += 1
-                if _smtp_consecutive_failures >= self.smtp_failure_threshold:
-                    _smtp_egress_blocked_until = time.time() + self.smtp_block_ttl
+                # hosts). Report unknown rather than penalizing the address. The
+                # breaker trips only after the COMBINED (cross-worker) failure
+                # count reaches the threshold, so one slow MX on a healthy host
+                # doesn't disable SMTP for everything.
+                self._breaker_record_failure()
                 results["status"] = "unknown"
                 results["sub_status"] = "failed_smtp_connection"
                 results["error"] = "SMTP port 25 unreachable from this host"
