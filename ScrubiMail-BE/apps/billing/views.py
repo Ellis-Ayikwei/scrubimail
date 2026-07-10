@@ -5,7 +5,12 @@ from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from backend.middle_ware import AllowJWTOrAPIKey
-from rest_framework.decorators import api_view, permission_classes
+from rest_framework.decorators import (
+    api_view,
+    permission_classes,
+    authentication_classes,
+    throttle_classes,
+)
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from django.db.models import Sum, Count
@@ -28,7 +33,9 @@ from .models import (
     PromoCodeRedemption,
     Invoice,
     InvoiceLineItem,
+    ProcessedWebhookEvent,
 )
+from django.db import transaction
 from .serializers import (
     BillingProfileSerializer,
     CreditTransactionSerializer,
@@ -357,80 +364,94 @@ class CancelSubscriptionView(APIView):
             return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
 
-@api_view(["POST"])
-@permission_classes([])
-def paystack_webhook(request):
-    """Handle Paystack webhook events with HMAC verification"""
-    if request.method != "POST":
-        return Response(
-            {"error": "Method not allowed"}, status=status.HTTP_405_METHOD_NOT_ALLOWED
-        )
+def _paystack_event_id(event_type, data, raw_body):
+    """Stable, per-event idempotency key. Include the event type so that, e.g.,
+    subscription.create and subscription.disable for the same subscription are
+    distinct events, and fall back to a payload hash when no stable id exists."""
+    ident = (
+        data.get("id")
+        or data.get("reference")
+        or data.get("subscription_code")
+        or hashlib.sha256(raw_body).hexdigest()
+    )
+    return f"{event_type}:{ident}"
 
-    # Verify webhook signature
+
+@api_view(["POST"])
+@authentication_classes([])  # authenticated by HMAC signature, not user auth
+@permission_classes([])
+@throttle_classes([])  # never throttle a payment provider (429 would retry)
+def paystack_webhook(request):
+    """Handle Paystack webhook events: verify HMAC-SHA512, dedupe, apply effects
+    idempotently. Non-2xx is reserved for genuinely invalid/unsigned requests."""
+    from django.conf import settings
+
     signature = request.headers.get("X-Paystack-Signature")
     if not signature:
         return Response(
             {"error": "Missing signature"}, status=status.HTTP_400_BAD_REQUEST
         )
 
-    # Get webhook secret from settings
-    from django.conf import settings
-
+    # The secret is MANDATORY — an unsigned/unverifiable request is never
+    # processed. If it isn't configured, hard-fail and alert; do NOT mint credits.
     webhook_secret = settings.PAYSTACK_WEBHOOK_SECRET
-
     if not webhook_secret:
-        # Log error but process anyway in development
-        import logging
+        logger.critical(
+            "PAYSTACK_WEBHOOK_SECRET is not configured — refusing to process "
+            "webhook. Payments will not be applied until this is set."
+        )
+        return Response(
+            {"error": "Webhook not configured"},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        )
 
-        logger = logging.getLogger(__name__)
-        logger.error("PAYSTACK_WEBHOOK_SECRET not configured")
-        # In production, you should return error here
-        # return Response({"error": "Webhook not configured"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
-    # Verify HMAC signature
-    import hmac
-    import hashlib
-
-    # Get raw request body
-    payload = request.body.decode("utf-8")
-
-    # Compute expected signature
+    # Verify HMAC-SHA512 over the RAW body (constant-time compare).
+    raw_body = request.body
     expected_signature = hmac.new(
-        webhook_secret.encode("utf-8") if webhook_secret else b"",
-        payload.encode("utf-8"),
-        hashlib.sha512,
+        webhook_secret.encode("utf-8"), raw_body, hashlib.sha512
     ).hexdigest()
-
-    # Compare signatures (constant time comparison to prevent timing attacks)
-    if webhook_secret and not hmac.compare_digest(signature, expected_signature):
+    if not hmac.compare_digest(signature, expected_signature):
+        logger.warning("Rejected Paystack webhook with invalid signature")
         return Response(
             {"error": "Invalid signature"}, status=status.HTTP_401_UNAUTHORIZED
         )
 
-    # Verify this is not a replay attack (check timestamp)
     try:
-        event_data = json.loads(payload)
-
-        # Paystack doesn't provide timestamp in webhook, but we can add our own tracking
-        # For now, just process the event
-
-        billing_service = BillingService()
-        billing_service.handle_subscription_webhook(event_data)
-
-        return Response({"status": "success"}, status=status.HTTP_200_OK)
-    except json.JSONDecodeError:
+        event_data = json.loads(raw_body.decode("utf-8"))
+    except (json.JSONDecodeError, UnicodeDecodeError):
         return Response(
             {"error": "Invalid JSON payload"}, status=status.HTTP_400_BAD_REQUEST
         )
-    except Exception as e:
-        import logging
 
-        logger = logging.getLogger(__name__)
-        logger.error(f"Webhook processing error: {str(e)}")
-        return Response(
-            {"error": f"Processing error: {str(e)}"},
-            status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+    event_type = event_data.get("event", "")
+    data = event_data.get("data", {}) or {}
+    event_id = _paystack_event_id(event_type, data, raw_body)
+
+    # Idempotency + effects in ONE transaction: the marker and any credit change
+    # commit together. A duplicate delivery finds the marker and no-ops.
+    try:
+        with transaction.atomic():
+            _, created = ProcessedWebhookEvent.objects.get_or_create(
+                event_id=event_id,
+                defaults={"provider": "paystack", "event_type": event_type},
+            )
+            if not created:
+                return Response(
+                    {"status": "already_processed"}, status=status.HTTP_200_OK
+                )
+            BillingService().handle_subscription_webhook(event_data)
+        return Response({"status": "success"}, status=status.HTTP_200_OK)
+    except Exception:
+        # The signature was valid, so this is our problem, not a forged request.
+        # Log/alert for reconciliation and return 200 — a retry-inducing 5xx here
+        # would just re-deliver and compound risk. The transaction rolled back,
+        # so no partial effect persisted.
+        logger.exception(
+            "Paystack webhook processing failed (event_id=%s, type=%s)",
+            event_id,
+            event_type,
         )
+        return Response({"status": "received"}, status=status.HTTP_200_OK)
 
 
 class DownloadInvoiceView(APIView):
