@@ -22,7 +22,18 @@ def validate_email_task(self, email_validation_id):
         # Async/background path: run full SMTP verification (deep) since
         # multi-second latency is acceptable here, unlike the realtime API.
         result = validator.validate_email(email, deep=True)
+    except Exception as exc:
+        raise self.retry(exc=exc, countdown=2 ** self.request.retries)
 
+    # Rate limited by our own per-provider limiter or a provider cooldown:
+    # reschedule this address with backoff instead of finalizing it, so we stay
+    # within the configured probes/minute and don't burn IP reputation. A
+    # generous max_retries lets an address wait out a 15-minute cooldown.
+    if result.metadata.get("rate_limited"):
+        countdown = result.metadata.get("retry_after") or 60
+        raise self.retry(countdown=countdown, max_retries=20)
+
+    try:
         # Update validation record
         validation.status = "completed"
         validation.score = result.score

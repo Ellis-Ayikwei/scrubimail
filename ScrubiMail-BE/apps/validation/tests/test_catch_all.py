@@ -94,6 +94,9 @@ class CatchAllReuseAndCacheTests(SimpleTestCase):
         advanced_validator._domain_cache.clear()
         self.validator = AdvancedEmailValidator()
         self.validator.smtp_enabled = True
+        # These tests exercise catch-all behavior only — disable the per-provider
+        # rate limiter so they never touch the real (shared) cache/Redis.
+        self.validator.rate_limiter.enabled = False
 
     def tearDown(self):
         for p in self._patchers:

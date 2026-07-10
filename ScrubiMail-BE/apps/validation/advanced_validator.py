@@ -24,6 +24,8 @@ try:
 except Exception:  # pragma: no cover - allow use outside Django
     _django_cache = None
 
+from .rate_limit import ProviderRateLimiter, provider_for_mx
+
 logger = logging.getLogger(__name__)
 
 
@@ -193,6 +195,8 @@ class AdvancedEmailValidator:
         # Catch-all status is cached per domain (Redis) so we probe a garbage
         # address at most once per domain per this TTL, never once per address.
         self.catchall_ttl = int(_conf("VALIDATION_CATCHALL_TTL", 86400))
+        # Per-provider probe rate limiter (concurrency + probes/min + cooldown).
+        self.rate_limiter = ProviderRateLimiter()
 
     # ------------------------------------------------------------------ cache
     def _get_cached(self, key: str) -> Optional[Any]:
@@ -486,113 +490,137 @@ class AdvancedEmailValidator:
             results["error"] = "SMTP egress recently unreachable (circuit open)"
             return results
 
+        # Per-provider rate limit: reserve a probe slot before touching the
+        # network. If the bucket is empty or the provider is in cooldown, do NOT
+        # probe — return a rate-limited result the Celery task reschedules
+        # (self.retry) instead of blocking the worker or burning IP reputation.
+        provider = provider_for_mx(mx_records[0]["host"])
+        allowed, retry_after, reason = self.rate_limiter.try_acquire(provider)
+        if not allowed:
+            results["status"] = "unknown"
+            results["sub_status"] = "rate_limited"
+            results["rate_limited"] = True
+            results["retry_after"] = retry_after
+            results["provider"] = provider
+            results["error"] = f"Provider {provider} rate-limited ({reason})"
+            return results
+
         connection_succeeded = False
-
-        for mx in mx_records[:2]:
-            mx_host = mx["host"]
-            server = None
-            try:
-                server = smtplib.SMTP(timeout=self.smtp_timeout)
-                server.connect(mx_host, 25)
-                connection_succeeded = True
-                server.helo(self.smtp_helo_host)
-
-                if self.smtp_use_starttls and server.has_extn("starttls"):
-                    try:
-                        server.starttls()
-                        server.helo(self.smtp_helo_host)
-                    except Exception:
-                        pass  # fall back to plaintext probe
-
-                server.mail(self.smtp_mail_from)
-                code, message = server.rcpt(email)
-                message_str = message.decode("utf-8", errors="ignore")
-                results["response_codes"].append(
-                    {"mx": mx_host, "code": code, "message": message_str}
-                )
-
-                if code in (250, 251):
-                    results["valid"] = True
-                    results["status"] = "deliverable"
-                    results["sub_status"] = "mailbox_exists"
-                elif code in (450, 451, 452, 421):
-                    # Temporary failure / greylisting — indeterminate.
-                    results["greylisting"] = code == 450
-                    results["status"] = "unknown"
-                    results["sub_status"] = (
-                        "greylisted" if code == 450 else "antispam_block"
-                    )
-                elif code in (550, 551, 553, 554):
-                    lowered = message_str.lower()
-                    if any(
-                        p in lowered
-                        for p in [
-                            "user unknown",
-                            "no such user",
-                            "mailbox not found",
-                            "mailbox unavailable",
-                            "does not exist",
-                            "recipient rejected",
-                            "invalid recipient",
-                            "address rejected",
-                        ]
-                    ):
-                        results["ndr_patterns"].append(lowered)
-                        results["status"] = "undeliverable"
-                        results["sub_status"] = "mailbox_not_found"
-                    else:
-                        # Policy block / anti-spam refusal — not proof the
-                        # mailbox is missing.
-                        results["status"] = "unknown"
-                        results["sub_status"] = "antispam_block"
-                else:
-                    results["status"] = "unknown"
-                    results["sub_status"] = "unexpected_response"
-
-                # Catch-all detection reuses THIS already-open session (RSET +
-                # a second RCPT) so we never open a second connection per
-                # address, and the result is cached per domain — see
-                # _get_or_detect_catch_all. Do it before quitting.
-                if results["status"] == "deliverable":
-                    results["catch_all"] = self._get_or_detect_catch_all(
-                        domain, mx_records, server=server
-                    )
-
+        try:
+            for mx in mx_records[:2]:
+                mx_host = mx["host"]
+                server = None
                 try:
-                    server.quit()
-                except Exception:
-                    pass
+                    server = smtplib.SMTP(timeout=self.smtp_timeout)
+                    server.connect(mx_host, 25)
+                    connection_succeeded = True
+                    server.helo(self.smtp_helo_host)
 
-                # Stop after the first server that gave us a definitive answer.
-                if results["status"] in ("deliverable", "undeliverable"):
-                    break
+                    if self.smtp_use_starttls and server.has_extn("starttls"):
+                        try:
+                            server.starttls()
+                            server.helo(self.smtp_helo_host)
+                        except Exception:
+                            pass  # fall back to plaintext probe
 
-            except (socket.timeout, ConnectionRefusedError, OSError) as e:
-                results["errors"].append(f"MX {mx_host}: {str(e)}")
-                if server is not None:
+                    server.mail(self.smtp_mail_from)
+                    code, message = server.rcpt(email)
+                    message_str = message.decode("utf-8", errors="ignore")
+                    results["response_codes"].append(
+                        {"mx": mx_host, "code": code, "message": message_str}
+                    )
+
+                    if code in (250, 251):
+                        results["valid"] = True
+                        results["status"] = "deliverable"
+                        results["sub_status"] = "mailbox_exists"
+                    elif code in (450, 451, 452, 421):
+                        # Temporary failure / greylisting — indeterminate. A 421
+                        # (or repeated 4xx) is a reputation signal: pause probes
+                        # to this provider so we don't dig the hole deeper.
+                        results["greylisting"] = code == 450
+                        results["status"] = "unknown"
+                        results["sub_status"] = (
+                            "greylisted" if code == 450 else "antispam_block"
+                        )
+                        if code == 421:
+                            self.rate_limiter.trip_cooldown(provider)
+                        else:
+                            self.rate_limiter.note_soft_failure(provider)
+                    elif code in (550, 551, 553, 554):
+                        lowered = message_str.lower()
+                        if any(
+                            p in lowered
+                            for p in [
+                                "user unknown",
+                                "no such user",
+                                "mailbox not found",
+                                "mailbox unavailable",
+                                "does not exist",
+                                "recipient rejected",
+                                "invalid recipient",
+                                "address rejected",
+                            ]
+                        ):
+                            results["ndr_patterns"].append(lowered)
+                            results["status"] = "undeliverable"
+                            results["sub_status"] = "mailbox_not_found"
+                        else:
+                            # Policy block / anti-spam refusal — not proof the
+                            # mailbox is missing.
+                            results["status"] = "unknown"
+                            results["sub_status"] = "antispam_block"
+                    else:
+                        results["status"] = "unknown"
+                        results["sub_status"] = "unexpected_response"
+
+                    # Catch-all detection reuses THIS already-open session (RSET
+                    # + a second RCPT) so we never open a second connection per
+                    # address, and the result is cached per domain — see
+                    # _get_or_detect_catch_all. Do it before quitting.
+                    if results["status"] == "deliverable":
+                        results["catch_all"] = self._get_or_detect_catch_all(
+                            domain, mx_records, server=server
+                        )
+
                     try:
-                        server.close()
+                        server.quit()
                     except Exception:
                         pass
-                continue
-            except Exception as e:
-                results["errors"].append(f"MX {mx_host}: {str(e)}")
-                continue
 
-        if connection_succeeded:
-            # Egress works — reset the failure streak.
-            _smtp_consecutive_failures = 0
-        else:
-            # Couldn't reach any MX on port 25 (commonly blocked on cloud
-            # hosts). Report unknown rather than penalizing the address. Trip
-            # the breaker only after repeated failures (systemic block), so one
-            # slow MX on a healthy host doesn't disable SMTP for everything.
-            _smtp_consecutive_failures += 1
-            if _smtp_consecutive_failures >= self.smtp_failure_threshold:
-                _smtp_egress_blocked_until = time.time() + self.smtp_block_ttl
-            results["status"] = "unknown"
-            results["sub_status"] = "failed_smtp_connection"
-            results["error"] = "SMTP port 25 unreachable from this host"
+                    # Stop after the first server that gave us a definitive answer.
+                    if results["status"] in ("deliverable", "undeliverable"):
+                        break
+
+                except (socket.timeout, ConnectionRefusedError, OSError) as e:
+                    results["errors"].append(f"MX {mx_host}: {str(e)}")
+                    if server is not None:
+                        try:
+                            server.close()
+                        except Exception:
+                            pass
+                    continue
+                except Exception as e:
+                    results["errors"].append(f"MX {mx_host}: {str(e)}")
+                    continue
+
+            if connection_succeeded:
+                # Egress works — reset the failure streak.
+                _smtp_consecutive_failures = 0
+            else:
+                # Couldn't reach any MX on port 25 (commonly blocked on cloud
+                # hosts). Report unknown rather than penalizing the address. Trip
+                # the breaker only after repeated failures (systemic block), so
+                # one slow MX on a healthy host doesn't disable SMTP for all.
+                _smtp_consecutive_failures += 1
+                if _smtp_consecutive_failures >= self.smtp_failure_threshold:
+                    _smtp_egress_blocked_until = time.time() + self.smtp_block_ttl
+                results["status"] = "unknown"
+                results["sub_status"] = "failed_smtp_connection"
+                results["error"] = "SMTP port 25 unreachable from this host"
+        finally:
+            # Always release the concurrency slot we reserved above.
+            self.rate_limiter.release(provider)
 
         return results
 
@@ -1038,6 +1066,17 @@ class AdvancedEmailValidator:
                     "mailbox cannot be confirmed"
                 )
 
+            metadata = {
+                "validation_time": time.time() - start_time,
+                "status": risk_result["status"],
+                "sub_status": risk_result["sub_status"],
+            }
+            # Surface a rate-limit signal so the async task can reschedule this
+            # address (self.retry) rather than finalize it — see tasks.py.
+            if smtp_result.get("rate_limited"):
+                metadata["rate_limited"] = True
+                metadata["retry_after"] = smtp_result.get("retry_after")
+
             return ValidationResult(
                 # Strict, ZeroBounce-style: only a SMTP-confirmed mailbox is valid.
                 is_valid=risk_result["is_valid"],
@@ -1046,11 +1085,7 @@ class AdvancedEmailValidator:
                 breakdown=validation_results,
                 suggestions=syntax_result.get("suggestions", []),
                 warnings=warnings,
-                metadata={
-                    "validation_time": time.time() - start_time,
-                    "status": risk_result["status"],
-                    "sub_status": risk_result["sub_status"],
-                },
+                metadata=metadata,
             )
 
         except Exception as e:

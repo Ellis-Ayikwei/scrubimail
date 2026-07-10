@@ -618,6 +618,35 @@ VALIDATION_SMTP_BLOCK_TTL = int(os.getenv("VALIDATION_SMTP_BLOCK_TTL", 600))
 # address. Reusing the live SMTP session (RSET + RCPT) keeps it to one
 # connection per address in the common case.
 VALIDATION_CATCHALL_TTL = int(os.getenv("VALIDATION_CATCHALL_TTL", 86400))
+
+# --- Per-provider SMTP rate limiting (protects the egress IP reputation) -----
+# Conservative on purpose: loosen later with data, never the reverse. Limits are
+# keyed on the MX provider fingerprint (google, microsoft, yahoo, proofpoint,
+# mimecast, other) and enforced via the shared Redis cache across all workers.
+VALIDATION_SMTP_RATE_LIMIT_ENABLED = (
+    os.getenv("VALIDATION_SMTP_RATE_LIMIT_ENABLED", "True") == "True"
+)
+VALIDATION_SMTP_MAX_CONCURRENT_PER_PROVIDER = int(
+    os.getenv("VALIDATION_SMTP_MAX_CONCURRENT_PER_PROVIDER", 2)
+)
+VALIDATION_SMTP_MAX_PROBES_PER_MINUTE_PER_PROVIDER = int(
+    os.getenv("VALIDATION_SMTP_MAX_PROBES_PER_MINUTE_PER_PROVIDER", 10)
+)
+VALIDATION_SMTP_MAX_PROBES_PER_MINUTE_GLOBAL = int(
+    os.getenv("VALIDATION_SMTP_MAX_PROBES_PER_MINUTE_GLOBAL", 20)
+)
+# On 421 (or this many repeated 4xx), pause probes to that provider this long.
+VALIDATION_SMTP_PROVIDER_COOLDOWN = int(
+    os.getenv("VALIDATION_SMTP_PROVIDER_COOLDOWN", 900)
+)
+VALIDATION_SMTP_SOFT_FAIL_THRESHOLD = int(
+    os.getenv("VALIDATION_SMTP_SOFT_FAIL_THRESHOLD", 3)
+)
+# Safety TTL on the per-provider concurrency counter (frees a crashed worker's
+# slot); and how long a rate-limited bulk address waits before the task retries.
+VALIDATION_SMTP_CONCURRENCY_TTL = int(
+    os.getenv("VALIDATION_SMTP_CONCURRENCY_TTL", 120)
+)
 # Optional external disposable-domain feed (one domain per line), merged with
 # the bundled baseline. Point at a maintained 100k+ feed in production.
 VALIDATION_DISPOSABLE_DOMAINS_FILE = os.getenv(
