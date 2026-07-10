@@ -633,6 +633,29 @@ VALIDATION_SMTP_BLOCK_TTL = int(os.getenv("VALIDATION_SMTP_BLOCK_TTL", 600))
 # connection per address in the common case.
 VALIDATION_CATCHALL_TTL = int(os.getenv("VALIDATION_CATCHALL_TTL", 86400))
 
+# Per-kind cache TTLs (seconds) — replaces the old single 5-minute TTL so each
+# kind of lookup lives as long as it is actually stable.
+VALIDATION_CACHE_TTL_DNS = int(os.getenv("VALIDATION_CACHE_TTL_DNS", 21600))  # 6h
+VALIDATION_CACHE_TTL_REPUTATION = int(
+    os.getenv("VALIDATION_CACHE_TTL_REPUTATION", 86400)  # 24h
+)
+# NXDOMAIN / no-records answers change more often (domain just registered), so
+# cache them briefly.
+VALIDATION_CACHE_TTL_NEGATIVE_DNS = int(
+    os.getenv("VALIDATION_CACHE_TTL_NEGATIVE_DNS", 3600)  # 1h
+)
+
+# Greylisting (SMTP 450): the server asked us to retry later. Re-probe once after
+# this delay, up to this many times, before finalizing as unknown/greylisted.
+VALIDATION_GREYLIST_RETRY_DELAY = int(
+    os.getenv("VALIDATION_GREYLIST_RETRY_DELAY", 600)  # 10 min
+)
+VALIDATION_GREYLIST_MAX_RETRIES = int(os.getenv("VALIDATION_GREYLIST_MAX_RETRIES", 2))
+
+# Try up to this many MX hosts, but ONLY advancing to the next when the previous
+# failed to CONNECT — never re-probe a host that already answered.
+VALIDATION_SMTP_MAX_MX_HOSTS = int(os.getenv("VALIDATION_SMTP_MAX_MX_HOSTS", 3))
+
 # --- Per-provider SMTP rate limiting (protects the egress IP reputation) -----
 # Conservative on purpose: loosen later with data, never the reverse. Limits are
 # keyed on the MX provider fingerprint (google, microsoft, yahoo, proofpoint,

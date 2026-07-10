@@ -5,6 +5,7 @@ import socket
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from celery import shared_task
+from django.conf import settings
 from .models import EmailValidation
 from .advanced_validator import AdvancedEmailValidator
 
@@ -48,6 +49,16 @@ def validate_email_task(self, email_validation_id):
     if result.metadata.get("rate_limited"):
         countdown = result.metadata.get("retry_after") or 60
         raise self.retry(countdown=countdown, max_retries=20)
+
+    # Greylisting (SMTP 450): the server asked us to come back later. Re-probe
+    # automatically after a delay, up to a small cap, before finalizing the
+    # address as unknown/greylisted.
+    if result.metadata.get("sub_status") == "greylisted":
+        delay = int(getattr(settings, "VALIDATION_GREYLIST_RETRY_DELAY", 600))
+        max_greylist = int(getattr(settings, "VALIDATION_GREYLIST_MAX_RETRIES", 2))
+        if self.request.retries < max_greylist:
+            raise self.retry(countdown=delay, max_retries=max_greylist)
+        # Out of greylist retries — fall through and finalize as unknown.
 
     try:
         # Update validation record
@@ -136,6 +147,16 @@ def bulk_validate_emails_task(self, validation_job_id):
                 deferred = True
                 deferred_after = max(
                     deferred_after, int(result.metadata.get("retry_after") or 60)
+                )
+                continue
+
+            if result.metadata.get("sub_status") == "greylisted":
+                # Server greylisted us — defer and re-probe on the next pass
+                # instead of finalizing this address as unknown right away.
+                deferred = True
+                deferred_after = max(
+                    deferred_after,
+                    int(getattr(dj_settings, "VALIDATION_GREYLIST_RETRY_DELAY", 600)),
                 )
                 continue
 

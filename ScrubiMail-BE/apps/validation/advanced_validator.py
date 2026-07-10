@@ -74,10 +74,49 @@ _SMTP_BREAKER_FAIL_KEY = "smtp:breaker_failcount"
 _DISPOSABLE_BASELINE = os.path.join(
     os.path.dirname(__file__), "data", "disposable_domains.txt"
 )
+# Bundled top consumer-mail domains, used for Damerau-Levenshtein typo suggestions.
+_TOP_DOMAINS_FILE = os.path.join(
+    os.path.dirname(__file__), "data", "top_domains.txt"
+)
 _disposable_domains: Optional[set] = None
 # mtime of the external feed file last loaded, so workers pick up a weekly
 # refresh (see update_disposable_domains) without a restart.
 _disposable_external_mtime: Optional[float] = None
+
+
+def _damerau_levenshtein(a: str, b: str, max_distance: int = 2) -> int:
+    """Optimal string alignment (Damerau-Levenshtein) distance between two
+    strings, counting insertions, deletions, substitutions AND adjacent
+    transpositions (so "gmial" -> "gmail" is distance 1). Returns early with
+    max_distance + 1 once the best possible distance exceeds max_distance."""
+    la, lb = len(a), len(b)
+    if abs(la - lb) > max_distance:
+        return max_distance + 1
+    # d[i][j] = distance between a[:i] and b[:j]
+    prev2 = None
+    prev = list(range(lb + 1))
+    for i in range(1, la + 1):
+        cur = [i] + [0] * lb
+        row_min = cur[0]
+        for j in range(1, lb + 1):
+            cost = 0 if a[i - 1] == b[j - 1] else 1
+            cur[j] = min(
+                prev[j] + 1,        # deletion
+                cur[j - 1] + 1,     # insertion
+                prev[j - 1] + cost,  # substitution
+            )
+            if (
+                i > 1
+                and j > 1
+                and a[i - 1] == b[j - 2]
+                and a[i - 2] == b[j - 1]
+            ):
+                cur[j] = min(cur[j], prev2[j - 2] + 1)  # transposition
+            row_min = min(row_min, cur[j])
+        if row_min > max_distance:
+            return max_distance + 1
+        prev2, prev = prev, cur
+    return prev[lb]
 
 
 def _load_domain_file(path: str) -> set:
@@ -234,8 +273,17 @@ class AdvancedEmailValidator:
         # Catch-all status is cached per domain (Redis) so we probe a garbage
         # address at most once per domain per this TTL, never once per address.
         self.catchall_ttl = int(_conf("VALIDATION_CATCHALL_TTL", 86400))
+        # Per-kind cache TTLs (replaces the old single 5-minute TTL).
+        self.dns_ttl = int(_conf("VALIDATION_CACHE_TTL_DNS", 21600))
+        self.reputation_ttl = int(_conf("VALIDATION_CACHE_TTL_REPUTATION", 86400))
+        self.negative_dns_ttl = int(_conf("VALIDATION_CACHE_TTL_NEGATIVE_DNS", 3600))
+        # Try up to this many MX hosts (only on connection failure — see
+        # smtp_handshake).
+        self.max_mx_hosts = int(_conf("VALIDATION_SMTP_MAX_MX_HOSTS", 3))
         # Per-provider probe rate limiter (concurrency + probes/min + cooldown).
         self.rate_limiter = ProviderRateLimiter()
+        # Top consumer-mail domains for typo suggestions (Damerau-Levenshtein).
+        self.top_domains = _load_domain_file(_TOP_DOMAINS_FILE)
 
     # ------------------------------------------------------------------ cache
     def _get_cached(self, key: str) -> Optional[Any]:
@@ -348,29 +396,46 @@ class AdvancedEmailValidator:
             }
 
     def _generate_suggestions(self, email: str) -> List[str]:
-        """Generate email suggestions for common typos"""
-        suggestions = []
+        """Suggest a likely-intended address for common typos.
+
+        NEVER auto-corrects — only suggests. Uses Damerau-Levenshtein distance
+        (<= 2) against the bundled top consumer-domain list, plus explicit TLD
+        fixes (.con/.cmo -> .com, and .co -> .com only for known mail domains)."""
+        suggestions: List[str] = []
         if "@" not in email:
             return suggestions
         local, domain = email.rsplit("@", 1)
+        domain = domain.strip().lower()
+        if not local or not domain:
+            return suggestions
 
-        domain_suggestions = {
-            "gmai.com": "gmail.com",
-            "gmal.com": "gmail.com",
-            "gamil.com": "gmail.com",
-            "gmial.com": "gmail.com",
-            "hotmai.com": "hotmail.com",
-            "hotmal.com": "hotmail.com",
-            "outlok.com": "outlook.com",
-            "yaho.com": "yahoo.com",
-            "yhoo.com": "yahoo.com",
-        }
+        def _add(candidate: str) -> None:
+            fixed = f"{local}@{candidate}"
+            if candidate != domain and fixed not in suggestions:
+                suggestions.append(fixed)
 
-        if domain in domain_suggestions:
-            suggestions.append(f"{local}@{domain_suggestions[domain]}")
+        # Explicit TLD typo fixes (adjacent-key / transposition slips of .com).
+        for bad in (".con", ".cmo", ".vom", ".xom", ".ocm", ".comm", ".cim"):
+            if domain.endswith(bad):
+                _add(domain[: -len(bad)] + ".com")
+                break
+        # ".co" is a real TLD, so only suggest ".com" when the fixed form is a
+        # known mail domain (e.g. gmail.co -> gmail.com).
+        if domain.endswith(".co"):
+            candidate = domain[:-3] + ".com"
+            if candidate in self.top_domains:
+                _add(candidate)
 
-        if domain.endswith(".con") or domain.endswith(".cmo"):
-            suggestions.append(f"{local}@{domain[:-4]}.com")
+        # Nearest known consumer domain within Damerau-Levenshtein distance <= 2.
+        # Iterate deterministically so ties resolve the same way every time.
+        if domain not in self.top_domains:
+            best, best_dist = None, 3
+            for known in sorted(self.top_domains):
+                d = _damerau_levenshtein(domain, known, max_distance=2)
+                if d < best_dist:
+                    best, best_dist = known, d
+            if best is not None:
+                _add(best)
 
         return suggestions
 
@@ -443,6 +508,14 @@ class AdvancedEmailValidator:
 
             dns_score = self._calculate_dns_score(mx_records, a_records, dnssec_valid)
 
+            # Null MX (RFC 7505): a single MX of "." with preference 0 means the
+            # domain explicitly does NOT accept mail. Definitive — no SMTP needed.
+            null_mx = (
+                len(mx_records) == 1
+                and mx_records[0]["host"] in ("", ".")
+                and mx_records[0]["preference"] == 0
+            )
+
             result = {
                 "valid": len(mx_records) > 0 or len(a_records) > 0,
                 "a_records": a_records,
@@ -450,10 +523,15 @@ class AdvancedEmailValidator:
                 "mx_records": mx_records,
                 "cname_record": cname_record,
                 "dnssec_valid": dnssec_valid,
+                "null_mx": null_mx,
                 "score": dns_score,
             }
 
-            self._set_cached(cache_key, result)
+            # Per-kind TTL: real DNS is stable (6h); a negative answer (no MX and
+            # no A — e.g. a freshly registered / non-existent domain) is cached
+            # only briefly (1h) so it corrects itself quickly.
+            ttl = self.dns_ttl if (mx_records or a_records) else self.negative_dns_ttl
+            self._set_cached(cache_key, result, ttl=ttl)
             return result
 
         except Exception as e:
@@ -599,7 +677,10 @@ class AdvancedEmailValidator:
 
         connection_succeeded = False
         try:
-            for mx in mx_records[:2]:
+            # Try up to max_mx_hosts, but we only ADVANCE to the next host on a
+            # connection failure (handled in the except clauses). Any SMTP answer
+            # ends the loop — re-probing another MX would add volume for no gain.
+            for mx in mx_records[: self.max_mx_hosts]:
                 mx_host = mx["host"]
                 server = None
                 try:
@@ -680,9 +761,9 @@ class AdvancedEmailValidator:
                     except Exception:
                         pass
 
-                    # Stop after the first server that gave us a definitive answer.
-                    if results["status"] in ("deliverable", "undeliverable"):
-                        break
+                    # This MX answered (any SMTP code) — we have our result for
+                    # this address. Never re-probe another MX for it.
+                    break
 
                 except (socket.timeout, ConnectionRefusedError, OSError) as e:
                     results["errors"].append(f"MX {mx_host}: {str(e)}")
@@ -833,7 +914,7 @@ class AdvancedEmailValidator:
                 "reputation_score": reputation_score,
                 "risk_level": self._get_risk_level(reputation_score),
             }
-            self._set_cached(cache_key, result)
+            self._set_cached(cache_key, result, ttl=self.reputation_ttl)
             return result
 
         except Exception as e:
@@ -1044,6 +1125,10 @@ class AdvancedEmailValidator:
         if not dns.get("valid", False):
             return "invalid", "no_dns_entries"
 
+        # 1b. Null MX (RFC 7505): domain explicitly refuses mail.
+        if dns.get("null_mx", False):
+            return "invalid", "does_not_accept_mail"
+
         # 2. Confirmed non-existent mailbox.
         if smtp_status == "undeliverable":
             return "invalid", "mailbox_not_found"
@@ -1117,7 +1202,17 @@ class AdvancedEmailValidator:
             # cloud hosts where port 25 is blocked).
             mx_records = dns_result.get("mx_records", [])
             a_records = dns_result.get("a_records", [])
-            if not do_smtp:
+            if dns_result.get("null_mx", False):
+                # RFC 7505: the domain declared it accepts no mail. Definitive —
+                # skip SMTP entirely (an easy, certain "invalid").
+                smtp_result = {
+                    "valid": False,
+                    "status": "skipped",
+                    "sub_status": "null_mx",
+                    "catch_all": False,
+                    "greylisting": False,
+                }
+            elif not do_smtp:
                 smtp_result = {
                     "valid": False,
                     "status": "skipped",
