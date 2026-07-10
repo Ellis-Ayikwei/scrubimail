@@ -93,3 +93,6 @@ htmlcov/
 
 
 **/__pycache__/
+
+# Generated disposable-domain feed (refreshed weekly by update_disposable_domains)
+apps/validation/data/disposable_domains_external.txt

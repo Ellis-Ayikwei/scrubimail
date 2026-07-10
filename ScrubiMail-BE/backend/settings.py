@@ -172,6 +172,20 @@ CELERY_TASK_ROUTES = {
     "apps.validation.tasks.bulk_validate_emails_task": {"queue": "smtp_validation"},
 }
 
+# Scheduled (beat) tasks. The disposable-domain blocklist is refreshed weekly so
+# coverage keeps up with DEA services that rotate domains to evade static lists.
+from celery.schedules import crontab  # noqa: E402
+
+CELERY_BEAT_SCHEDULE = {
+    "refresh-disposable-domains-weekly": {
+        "task": "apps.validation.tasks.refresh_disposable_domains_task",
+        # Sundays at 03:00 UTC — off-peak. Keep it on the default queue (not the
+        # egress smtp_validation queue): it only downloads and writes a file.
+        "schedule": crontab(hour=3, minute=0, day_of_week=0),
+        "options": {"queue": "default"},
+    },
+}
+
 # Cache Configuration
 # Shared cache for DNS/MX and domain-reputation lookups so validation hits are
 # shared across all web/worker processes and survive restarts (vs. a per-process
@@ -647,11 +661,26 @@ VALIDATION_SMTP_SOFT_FAIL_THRESHOLD = int(
 VALIDATION_SMTP_CONCURRENCY_TTL = int(
     os.getenv("VALIDATION_SMTP_CONCURRENCY_TTL", 120)
 )
-# Optional external disposable-domain feed (one domain per line), merged with
-# the bundled baseline. Point at a maintained 100k+ feed in production.
+# Merged disposable-domain feed (baseline + downloaded feeds), maintained by the
+# update_disposable_domains management command / weekly beat task. Defaults to a
+# writable file next to the bundled baseline (gitignored). Loaded on top of the
+# bundled baseline; workers reload it via mtime when the weekly refresh runs.
 VALIDATION_DISPOSABLE_DOMAINS_FILE = os.getenv(
-    "VALIDATION_DISPOSABLE_DOMAINS_FILE", None
+    "VALIDATION_DISPOSABLE_DOMAINS_FILE",
+    os.path.join(BASE_DIR, "apps", "validation", "data", "disposable_domains_external.txt"),
 )
+# Primary source for the weekly refresh (the maintained community dataset).
+VALIDATION_DISPOSABLE_SOURCE_URL = os.getenv(
+    "VALIDATION_DISPOSABLE_SOURCE_URL",
+    "https://raw.githubusercontent.com/disposable-email-domains/"
+    "disposable-email-domains/master/disposable_email_domains.txt",
+)
+# Optional extra feeds (comma-separated URLs), merged with the primary source.
+VALIDATION_DISPOSABLE_EXTRA_FEEDS = [
+    u.strip()
+    for u in os.getenv("VALIDATION_DISPOSABLE_EXTRA_FEEDS", "").split(",")
+    if u.strip()
+]
 
 # Bulk jobs run entirely in Celery (never inline in the HTTP request). Addresses
 # are processed in chunks of this size; progress is persisted after each chunk.

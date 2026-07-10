@@ -213,6 +213,25 @@ def bulk_validate_emails_task(self, validation_job_id):
     }
 
 
+@shared_task(bind=True, max_retries=3)
+def refresh_disposable_domains_task(self):
+    """Weekly refresh of the disposable-domain blocklist (Celery beat).
+
+    Delegates to the update_disposable_domains management command, which keeps
+    the previous file on failure (never ships an empty list). Retries later if
+    every feed was unreachable."""
+    from django.core.management import call_command
+
+    try:
+        call_command("update_disposable_domains")
+        return {"status": "completed"}
+    except SystemExit as exc:
+        # Command signalled failure (all feeds down); the old file is kept.
+        raise self.retry(countdown=3600, exc=exc)
+    except Exception as exc:
+        raise self.retry(countdown=3600, exc=exc)
+
+
 @shared_task
 def cleanup_old_validations_task():
     """Clean up old validation records (older than 30 days)"""

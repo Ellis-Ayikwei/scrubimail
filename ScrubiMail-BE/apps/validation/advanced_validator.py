@@ -68,6 +68,9 @@ _DISPOSABLE_BASELINE = os.path.join(
     os.path.dirname(__file__), "data", "disposable_domains.txt"
 )
 _disposable_domains: Optional[set] = None
+# mtime of the external feed file last loaded, so workers pick up a weekly
+# refresh (see update_disposable_domains) without a restart.
+_disposable_external_mtime: Optional[float] = None
 
 
 def _load_domain_file(path: str) -> set:
@@ -86,10 +89,30 @@ def _load_domain_file(path: str) -> set:
     return domains
 
 
+def _external_disposable_mtime() -> Optional[float]:
+    external = _conf("VALIDATION_DISPOSABLE_DOMAINS_FILE", None)
+    if not external:
+        return None
+    try:
+        return os.path.getmtime(external)
+    except OSError:
+        return None
+
+
 def load_disposable_domains(force: bool = False) -> set:
-    """Load and cache the disposable-domain set (baseline + optional feed)."""
-    global _disposable_domains
-    if _disposable_domains is not None and not force:
+    """Load and cache the disposable-domain set (baseline + optional feed).
+
+    The set is reloaded when forced, when never loaded, or when the external
+    feed file's mtime changed on disk — so a weekly refresh written by the
+    update_disposable_domains command is picked up by long-lived workers
+    without a restart (the cache is keyed on the file's mtime)."""
+    global _disposable_domains, _disposable_external_mtime
+    current_mtime = _external_disposable_mtime()
+    if (
+        _disposable_domains is not None
+        and not force
+        and current_mtime == _disposable_external_mtime
+    ):
         return _disposable_domains
 
     domains = _load_domain_file(_DISPOSABLE_BASELINE)
@@ -99,6 +122,7 @@ def load_disposable_domains(force: bool = False) -> set:
         domains |= _load_domain_file(external)
 
     _disposable_domains = domains
+    _disposable_external_mtime = current_mtime
     logger.info("Loaded %d disposable domains", len(domains))
     return domains
 
@@ -716,7 +740,10 @@ class AdvancedEmailValidator:
 
         try:
             domain_lower = domain.lower()
-            is_disposable = domain_lower in self.disposable_domains
+            # Use the live set (reloads on feed refresh via mtime) rather than
+            # the snapshot captured at __init__, so long-lived workers see the
+            # weekly disposable-domain update without a restart.
+            is_disposable = domain_lower in load_disposable_domains()
             tld_risk = any(domain_lower.endswith(tld) for tld in self.risky_tlds)
             is_free_provider = domain_lower in self.free_providers
             spam_trap_risk = self._detect_spam_trap_patterns(domain_lower)
