@@ -29,6 +29,7 @@ from rest_framework.permissions import BasePermission
 from apps.billing.services import BillingService
 from apps.billing.models import CreditTransaction, EmailValidationUsage
 from backend.throttling import PlanBasedRateThrottle, BulkValidationThrottle, PlanFeatureThrottle
+from backend.api_exceptions import InsufficientCredits, BulkLimitExceeded
 
 
 class SingleEmailValidationView(APIView):
@@ -49,9 +50,8 @@ class SingleEmailValidationView(APIView):
         profile = billing_service.get_or_create_billing_profile(user)
 
         if not profile.can_use_credits(1):
-            return Response(
-                {"error": "Insufficient credits. Please purchase more credits."},
-                status=status.HTTP_402_PAYMENT_REQUIRED,
+            raise InsufficientCredits(
+                "Insufficient credits. Please purchase more credits."
             )
 
         if real_time:
@@ -190,16 +190,18 @@ class BulkEmailValidationView(APIView):
         """Bulk email validation with job tracking"""
         # Check if bulk limit was exceeded by throttle
         if hasattr(request, 'bulk_limit_exceeded') and request.bulk_limit_exceeded:
-            return Response(
-                {
-                    "error": f"Bulk validation limit exceeded. Your plan allows {request.bulk_limit} emails per request, but you requested {request.bulk_requested}. Please upgrade your plan or reduce the number of emails.",
-                    "limit": request.bulk_limit,
-                    "requested": request.bulk_requested,
-                    "upgrade_url": "/plans/",
-                },
-                status=status.HTTP_429_TOO_MANY_REQUESTS,
+            raise BulkLimitExceeded(
+                detail=(
+                    f"Bulk validation limit exceeded. Your plan allows "
+                    f"{request.bulk_limit} emails per request, but you requested "
+                    f"{request.bulk_requested}. Please upgrade your plan or reduce "
+                    f"the number of emails."
+                ),
+                limit=request.bulk_limit,
+                requested=request.bulk_requested,
+                upgrade_url="/plans/",
             )
-        
+
         serializer = BulkEmailValidationSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
@@ -214,11 +216,9 @@ class BulkEmailValidationView(APIView):
 
         required_credits = len(emails)
         if not profile.can_use_credits(required_credits):
-            return Response(
-                {
-                    "error": f"Insufficient credits. You need {required_credits} credits but only have {profile.credits_remaining}."
-                },
-                status=status.HTTP_402_PAYMENT_REQUIRED,
+            raise InsufficientCredits(
+                f"Insufficient credits. You need {required_credits} credits but "
+                f"only have {profile.credits_remaining}."
             )
 
         # Create the job row and hand ALL processing to Celery. The request must

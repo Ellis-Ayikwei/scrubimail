@@ -426,3 +426,45 @@ volumes:
 - **Email Support**: support@scrubimail.com
 - **Status Page**: status.scrubimail.com
 - **Community Forum**: community.scrubimail.com 
+## Error responses
+
+Every non-2xx API response uses one envelope:
+
+```json
+{
+  "success": false,
+  "error": {
+    "code": "validation_error",
+    "message": "email: This field is required.",
+    "details": [{ "field": "email", "issue": "This field is required." }],
+    "meta": {}
+  }
+}
+```
+
+- `code` is a stable, machine-readable value — branch on this, not on the HTTP
+  status or the message.
+- `message` is a human summary: the first detail as `"field: issue"`, or the
+  bare issue for non-field errors.
+- `details` is a flat list of `{field, issue}` with dotted field paths (e.g.
+  `profile.email`) for nested serializers.
+- `meta` is optional and carries extras such as a throttle `retry_after` or a
+  bulk-limit `limit`/`requested`/`upgrade_url` — never at the top level.
+
+### Error codes
+
+| code | HTTP | when |
+| --- | --- | --- |
+| `validation_error` | 400 | request body / query failed validation |
+| `authentication_required` | 401 | no valid credentials supplied |
+| `invalid_credentials` | 401 | credentials supplied but rejected |
+| `permission_denied` | 403 | authenticated but not allowed |
+| `not_found` | 404 | resource does not exist |
+| `insufficient_credits` | 402 | not enough credits for the request |
+| `rate_limit_exceeded` | 429 | throttled or bulk-per-request limit exceeded |
+| `internal_error` | 500 | unexpected server error (no internals exposed) |
+| `api_error` | any | fallback for anything unmapped |
+
+500 responses never include exception text or a stack trace; the full traceback
+is logged server-side only. These codes are covered by tests
+(`apps/validation/tests/test_error_envelope.py`) so they cannot change silently.
