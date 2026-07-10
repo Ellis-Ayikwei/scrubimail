@@ -60,6 +60,10 @@ def validate_email_task(self, email_validation_id):
             raise self.retry(countdown=delay, max_retries=max_greylist)
         # Out of greylist retries — fall through and finalize as unknown.
 
+    # Warm the shared result cache so the realtime endpoint benefits from this
+    # deep verification (Issue 9).
+    validator.store_result(email, result)
+
     try:
         # Update validation record
         validation.status = "completed"
@@ -179,6 +183,8 @@ def bulk_validate_emails_task(self, validation_job_id):
                 job_type="bulk",
             )
             profile.consume_credits(1, "bulk")
+            # Warm the shared result cache for the realtime endpoint (Issue 9).
+            validator.store_result(email, result)
             done.add(email)
             processed += 1
 

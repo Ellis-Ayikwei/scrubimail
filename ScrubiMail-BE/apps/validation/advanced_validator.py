@@ -1,10 +1,12 @@
 import os
 import re
+import hashlib
 import dns.resolver
 import smtplib
 import socket
 import time
 import logging
+from datetime import datetime, timezone as _dt_timezone
 from typing import Dict, List, Any, Optional
 from dataclasses import dataclass
 from concurrent.futures import ThreadPoolExecutor
@@ -27,6 +29,11 @@ except Exception:  # pragma: no cover - allow use outside Django
 from .rate_limit import ProviderRateLimiter, provider_for_mx
 
 logger = logging.getLogger(__name__)
+
+
+def _now_iso() -> str:
+    """UTC verification timestamp for cached/realtime results."""
+    return datetime.now(_dt_timezone.utc).isoformat()
 
 
 def _conf(name: str, default: Any) -> Any:
@@ -284,6 +291,13 @@ class AdvancedEmailValidator:
         self.rate_limiter = ProviderRateLimiter()
         # Top consumer-mail domains for typo suggestions (Damerau-Levenshtein).
         self.top_domains = _load_domain_file(_TOP_DOMAINS_FILE)
+        # Realtime endpoint: deep verification within a hard time budget, with a
+        # shared result cache (see validate_email_realtime).
+        self.realtime_budget = int(_conf("VALIDATION_REALTIME_BUDGET_SECONDS", 8))
+        self.result_cache_ttl = int(_conf("VALIDATION_RESULT_CACHE_TTL", 604800))
+        self.result_cache_ttl_unknown = int(
+            _conf("VALIDATION_RESULT_CACHE_TTL_UNKNOWN", 86400)
+        )
 
     # ------------------------------------------------------------------ cache
     def _get_cached(self, key: str) -> Optional[Any]:
@@ -618,7 +632,11 @@ class AdvancedEmailValidator:
 
     # ------------------------------------------------------------------ SMTP
     def smtp_handshake(
-        self, email: str, domain: str, mx_records: List[Dict]
+        self,
+        email: str,
+        domain: str,
+        mx_records: List[Dict],
+        timeout: Optional[int] = None,
     ) -> Dict[str, Any]:
         """SMTP RCPT-TO probe.
 
@@ -684,7 +702,7 @@ class AdvancedEmailValidator:
                 mx_host = mx["host"]
                 server = None
                 try:
-                    server = smtplib.SMTP(timeout=self.smtp_timeout)
+                    server = smtplib.SMTP(timeout=timeout or self.smtp_timeout)
                     server.connect(mx_host, 25)
                     connection_succeeded = True
                     server.helo(self.smtp_helo_host)
@@ -1154,8 +1172,128 @@ class AdvancedEmailValidator:
         # 5. Everything else = we could not verify the mailbox.
         return "unknown", smtp.get("sub_status") or "no_smtp_check"
 
+    # ------------------------------------------------------------- realtime
+    def _probe_timeout(self, start_time: float, budget: Optional[float]) -> int:
+        """SMTP connect timeout for this probe, capped to the budget remaining so
+        one tarpit can't consume the whole realtime budget."""
+        if budget is None:
+            return self.smtp_timeout
+        remaining = budget - (time.time() - start_time)
+        return max(1, min(self.smtp_timeout, int(remaining)))
+
+    @staticmethod
+    def _result_key(email: str) -> str:
+        digest = hashlib.sha256(email.strip().lower().encode("utf-8")).hexdigest()
+        return f"result:{digest}"
+
+    def get_cached_result(self, email: str) -> Optional[ValidationResult]:
+        """Return a previously-completed verification for `email` from the shared
+        result cache, or None. Checked before any network work."""
+        payload = self._get_cached(self._result_key(email))
+        if not payload:
+            return None
+        return ValidationResult(
+            is_valid=payload["is_valid"],
+            score=payload["score"],
+            verdict=payload["verdict"],
+            breakdown=payload.get("breakdown", {}),
+            suggestions=payload.get("suggestions", []),
+            warnings=payload.get("warnings", []),
+            metadata=payload.get("metadata", {}),
+        )
+
+    def store_result(self, email: str, result: ValidationResult) -> None:
+        """Persist a COMPLETED verification to the shared result cache so both the
+        realtime endpoint and bulk/deep Celery work benefit. Transient failures
+        (rate-limited, timeout, egress unavailable) are not cached — the next
+        request should retry them."""
+        status = result.metadata.get("status")
+        sub_status = result.metadata.get("sub_status")
+        ttl = self._result_ttl(status, sub_status)
+        if ttl is None:
+            return
+        payload = {
+            "is_valid": result.is_valid,
+            "score": result.score,
+            "verdict": result.verdict,
+            "breakdown": result.breakdown,
+            "suggestions": result.suggestions,
+            "warnings": result.warnings,
+            "metadata": {
+                **result.metadata,
+                "verified_at": result.metadata.get("verified_at") or _now_iso(),
+            },
+        }
+        self._set_cached(self._result_key(email), payload, ttl=ttl)
+
+    _TRANSIENT_SUBSTATUSES = {
+        "rate_limited",
+        "timeout",
+        "smtp_unavailable",
+        "smtp_egress_blocked",
+        "failed_smtp_connection",
+        "exception_occurred",
+    }
+
+    def _result_ttl(self, status: Optional[str], sub_status: Optional[str]) -> Optional[int]:
+        if status in ("valid", "invalid", "catch_all", "do_not_mail"):
+            return self.result_cache_ttl
+        if status == "unknown" and sub_status not in self._TRANSIENT_SUBSTATUSES:
+            return self.result_cache_ttl_unknown
+        return None  # transient / non-terminal -> do not cache
+
+    def validate_email_realtime(
+        self, email: str, fast: bool = False, budget: Optional[float] = None
+    ):
+        """Customer-facing realtime verification. Deep by default within a hard
+        time budget; `fast=True` runs the syntax/DNS/list-only path.
+
+        Returns (ValidationResult, from_cache: bool). The result is honest —
+        `unknown` with sub_status timeout/rate_limited/smtp_unavailable when the
+        mailbox could not be confirmed within budget — never a fabricated valid.
+        """
+        budget = budget or self.realtime_budget
+
+        # 1. Result cache — before any network work.
+        cached = self.get_cached_result(email)
+        if cached is not None:
+            return cached, True
+
+        # 2. Only attempt SMTP from a worker with confirmed port-25 egress. The
+        # shared circuit breaker (Issue 6) is the signal: if it's open (or this
+        # isn't an egress worker), fall back to the fast path and report
+        # smtp_unavailable rather than burning the budget on timeouts.
+        egress_ok = self.smtp_enabled and not self._breaker_is_open()
+        if fast or not egress_ok:
+            result = self.validate_email(email, deep=False)
+            if not fast:
+                self._mark_smtp_unavailable(result)
+        else:
+            result = self.validate_email(email, deep=True, budget=budget)
+
+        # 3. Stamp the verification time and cache terminal results. Fast-mode
+        # results are never cached — they are not full verifications, so caching
+        # an unknown/no_smtp_check would poison a later deep lookup.
+        result.metadata["verified_at"] = _now_iso()
+        if not fast:
+            self.store_result(email, result)
+        return result, False
+
+    def _mark_smtp_unavailable(self, result: ValidationResult) -> None:
+        """Relabel a fast-path result whose SMTP stage was skipped because egress
+        is unavailable (breaker open / not an egress worker)."""
+        result.metadata["sub_status"] = "smtp_unavailable"
+        msg = "SMTP verification unavailable (egress down) — mailbox not confirmed"
+        if msg not in result.warnings:
+            result.warnings.append(msg)
+
     # -------------------------------------------------------------- pipeline
-    def validate_email(self, email: str, deep: Optional[bool] = None) -> ValidationResult:
+    def validate_email(
+        self,
+        email: str,
+        deep: Optional[bool] = None,
+        budget: Optional[float] = None,
+    ) -> ValidationResult:
         """Complete email validation pipeline.
 
         `deep` controls SMTP mailbox probing — the only slow (multi-second),
@@ -1165,6 +1303,11 @@ class AdvancedEmailValidator:
           * deep=True   -> probe SMTP (subject to VALIDATION_SMTP_ENABLED).
             Use for async/bulk jobs where multi-second latency is acceptable.
           * deep=None   -> fall back to the VALIDATION_SMTP_ENABLED setting.
+
+        `budget` (seconds) bounds the realtime deep path: if the SMTP stage
+        would start after the budget is spent, it is skipped and reported as
+        unknown/timeout, and the probe's own connect timeout is capped to the
+        time remaining so a single tarpit can't consume the whole budget.
         """
         start_time = time.time()
         do_smtp = self.smtp_enabled if deep is None else (deep and self.smtp_enabled)
@@ -1219,14 +1362,26 @@ class AdvancedEmailValidator:
                     "catch_all": False,
                     "greylisting": False,
                 }
+            elif budget is not None and (budget - (time.time() - start_time)) <= 0.5:
+                # Realtime budget spent before we could probe — honest timeout.
+                smtp_result = {
+                    "valid": False,
+                    "status": "unknown",
+                    "sub_status": "timeout",
+                    "catch_all": False,
+                    "greylisting": False,
+                }
             elif mx_records:
-                smtp_result = self.smtp_handshake(email, domain, mx_records)
+                smtp_result = self.smtp_handshake(
+                    email, domain, mx_records, timeout=self._probe_timeout(start_time, budget)
+                )
             elif a_records:
                 # Fallback to A record as implicit MX (RFC 5321 §5.1).
                 smtp_result = self.smtp_handshake(
                     email,
                     domain,
                     [{"host": domain, "preference": 0, "score": 30}],
+                    timeout=self._probe_timeout(start_time, budget),
                 )
             else:
                 smtp_result = {

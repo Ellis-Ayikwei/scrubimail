@@ -37,13 +37,25 @@ class SingleEmailValidationView(APIView):
     throttle_classes = [PlanBasedRateThrottle, PlanFeatureThrottle]
 
     def post(self, request):
-        """Single email validation with real-time option"""
+        """Single email validation.
+
+        DEEP by default: full mailbox verification runs inline within a hard time
+        budget (VALIDATION_REALTIME_BUDGET_SECONDS) and can return status=valid.
+        Pass ?mode=fast (or ?deep=false) for the sub-100ms syntax/DNS/list-only
+        path that never opens an SMTP connection. A shared result cache returns
+        repeat lookups instantly with "cached": true.
+        """
         serializer = EmailValidationSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
         email = serializer.validated_data["email"]
-        real_time = serializer.validated_data.get("real_time", False)
         user = request.user
+
+        # Fast mode is opt-in: ?mode=fast or ?deep=false (back-compat). Deep is
+        # the default so the endpoint can produce the product's core answer.
+        mode = request.query_params.get("mode", "").lower()
+        deep_q = request.query_params.get("deep", "").lower()
+        fast = mode == "fast" or deep_q in ("false", "0", "no")
 
         # Check if user has enough credits
         billing_service = BillingService()
@@ -54,132 +66,65 @@ class SingleEmailValidationView(APIView):
                 "Insufficient credits. Please purchase more credits."
             )
 
-        if real_time:
-            # Perform real-time validation. deep=False guarantees the SMTP
-            # probe (the only multi-second stage) is skipped, keeping this
-            # interactive path at ~20-50ms cold / sub-ms cached.
-            validator = AdvancedEmailValidator()
-            result = validator.validate_email(email, deep=False)
+        validator = AdvancedEmailValidator()
+        result, from_cache = validator.validate_email_realtime(email, fast=fast)
 
-            # Create validation record
-            validation = EmailValidation.objects.create(
-                email=email,
-                user=user,
-                status="completed",
-                score=result.score,
-                breakdown={
-                    "syntax": result.breakdown.get("syntax", {}),
-                    "dns": result.breakdown.get("dns", {}),
-                    "smtp": result.breakdown.get("smtp", {}),
-                    "reputation": result.breakdown.get("reputation", {}),
-                    "role_based": result.breakdown.get("role_based", {}),
-                    "risk_score": {
-                        "score": result.score,
-                        "verdict": result.verdict,
-                        "is_valid": result.is_valid,
-                    },
+        validation = EmailValidation.objects.create(
+            email=email,
+            user=user,
+            status="completed",
+            score=result.score,
+            breakdown={
+                "syntax": result.breakdown.get("syntax", {}),
+                "dns": result.breakdown.get("dns", {}),
+                "smtp": result.breakdown.get("smtp", {}),
+                "reputation": result.breakdown.get("reputation", {}),
+                "role_based": result.breakdown.get("role_based", {}),
+                "risk_score": {
+                    "score": result.score,
+                    "verdict": result.verdict,
+                    "is_valid": result.is_valid,
                 },
-                suggestions=result.suggestions,
-                warnings=result.warnings,
-                metadata=result.metadata,
-                job_type="api",
-            )
+            },
+            suggestions=result.suggestions,
+            warnings=result.warnings,
+            metadata=result.metadata,
+            job_type="api",
+        )
 
-            # Consume credits and create billing records
-            profile.consume_credits(1, f"Email validation: {email}")
+        # Consume credits and create billing records
+        profile.consume_credits(1, f"Email validation: {email}")
+        EmailValidationUsage.objects.create(
+            billing_profile=profile,
+            validation_request_id=str(validation.id),
+            credits_consumed=1,
+            cost_per_credit=0.01,
+            validation_type="single",
+            email_count=1,
+        )
 
-            # Create usage tracking record
-            EmailValidationUsage.objects.create(
-                billing_profile=profile,
-                validation_request_id=str(validation.id),
-                credits_consumed=1,
-                cost_per_credit=0.01,
-                validation_type="single",
-                email_count=1,
-            )
+        details = request.query_params.get("details", "false").lower() == "true"
+        response_data = {
+            "id": validation.id,
+            "email": email,
+            "status": "completed",
+            "score": result.score,
+            "verdict": result.verdict,
+            "is_valid": result.is_valid,
+            "verification_status": result.metadata.get("status"),
+            "sub_status": result.metadata.get("sub_status"),
+            "mode": "fast" if fast else "deep",
+            "cached": from_cache,
+            "verified_at": result.metadata.get("verified_at"),
+            "suggestions": result.suggestions,
+            "warnings": result.warnings,
+            "validation_time": result.metadata.get("validation_time", 0),
+        }
+        if details:
+            response_data["breakdown"] = validation.breakdown
+            response_data["metadata"] = result.metadata
 
-            # Check for ?details=true in query params
-            details = request.query_params.get("details", "false").lower() == "true"
-
-            response_data = {
-                "id": validation.id,
-                "email": email,
-                "status": "completed",
-                "score": result.score,
-                "verdict": result.verdict,
-                "is_valid": result.is_valid,
-                "verification_status": result.metadata.get("status"),
-                "sub_status": result.metadata.get("sub_status"),
-                "suggestions": result.suggestions,
-                "warnings": result.warnings,
-                "validation_time": result.metadata.get("validation_time", 0),
-            }
-            if details:
-                response_data["breakdown"] = validation.breakdown
-                response_data["metadata"] = result.metadata
-
-            return Response(response_data, status=status.HTTP_200_OK)
-        else:
-            # Non-real-time path: still validate synchronously using the
-            # validator directly (avoids Celery dependency) but with the
-            # same optimised AdvancedEmailValidator pipeline.
-            validator = AdvancedEmailValidator()
-            result = validator.validate_email(email)
-
-            validation = EmailValidation.objects.create(
-                email=email,
-                user=user,
-                status="completed",
-                score=result.score,
-                breakdown={
-                    "syntax": result.breakdown.get("syntax", {}),
-                    "dns": result.breakdown.get("dns", {}),
-                    "smtp": result.breakdown.get("smtp", {}),
-                    "reputation": result.breakdown.get("reputation", {}),
-                    "role_based": result.breakdown.get("role_based", {}),
-                    "risk_score": {
-                        "score": result.score,
-                        "verdict": result.verdict,
-                        "is_valid": result.is_valid,
-                    },
-                },
-                suggestions=result.suggestions,
-                warnings=result.warnings,
-                metadata=result.metadata,
-                job_type="single",
-            )
-
-            # Consume credits and create billing records
-            profile.consume_credits(1, f"Email validation: {email}")
-
-            EmailValidationUsage.objects.create(
-                billing_profile=profile,
-                validation_request_id=str(validation.id),
-                credits_consumed=1,
-                cost_per_credit=0.01,
-                validation_type="single",
-                email_count=1,
-            )
-
-            details = request.query_params.get("details", "false").lower() == "true"
-            response_data = {
-                "id": validation.id,
-                "email": email,
-                "status": "completed",
-                "score": result.score,
-                "verdict": result.verdict,
-                "is_valid": result.is_valid,
-                "verification_status": result.metadata.get("status"),
-                "sub_status": result.metadata.get("sub_status"),
-                "suggestions": result.suggestions,
-                "warnings": result.warnings,
-                "validation_time": result.metadata.get("validation_time", 0),
-            }
-            if details:
-                response_data["breakdown"] = validation.breakdown
-                response_data["metadata"] = result.metadata
-
-            return Response(response_data, status=status.HTTP_200_OK)
+        return Response(response_data, status=status.HTTP_200_OK)
 
 
 class BulkEmailValidationView(APIView):

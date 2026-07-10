@@ -656,6 +656,24 @@ VALIDATION_GREYLIST_MAX_RETRIES = int(os.getenv("VALIDATION_GREYLIST_MAX_RETRIES
 # failed to CONNECT — never re-probe a host that already answered.
 VALIDATION_SMTP_MAX_MX_HOSTS = int(os.getenv("VALIDATION_SMTP_MAX_MX_HOSTS", 3))
 
+# --- Realtime endpoint (deep verification inline, within a hard time budget) --
+# The customer-facing single-validation endpoint performs FULL verification by
+# default within this wall-clock budget. If the budget expires, the rate limiter
+# denies a slot, or the egress breaker is open, it returns an honest `unknown`
+# with the appropriate sub_status — never blocks past the budget, never fakes
+# `valid`. Pass ?mode=fast (or deep=false) for the sub-100ms syntax/DNS-only path.
+VALIDATION_REALTIME_BUDGET_SECONDS = int(
+    os.getenv("VALIDATION_REALTIME_BUDGET_SECONDS", 8)
+)
+# Shared result cache (keyed on sha256(email)) checked before any network work;
+# deep Celery verifications write to it too, so bulk work warms the realtime path.
+VALIDATION_RESULT_CACHE_TTL = int(
+    os.getenv("VALIDATION_RESULT_CACHE_TTL", 604800)  # 7 days for terminal results
+)
+VALIDATION_RESULT_CACHE_TTL_UNKNOWN = int(
+    os.getenv("VALIDATION_RESULT_CACHE_TTL_UNKNOWN", 86400)  # 1 day for unknown
+)
+
 # --- Per-provider SMTP rate limiting (protects the egress IP reputation) -----
 # Conservative on purpose: loosen later with data, never the reverse. Limits are
 # keyed on the MX provider fingerprint (google, microsoft, yahoo, proofpoint,
