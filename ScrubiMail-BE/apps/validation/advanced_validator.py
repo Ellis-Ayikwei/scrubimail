@@ -190,11 +190,18 @@ class AdvancedEmailValidator:
             _conf("VALIDATION_SMTP_FAILURE_THRESHOLD", 3)
         )
         self.smtp_block_ttl = int(_conf("VALIDATION_SMTP_BLOCK_TTL", 600))
+        # Catch-all status is cached per domain (Redis) so we probe a garbage
+        # address at most once per domain per this TTL, never once per address.
+        self.catchall_ttl = int(_conf("VALIDATION_CATCHALL_TTL", 86400))
 
     # ------------------------------------------------------------------ cache
     def _get_cached(self, key: str) -> Optional[Any]:
         """Read from the shared Django cache (Redis), falling back to the
-        in-process dict if the cache backend is unavailable."""
+        in-process dict if the cache backend is unavailable.
+
+        Note a cached value of ``False`` (e.g. "not catch-all") is a real hit,
+        not a miss — only ``None`` means "not cached".
+        """
         if _django_cache is not None:
             try:
                 val = _django_cache.get(f"emailval:{key}")
@@ -203,17 +210,22 @@ class AdvancedEmailValidator:
             except Exception:
                 pass  # Redis down / misconfigured -> fall through to dict
         entry = _domain_cache.get(key)
-        if entry and time.time() - entry["ts"] < _cache_ttl:
+        if entry and time.time() - entry["ts"] < entry.get("ttl", _cache_ttl):
             return entry["val"]
         return None
 
-    def _set_cached(self, key: str, value: Any) -> None:
+    def _set_cached(self, key: str, value: Any, ttl: Optional[int] = None) -> None:
+        """Write to the shared cache with an explicit per-kind TTL.
+
+        `ttl` defaults to the legacy 5-minute value; callers pass longer,
+        per-kind TTLs (DNS, reputation, catch-all — see settings)."""
+        ttl = _cache_ttl if ttl is None else ttl
         if _django_cache is not None:
             try:
-                _django_cache.set(f"emailval:{key}", value, timeout=_cache_ttl)
+                _django_cache.set(f"emailval:{key}", value, timeout=ttl)
             except Exception:
                 pass  # degrade to the in-process dict below
-        _domain_cache[key] = {"val": value, "ts": time.time()}
+        _domain_cache[key] = {"val": value, "ts": time.time(), "ttl": ttl}
 
     # ----------------------------------------------------------------- syntax
     def _to_ascii_domain(self, domain: str) -> str:
@@ -537,6 +549,15 @@ class AdvancedEmailValidator:
                     results["status"] = "unknown"
                     results["sub_status"] = "unexpected_response"
 
+                # Catch-all detection reuses THIS already-open session (RSET +
+                # a second RCPT) so we never open a second connection per
+                # address, and the result is cached per domain — see
+                # _get_or_detect_catch_all. Do it before quitting.
+                if results["status"] == "deliverable":
+                    results["catch_all"] = self._get_or_detect_catch_all(
+                        domain, mx_records, server=server
+                    )
+
                 try:
                     server.quit()
                 except Exception:
@@ -573,14 +594,59 @@ class AdvancedEmailValidator:
             results["sub_status"] = "failed_smtp_connection"
             results["error"] = "SMTP port 25 unreachable from this host"
 
-        # Catch-all detection only when the mailbox itself looked deliverable.
-        if results["status"] == "deliverable":
-            results["catch_all"] = self._detect_catch_all(domain, mx_records)
-
         return results
 
+    def _get_or_detect_catch_all(
+        self, domain: str, mx_records: List[Dict], server: Any = None
+    ) -> bool:
+        """Return whether `domain` is catch-all, using a cached result when
+        available and otherwise a SINGLE probe.
+
+        Caching (Redis, 24h by default) means we probe a given domain's
+        catch-all status at most once per TTL no matter how many addresses we
+        validate there — the old code fired one garbage-address probe per
+        deliverable address, a textbook verifier-abuse pattern that gets the
+        egress IP tempfailed/blocklisted. Both true and false results are
+        cached. When a live SMTP session is supplied we reuse it (RSET + a
+        second RCPT) so no extra connection is opened; we only fall back to a
+        fresh connection if that session cannot be reused.
+        """
+        cache_key = f"catchall:{domain}"
+        cached = self._get_cached(cache_key)
+        if cached is not None:
+            return bool(cached)
+
+        result: Optional[bool] = None
+        if server is not None:
+            result = self._probe_catch_all_on_session(server, domain)
+        if result is None:
+            result = self._detect_catch_all(domain, mx_records)
+
+        self._set_cached(cache_key, bool(result), ttl=self.catchall_ttl)
+        return bool(result)
+
+    def _probe_catch_all_on_session(self, server: Any, domain: str) -> Optional[bool]:
+        """Probe catch-all on an already-open SMTP session via RSET + RCPT.
+
+        Returns True/False on a clean result, or None if the session could not
+        be reused (the caller then falls back to a new connection). RSET aborts
+        the current mail transaction, so we must re-issue MAIL FROM before the
+        second RCPT (RFC 5321).
+        """
+        test_email = f"xq7z9k-{int(time.time())}@{domain}"
+        try:
+            server.rset()
+            server.mail(self.smtp_mail_from)
+            code, _ = server.rcpt(test_email)
+            return code in (250, 251)
+        except Exception:
+            return None
+
     def _detect_catch_all(self, domain: str, mx_records: List[Dict]) -> bool:
-        """Detect catch-all domains with a single random-address probe."""
+        """Detect catch-all with a single random-address probe on a NEW
+        connection. Fallback path only — the common case reuses the existing
+        session via _probe_catch_all_on_session. Caching is handled by the
+        caller (_get_or_detect_catch_all), so this must not cache."""
         if not mx_records:
             return False
 

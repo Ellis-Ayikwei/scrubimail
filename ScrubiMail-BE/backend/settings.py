@@ -613,6 +613,11 @@ VALIDATION_SMTP_FAILURE_THRESHOLD = int(
     os.getenv("VALIDATION_SMTP_FAILURE_THRESHOLD", 3)
 )
 VALIDATION_SMTP_BLOCK_TTL = int(os.getenv("VALIDATION_SMTP_BLOCK_TTL", 600))
+# Catch-all detection is cached per domain so we probe a garbage address at
+# most once per domain per TTL (default 24h), never once per deliverable
+# address. Reusing the live SMTP session (RSET + RCPT) keeps it to one
+# connection per address in the common case.
+VALIDATION_CATCHALL_TTL = int(os.getenv("VALIDATION_CATCHALL_TTL", 86400))
 # Optional external disposable-domain feed (one domain per line), merged with
 # the bundled baseline. Point at a maintained 100k+ feed in production.
 VALIDATION_DISPOSABLE_DOMAINS_FILE = os.getenv(
