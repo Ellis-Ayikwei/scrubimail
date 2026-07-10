@@ -153,8 +153,11 @@ INSTALLED_APPS = [
 ]
 
 # Celery Configuration
-CELERY_BROKER_URL = os.getenv("CELERY_BROKER_URL", "redis://localhost:6379/0")
-CELERY_RESULT_BACKEND = os.getenv("CELERY_RESULT_BACKEND", "redis://localhost:6379/0")
+# Falls back to REDIS_URL (the Redis service deployed in this Railway
+# environment) so we never try to connect to a non-existent local Redis.
+REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
+CELERY_BROKER_URL = os.getenv("CELERY_BROKER_URL", REDIS_URL)
+CELERY_RESULT_BACKEND = os.getenv("CELERY_RESULT_BACKEND", REDIS_URL)
 CELERY_ACCEPT_CONTENT = ["json"]
 CELERY_TASK_SERIALIZER = "json"
 CELERY_RESULT_SERIALIZER = "json"
@@ -175,7 +178,7 @@ CELERY_TASK_ROUTES = {
 # in-memory cache). Uses Django 5.x's built-in Redis backend (no extra dep).
 # Falls back to local-memory if CACHE_REDIS_URL isn't set; the validator also
 # degrades gracefully to an in-process cache if Redis is unreachable.
-CACHE_REDIS_URL = os.getenv("CACHE_REDIS_URL") or os.getenv("REDIS_URL")
+CACHE_REDIS_URL = os.getenv("CACHE_REDIS_URL") or REDIS_URL
 if CACHE_REDIS_URL:
     CACHES = {
         "default": {
@@ -424,7 +427,9 @@ CHANNEL_LAYERS = {
     "default": {
         "BACKEND": "channels_redis.core.RedisChannelLayer",
         "CONFIG": {
-            "hosts": [("172.18.112.22", 6379)],
+            # Use REDIS_URL (the Redis service deployed in this Railway
+            # environment) instead of a hardcoded host/IP.
+            "hosts": [REDIS_URL],
         },
     },
 }
