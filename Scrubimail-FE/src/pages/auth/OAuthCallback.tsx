@@ -1,82 +1,62 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useDispatch } from 'react-redux';
+import useSignIn from 'react-auth-kit/hooks/useSignIn';
 import { Loader2, CheckCircle, AlertCircle } from 'lucide-react';
-import { LoginUser } from '../../store/authSlice';
-import { showMessage } from '../../utils/notifications';
-import { getDeviceInfo } from '../../utils/DeviceFingerPrint';
-import ssoService from '../../services/ssoService';
+import ssoService, { OAUTH_ERROR_MESSAGES } from '../../services/ssoService';
 
 const OAuthCallback: React.FC = () => {
   const navigate = useNavigate();
-  const dispatch = useDispatch();
+  const signIn = useSignIn();
   const [status, setStatus] = useState<'loading' | 'success' | 'error'>('loading');
-  const [message, setMessage] = useState('Processing OAuth callback...');
-  const [deviceInfo, setDeviceInfo] = useState<any>(null);
+  const [message, setMessage] = useState('Completing sign-in...');
 
   useEffect(() => {
     const handleCallback = async () => {
-      try {
-        // Get device info for fingerprinting
-        const device = getDeviceInfo();
-        setDeviceInfo(device);
+      // The browser lands here with only a single-use `code` (or an `error`) —
+      // never tokens. We exchange the code for tokens over POST.
+      const { code, error, provider } = ssoService.getCallbackParams();
 
-        // Check for OAuth callback data in URL
-        const callbackData = ssoService.handleCallbackFromUrl();
-        
-        if (callbackData) {
-          // Handle successful OAuth login
-          dispatch(LoginUser({
-            email: '', // OAuth users don't need email/password
-            password: '',
-            trust_device: false,
-            device_id: device?.device_id,
-            device_name: device?.device_name,
-            fingerprint: device?.fingerprint,
-            user_id: '', // Will be set by backend
-            session_id: '',
-            device_info: device?.device_info,
-            extra: {
-              access_token: callbackData.access_token,
-              refresh_token: callbackData.refresh_token,
-              provider: callbackData.provider
-            }
-          }));
-          
-          setStatus('success');
-          setMessage(`Successfully logged in with ${callbackData.provider}!`);
-          
-          // Clear URL parameters
-          ssoService.clearCallbackFromUrl();
-          
-          // Redirect to dashboard after a short delay
-          setTimeout(() => {
-            navigate('/dashboard', { replace: true });
-          }, 2000);
-        } else {
-          // No callback data found
-          setStatus('error');
-          setMessage('No OAuth callback data found. Please try logging in again.');
-          
-          // Redirect to login after a delay
-          setTimeout(() => {
-            navigate('/login', { replace: true });
-          }, 3000);
-        }
-      } catch (error: any) {
-        console.error('OAuth callback error:', error);
+      const fail = (msg: string) => {
         setStatus('error');
-        setMessage('OAuth callback failed. Please try logging in again.');
-        
-        // Redirect to login after a delay
-        setTimeout(() => {
-          navigate('/login', { replace: true });
-        }, 3000);
+        setMessage(msg);
+        ssoService.clearCallbackFromUrl();
+        setTimeout(() => navigate('/login', { replace: true }), 3500);
+      };
+
+      if (error) {
+        return fail(OAUTH_ERROR_MESSAGES[error] || 'Sign-in failed. Please try again.');
+      }
+      if (!code) {
+        return fail('No sign-in code found. Please try logging in again.');
+      }
+
+      try {
+        const data = await ssoService.exchangeCode(code);
+        const isSignedIn = signIn({
+          auth: { token: data.access_token, type: 'Bearer' },
+          refresh: data.refresh_token,
+          userState: data.user,
+        });
+        ssoService.clearCallbackFromUrl();
+
+        if (!isSignedIn) {
+          return fail('Could not complete sign-in on this device. Please try again.');
+        }
+
+        setStatus('success');
+        setMessage(
+          provider
+            ? `Successfully signed in with ${provider}!`
+            : 'Successfully signed in!'
+        );
+        setTimeout(() => navigate('/dashboard', { replace: true }), 1500);
+      } catch (err: any) {
+        fail(err?.message || 'Sign-in failed. Please try logging in again.');
       }
     };
 
     handleCallback();
-  }, [dispatch, navigate]);
+  }, [navigate, signIn]);
 
   const getStatusIcon = () => {
     switch (status) {

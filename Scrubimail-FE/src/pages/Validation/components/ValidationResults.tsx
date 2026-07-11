@@ -133,6 +133,14 @@ const ValidationResults: React.FC<ValidationResultsProps> = ({
                 Detailed
               </span>
             )}
+            {result.cached && (
+              <span
+                title="Served from cache — a prior verification of this address"
+                className="font-mono text-[9px] px-2 py-0.5 bg-sky-50 border border-sky-200 text-sky-700 rounded-sm uppercase tracking-[0.1em] dark:bg-sky-400/10 dark:border-sky-400/20 dark:text-sky-300"
+              >
+                Cached
+              </span>
+            )}
           </div>
           {score !== null && (
             <span className={`font-['JetBrains_Mono',monospace] font-bold text-xl ${scoreClass}`}>{score}</span>
@@ -168,6 +176,15 @@ const ValidationResults: React.FC<ValidationResultsProps> = ({
           )}
           {result.validation_time && (
             <Row label="Response Time" value={`${result.validation_time.toFixed(0)} ms`} />
+          )}
+          {result.mode && (
+            <Row label="Mode" value={result.mode === 'fast' ? 'Fast (syntax/DNS)' : 'Deep (SMTP)'} />
+          )}
+          {result.verified_at && (
+            <Row
+              label="Verified At"
+              value={new Date(result.verified_at).toLocaleString()}
+            />
           )}
         </div>
 

@@ -47,16 +47,27 @@ axiosInstance.interceptors.response.use(
             const currentPath = window.location.pathname + window.location.search;
             window.location.href = `/login?from=${encodeURIComponent(currentPath)}`;
         }
-        // Extract the actual server error message so callers get readable errors
+        // Unified error envelope (backend Issue 8):
+        //   { success: false, error: { code, message, details: [{field, issue}] } }
+        // Fall back to legacy shapes for any endpoint not yet migrated.
         const serverData = error.response?.data;
+        const envelope = serverData?.error;
         const message =
+            (envelope && typeof envelope === 'object' ? envelope.message : null) ||
             serverData?.detail ||
             serverData?.message ||
-            serverData?.error ||
+            (typeof envelope === 'string' ? envelope : null) ||
             (typeof serverData === 'string' ? serverData : null) ||
             error.message ||
             'An unexpected error occurred';
-        return Promise.reject(new Error(message));
+        const normalized: any = new Error(message);
+        // Expose the stable machine-readable code + field details to callers.
+        if (envelope && typeof envelope === 'object') {
+            normalized.code = envelope.code;
+            normalized.details = envelope.details;
+        }
+        normalized.status = error.response?.status;
+        return Promise.reject(normalized);
     }
 );
 

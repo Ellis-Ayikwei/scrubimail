@@ -1,27 +1,47 @@
 import axiosInstance from "./axiosInstance";
 
 
+/** Verification mode for the realtime endpoint (Issue 9). Deep is the default. */
+export type ValidationMode = 'deep' | 'fast';
+
 export interface EmailValidationRequest {
   email: string;
-  real_time?: boolean;
+  /** Opt into the sub-100ms syntax/DNS-only path (no SMTP probe). */
+  mode?: ValidationMode;
+  details?: boolean;
 }
 
 export interface BulkValidationRequest {
   emails: string[];
 }
 
+/** The five-value verification status (Issue 5). */
+export type VerificationStatus =
+  | 'valid'
+  | 'invalid'
+  | 'catch_all'
+  | 'unknown'
+  | 'do_not_mail';
+
 export interface ValidationResult {
-  id: number;
+  id: string; // UUID
   email: string;
-  status: string;
+  status: string; // record status (completed/…)
   score: number;
   verdict: string;
   is_valid: boolean;
+  /** Machine-readable verification status + sub_status (Issue 5/9). */
+  verification_status?: VerificationStatus;
+  sub_status?: string;
+  /** Realtime endpoint extras (Issue 9). */
+  mode?: ValidationMode;
+  cached?: boolean;
+  verified_at?: string | null;
   breakdown: {
     syntax: { valid: boolean };
-    dns: { valid: boolean; score: number };
+    dns: { valid: boolean; score: number; null_mx?: boolean };
     smtp: { valid: boolean; catch_all: boolean };
-    reputation: { reputation_score: number };
+    reputation: { reputation_score: number; is_spam_trap?: boolean };
     role_based: { is_role_based: boolean };
   };
   suggestions: string[];
@@ -30,14 +50,15 @@ export interface ValidationResult {
 }
 
 export interface BulkJobResponse {
-  job_id: number;
+  job_id: string; // UUID
   total_emails: number;
   status: string;
   message: string;
+  status_url?: string;
 }
 
 export interface BulkJobStatus {
-  job_id: number;
+  job_id: string; // UUID
   status: string;
   progress: number;
   total_emails: number;
@@ -102,26 +123,33 @@ export interface DomainReputation {
 }
 
 class ValidationService {
-  // Single email validation
+  // Single email validation. Deep by default (may return valid/invalid inline);
+  // pass mode:'fast' for the syntax/DNS-only path. `details` returns the full
+  // breakdown. Mode/details go in the query string per the API contract.
   async validateEmail(request: EmailValidationRequest): Promise<ValidationResult> {
-    const response = await axiosInstance.post('/validate/', request);
+    const { email, mode, details } = request;
+    const params: Record<string, string> = {};
+    if (mode === 'fast') params.mode = 'fast';
+    if (details) params.details = 'true';
+    const response = await axiosInstance.post('/validate/', { email }, { params });
     return response.data;
   }
 
-  // Bulk email validation
+  // Bulk email validation — enqueues a job and returns 202 + job_id immediately.
+  // Poll getBulkJobStatus for progress.
   async validateBulk(request: BulkValidationRequest): Promise<BulkJobResponse> {
     const response = await axiosInstance.post('/validate-bulk/', request);
     return response.data;
   }
 
-  // Get bulk job status
-  async getBulkJobStatus(jobId: number): Promise<BulkJobStatus> {
+  // Get bulk job status (ids are UUIDs)
+  async getBulkJobStatus(jobId: string): Promise<BulkJobStatus> {
     const response = await axiosInstance.get(`/bulk-status/${jobId}/`);
     return response.data;
   }
 
-  // Get validation status
-  async getValidationStatus(validationId: number): Promise<ValidationResult> {
+  // Get validation status (ids are UUIDs)
+  async getValidationStatus(validationId: string): Promise<ValidationResult> {
     const response = await axiosInstance.get(`/status/${validationId}/`);
     return response.data;
   }

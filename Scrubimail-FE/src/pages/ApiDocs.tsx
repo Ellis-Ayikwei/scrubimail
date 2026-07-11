@@ -25,43 +25,50 @@ const ApiDocs: React.FC = () => {
       name: 'Single Email Validation',
       method: 'POST',
       path: '/scrubimail/api/v1/validate/',
-      description: 'Validate a single email address in real-time',
+      description:
+        'Deep verification by default: full mailbox check inline (~2-8s), can return valid/invalid. Add ?mode=fast for the sub-100ms syntax/DNS-only path. Repeat lookups are cached.',
       request: {
-        email: 'user@example.com',
-        real_time: true
+        email: 'user@example.com'
       },
       response: {
-        id: 123,
+        id: '9fa54b0c-ccf6-43a5-8706-522dc42c5e52',
         email: 'user@example.com',
         status: 'completed',
-        score: 85,
+        score: 96,
         verdict: 'Valid',
         is_valid: true,
+        verification_status: 'valid',
+        sub_status: 'mailbox_exists',
+        mode: 'deep',
+        cached: false,
+        verified_at: '2026-07-11T09:12:04Z',
         breakdown: {
           syntax: { valid: true },
           dns: { valid: true, score: 90 },
           smtp: { valid: true, catch_all: false },
-          reputation: { reputation_score: 85 },
+          reputation: { reputation_score: 92, is_spam_trap: false },
           role_based: { is_role_based: false }
         },
         suggestions: [],
         warnings: [],
-        validation_time: 0.245
+        validation_time: 2.13
       }
     },
     {
       name: 'Bulk Email Validation',
       method: 'POST',
       path: '/scrubimail/api/v1/validate-bulk/',
-      description: 'Submit multiple emails for bulk validation',
+      description:
+        'Enqueue a bulk job. Returns 202 immediately with a job_id; poll bulk-status for progress. Credits are consumed per processed address.',
       request: {
         emails: ['user1@example.com', 'user2@example.com']
       },
       response: {
-        job_id: 456,
+        job_id: '456e...uuid',
         total_emails: 2,
         status: 'pending',
-        message: 'Bulk validation job queued successfully'
+        message: 'Bulk validation job accepted and queued for processing.',
+        status_url: '/scrubimail/api/v1/bulk-status/456e...uuid/'
       }
     },
     {
@@ -70,7 +77,7 @@ const ApiDocs: React.FC = () => {
       path: '/scrubimail/api/v1/bulk-status/{job_id}/',
       description: 'Get bulk job status and progress',
       response: {
-        job_id: 456,
+        job_id: '456e...uuid',
         status: 'processing',
         progress: 75,
         total_emails: 2,
@@ -315,6 +322,7 @@ const ApiDocs: React.FC = () => {
 
         {/* Errors */}
         {activeTab === 'errors' && (
+          <div className="space-y-4">
           <div className={`${panel} overflow-hidden`}>
             <div className={`px-4 py-3 ${panelHeaderBorder}`}>
               <p className="font-['Space_Grotesk',sans-serif] uppercase tracking-[0.1em] text-[10px] text-gray-600 dark:text-[#bacbbf]">
@@ -347,6 +355,57 @@ const ApiDocs: React.FC = () => {
                 </div>
               ))}
             </div>
+          </div>
+
+          {/* Unified error envelope */}
+          <div className={`${panel} overflow-hidden`}>
+            <div className={`px-4 py-3 ${panelHeaderBorder}`}>
+              <p className="font-['Space_Grotesk',sans-serif] uppercase tracking-[0.1em] text-[10px] text-gray-600 dark:text-[#bacbbf]">
+                Error Envelope
+              </p>
+            </div>
+            <div className="p-4 space-y-3">
+              <p className={bodyMutedSoft}>
+                Every non-2xx response uses one shape. Branch on{' '}
+                <code className="font-mono text-[11px]">error.code</code> — a stable
+                machine-readable value — not on the message or HTTP status.
+              </p>
+              <pre className="bg-gray-900 dark:bg-black/40 rounded-md p-4 overflow-x-auto text-xs text-slate-200 font-['JetBrains_Mono',monospace]">
+{`{
+  "success": false,
+  "error": {
+    "code": "validation_error",
+    "message": "email: Enter a valid email address.",
+    "details": [{ "field": "email", "issue": "Enter a valid email address." }],
+    "meta": {}
+  }
+}`}
+              </pre>
+              <div className="divide-y divide-gray-200 dark:divide-[#3b4a41]/20">
+                {[
+                  ['validation_error', '400', 'Request body / query failed validation'],
+                  ['authentication_required', '401', 'No valid credentials supplied'],
+                  ['invalid_credentials', '401', 'Credentials supplied but rejected'],
+                  ['permission_denied', '403', 'Authenticated but not allowed'],
+                  ['not_found', '404', 'Resource does not exist'],
+                  ['insufficient_credits', '402', 'Not enough credits for the request'],
+                  ['rate_limit_exceeded', '429', 'Throttled or bulk-per-request limit exceeded'],
+                  ['internal_error', '500', 'Unexpected server error (no internals exposed)'],
+                  ['api_error', '—', 'Fallback for anything unmapped'],
+                ].map(([code, http, desc]) => (
+                  <div key={code} className="flex items-center gap-4 py-2">
+                    <code className="font-['JetBrains_Mono',monospace] text-[11px] text-emerald-700 dark:text-[#6effc0] w-52 flex-shrink-0">
+                      {code}
+                    </code>
+                    <span className="font-mono text-[11px] text-gray-500 dark:text-[#bacbbf]/60 w-10 flex-shrink-0">
+                      {http}
+                    </span>
+                    <span className={bodyMutedSoft}>{desc}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
           </div>
         )}
 
