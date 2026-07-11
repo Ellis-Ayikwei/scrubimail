@@ -553,6 +553,25 @@ PAYSTACK_MIN_GHS_MAJOR = os.getenv("PAYSTACK_MIN_GHS_MAJOR", "2.00")
 # Frontend base (Vite default :5173). Used for email links and Paystack callback fallbacks.
 FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:3000").rstrip("/")
 
+# --- OAuth / social login (Issue 11) ----------------------------------------
+# Where the OAuth callback redirects the browser after login. NO environment-
+# specific host or private IP is hardcoded in the auth code — it all comes from
+# here. The user-supplied ?redirect_uri is validated against the allowlist to
+# prevent an open redirect that would leak the one-time auth code.
+OAUTH_FRONTEND_CALLBACK_URL = os.getenv(
+    "OAUTH_FRONTEND_CALLBACK_URL", f"{FRONTEND_URL}/oauth/callback"
+)
+OAUTH_ALLOWED_REDIRECT_URIS = [
+    u.strip()
+    for u in os.getenv(
+        "OAUTH_ALLOWED_REDIRECT_URIS", OAUTH_FRONTEND_CALLBACK_URL
+    ).split(",")
+    if u.strip()
+]
+# The browser redirect carries only this opaque single-use code (never tokens);
+# the SPA exchanges it over POST within this many seconds.
+OAUTH_EXCHANGE_CODE_TTL = int(os.getenv("OAUTH_EXCHANGE_CODE_TTL", 120))
+
 # Paystack return URLs — default to same origin as FRONTEND_URL (override per env in production)
 PAYMENT_SUCCESS_URL = os.getenv(
     "PAYMENT_SUCCESS_URL", f"{FRONTEND_URL}/billing/payment/success"

@@ -22,7 +22,12 @@ from .views import (
     TokenRefreshView,
 )
 from .token_views import SuspensionAwareTokenRefreshView
-from .oauth_views import OAuthLoginView, OAuthCallbackView, OAuthProvidersView
+from .oauth_views import (
+    OAuthLoginView,
+    OAuthCallbackView,
+    OAuthProvidersView,
+    OAuthTokenExchangeView,
+)
 
 urlpatterns = [
     path("register/", RegisterView.as_view(), name="register"),
@@ -65,5 +70,10 @@ urlpatterns = [
         "oauth/<str:provider>/callback/",
         OAuthCallbackView.as_view(),
         name="oauth-callback",
+    ),
+    path(
+        "oauth/exchange/",
+        OAuthTokenExchangeView.as_view(),
+        name="oauth-token-exchange",
     ),
 ]
