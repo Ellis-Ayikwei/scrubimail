@@ -1,4 +1,5 @@
-from django.db import models
+from django.db import models, transaction
+from django.db.models import F
 from django.conf import settings
 from django.utils import timezone
 from datetime import timedelta
@@ -99,22 +100,35 @@ class BillingProfile(Basemodel):
         return self.credits_remaining >= amount
 
     def consume_credits(self, amount, validation_type="single"):
-        """Consume credits for email validation"""
-        if not self.can_use_credits(amount):
-            return False
+        """Atomically consume credits.
 
-        self.credits_remaining -= amount
-        self.credits_used_this_month += amount
-        self.save(update_fields=["credits_remaining", "credits_used_this_month"])
+        Concurrent validations of the same profile must never overspend, so the
+        deduction is a single conditional UPDATE (credits_remaining >= amount)
+        rather than a Python read-modify-write. Zero rows updated == insufficient
+        credits; the balance can never be driven below zero."""
+        if amount <= 0:
+            return True
+        with transaction.atomic():
+            updated = BillingProfile.objects.filter(
+                pk=self.pk, credits_remaining__gte=amount
+            ).update(
+                credits_remaining=F("credits_remaining") - amount,
+                credits_used_this_month=F("credits_used_this_month") + amount,
+            )
+            if not updated:
+                return False  # insufficient credits (lost the race / not enough)
 
-        # Create usage record
-        CreditTransaction.objects.create(
-            billing_profile=self,
-            transaction_type="usage",
-            amount=-amount,
-            description=f"Email validation ({validation_type})",
-            metadata={"validation_type": validation_type},
-        )
+            # Keep the in-memory instance consistent with the DB.
+            self.refresh_from_db(
+                fields=["credits_remaining", "credits_used_this_month"]
+            )
+            CreditTransaction.objects.create(
+                billing_profile=self,
+                transaction_type="usage",
+                amount=-amount,
+                description=f"Email validation ({validation_type})",
+                metadata={"validation_type": validation_type},
+            )
         return True
 
     def add_credits(
@@ -1155,3 +1169,29 @@ class InvoiceLineItem(Basemodel):
         managed = True
         db_table = "invoice_line_items"
         ordering = ["created_at"]
+
+
+class ProcessedWebhookEvent(models.Model):
+    """Idempotency ledger for payment-provider webhooks.
+
+    Paystack retries webhooks and may deliver an event more than once. We record
+    each event's stable id here (unique) inside the same transaction that applies
+    its effects, so a duplicate delivery is a no-op instead of a double-credit.
+    """
+
+    provider = models.CharField(max_length=32, default="paystack")
+    # Stable, per-event id: "{event_type}:{data.id|reference|subscription_code}".
+    event_id = models.CharField(max_length=255, unique=True)
+    event_type = models.CharField(max_length=100, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"{self.provider}:{self.event_id}"
+
+    class Meta:
+        managed = True
+        db_table = "processed_webhook_event"
+        indexes = [
+            models.Index(fields=["provider", "event_id"]),
+            models.Index(fields=["-created_at"]),
+        ]

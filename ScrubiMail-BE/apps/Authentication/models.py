@@ -1,10 +1,80 @@
 from django.db import models
+from django.conf import settings
 from apps.User.models import User
 import pyotp
 import qrcode
 import io
 import base64
+import secrets
+from datetime import timedelta
 from django.utils import timezone
+
+
+class SocialAccount(models.Model):
+    """A verified link between a User and an external OAuth identity.
+
+    Identity is resolved by (provider, provider_uid) — never by email alone —
+    so a provider account can only sign in as the user it is actually linked to.
+    Linking a second provider to the same user is just a second row."""
+
+    PROVIDER_CHOICES = [
+        ("github", "GitHub"),
+        ("gitlab", "GitLab"),
+        ("google", "Google"),
+    ]
+
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="social_accounts",
+    )
+    provider = models.CharField(max_length=32, choices=PROVIDER_CHOICES)
+    provider_uid = models.CharField(max_length=255)
+    email = models.EmailField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = "social_account"
+        # One external identity maps to exactly one link.
+        unique_together = ("provider", "provider_uid")
+        indexes = [
+            models.Index(fields=["provider", "provider_uid"]),
+            models.Index(fields=["user"]),
+        ]
+
+    def __str__(self):
+        return f"{self.provider}:{self.provider_uid} -> {self.user_id}"
+
+
+class OAuthExchangeCode(models.Model):
+    """Short-lived, single-use code exchanged (over POST) for JWT tokens.
+
+    Keeps tokens out of the browser redirect URL entirely: the callback redirects
+    with only this opaque code; the SPA POSTs it to mint fresh tokens once."""
+
+    code = models.CharField(max_length=64, unique=True)
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
+    provider = models.CharField(max_length=32, blank=True)
+    used = models.BooleanField(default=False)
+    expires_at = models.DateTimeField()
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = "oauth_exchange_code"
+        indexes = [models.Index(fields=["code"])]
+
+    @classmethod
+    def issue(cls, user, provider="", ttl_seconds=None):
+        ttl = ttl_seconds or int(getattr(settings, "OAUTH_EXCHANGE_CODE_TTL", 120))
+        return cls.objects.create(
+            code=secrets.token_urlsafe(32),
+            user=user,
+            provider=provider,
+            expires_at=timezone.now() + timedelta(seconds=ttl),
+        )
+
+    def is_valid(self):
+        return (not self.used) and self.expires_at > timezone.now()
 
 
 class TOTPDevice(models.Model):

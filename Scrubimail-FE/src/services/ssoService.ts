@@ -24,8 +24,26 @@ export interface OAuthCallbackResponse {
   user: any;
   access_token: string;
   refresh_token: string;
-  provider: string;
+  provider?: string;
 }
+
+export interface OAuthCallbackParams {
+  code: string | null;
+  error: string | null;
+  provider: string | null;
+}
+
+/** Friendly copy for the backend's OAuth error codes (Issue 11 / envelope). */
+export const OAUTH_ERROR_MESSAGES: Record<string, string> = {
+  unverified_email:
+    "Your email isn't verified with that provider. Verify it there, or sign in another way.",
+  link_required:
+    'An account with this email already exists. Sign in with your password, then link this provider from your account settings.',
+  already_linked: 'That provider account is linked to a different user.',
+  invalid_provider: 'That sign-in provider is not supported.',
+  invalid_code: 'Your sign-in link expired or was already used. Please try again.',
+  oauth_failed: 'Sign-in with the provider failed. Please try again.',
+};
 
 class SSOService {
   /**
@@ -55,20 +73,6 @@ class SSOService {
   }
 
   /**
-   * Handle OAuth callback (usually called by the backend)
-   */
-  async handleOAuthCallback(
-    provider: string,
-    code: string,
-    state?: string
-  ): Promise<OAuthCallbackResponse> {
-    const response = await axiosInstance.get(
-      `/auth/oauth/${provider}/callback/?code=${code}${state ? `&state=${state}` : ''}`
-    );
-    return response.data;
-  }
-
-  /**
    * Redirect to OAuth provider
    */
   redirectToProvider(authorizationUrl: string): void {
@@ -76,24 +80,28 @@ class SSOService {
   }
 
   /**
-   * Handle OAuth callback from URL parameters
+   * Read the OAuth callback params from the URL.
+   *
+   * Tokens are NEVER placed in the URL (they leak via history/logs/Referer).
+   * The backend redirects here with only a single-use `code` (or an `error`),
+   * which is exchanged for tokens over POST — see {@link exchangeCode}.
    */
-  handleCallbackFromUrl(): OAuthCallbackResponse | null {
-    const urlParams = new URLSearchParams(window.location.search);
-    const accessToken = urlParams.get('access_token');
-    const refreshToken = urlParams.get('refresh_token');
-    const provider = urlParams.get('provider');
+  getCallbackParams(): OAuthCallbackParams {
+    const params = new URLSearchParams(window.location.search);
+    return {
+      code: params.get('code'),
+      error: params.get('error'),
+      provider: params.get('provider'),
+    };
+  }
 
-    if (accessToken && refreshToken && provider) {
-      return {
-        user: null, // Will be populated by the backend
-        access_token: accessToken,
-        refresh_token: refreshToken,
-        provider: provider,
-      };
-    }
-
-    return null;
+  /**
+   * Exchange the single-use code from the redirect for JWT tokens (over POST).
+   * The code is short-lived and can only be redeemed once.
+   */
+  async exchangeCode(code: string): Promise<OAuthCallbackResponse> {
+    const response = await axiosInstance.post('/auth/oauth/exchange/', { code });
+    return response.data;
   }
 
   /**
@@ -106,6 +114,7 @@ class SSOService {
     url.searchParams.delete('provider');
     url.searchParams.delete('code');
     url.searchParams.delete('state');
+    url.searchParams.delete('error');
     window.history.replaceState({}, '', url.toString());
   }
 }

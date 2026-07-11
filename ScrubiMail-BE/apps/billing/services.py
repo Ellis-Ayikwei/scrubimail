@@ -548,124 +548,148 @@ class BillingService:
             # Handle one-time payments (credit packages, etc.)
             self._handle_charge_success(data)
 
+    # NOTE: these handlers no longer swallow exceptions. They run inside the
+    # webhook's transaction (see paystack_webhook); on failure the transaction
+    # rolls back — so the idempotency marker and any credit change are undone
+    # together — and the webhook logs/alerts and returns 200 (no retry storm).
+
     def _handle_subscription_created(self, data):
         """Handle subscription created event"""
         subscription_code = data["subscription_code"]
         customer_code = data["customer"]["customer_code"]
 
-        try:
-            profile = BillingProfile.objects.get(paystack_customer_id=customer_code)
-            plan = Plan.objects.get(paystack_plan_code=data["plan"]["plan_code"])
+        profile = BillingProfile.objects.get(paystack_customer_id=customer_code)
+        plan = Plan.objects.get(paystack_plan_code=data["plan"]["plan_code"])
 
-            # Create subscription record
-            Subscription.objects.create(
-                billing_profile=profile,
-                paystack_subscription_id=subscription_code,
-                plan=plan,
-                status="active",
-                current_period_start=datetime.fromisoformat(
-                    data["start"].replace("Z", "+00:00")
-                ),
-                current_period_end=datetime.fromisoformat(
-                    data["next_payment_date"].replace("Z", "+00:00")
-                ),
-                next_billing_date=datetime.fromisoformat(
-                    data["next_payment_date"].replace("Z", "+00:00")
-                ),
-            )
+        # Create subscription record
+        Subscription.objects.create(
+            billing_profile=profile,
+            paystack_subscription_id=subscription_code,
+            plan=plan,
+            status="active",
+            current_period_start=datetime.fromisoformat(
+                data["start"].replace("Z", "+00:00")
+            ),
+            current_period_end=datetime.fromisoformat(
+                data["next_payment_date"].replace("Z", "+00:00")
+            ),
+            next_billing_date=datetime.fromisoformat(
+                data["next_payment_date"].replace("Z", "+00:00")
+            ),
+        )
 
-            # Update billing profile
-            profile.current_plan = plan
-            profile.billing_status = "active"
-            profile.plan_start_date = timezone.now()
-            profile.reset_monthly_credits()
-            profile.save()
-
-        except Exception as e:
-            print(f"Error handling subscription created: {e}")
+        # Update billing profile
+        profile.current_plan = plan
+        profile.billing_status = "active"
+        profile.plan_start_date = timezone.now()
+        profile.reset_monthly_credits()
+        profile.save()
 
     def _handle_subscription_canceled(self, data):
         """Handle subscription canceled event"""
         subscription_code = data["subscription_code"]
 
-        try:
-            subscription = Subscription.objects.get(
-                paystack_subscription_id=subscription_code
-            )
-            subscription.status = "canceled"
-            subscription.save()
+        subscription = Subscription.objects.get(
+            paystack_subscription_id=subscription_code
+        )
+        subscription.status = "canceled"
+        subscription.save()
 
-            profile = subscription.billing_profile
-            profile.billing_status = "canceled"
-            profile.save()
-
-        except Exception as e:
-            print(f"Error handling subscription canceled: {e}")
+        profile = subscription.billing_profile
+        profile.billing_status = "canceled"
+        profile.save()
 
     def _handle_payment_failed(self, data):
         """Handle payment failed event"""
         customer_code = data["customer"]["customer_code"]
 
-        try:
-            profile = BillingProfile.objects.get(paystack_customer_id=customer_code)
-            profile.billing_status = "past_due"
-            profile.save()
-        except Exception as e:
-            print(f"Error handling payment failed: {e}")
+        profile = BillingProfile.objects.get(paystack_customer_id=customer_code)
+        profile.billing_status = "past_due"
+        profile.save()
 
     def _handle_payment_successful(self, data):
         """Handle payment successful event"""
         customer_code = data["customer"]["customer_code"]
 
-        try:
-            profile = BillingProfile.objects.get(paystack_customer_id=customer_code)
-            profile.billing_status = "active"
-            profile.save()
+        profile = BillingProfile.objects.get(paystack_customer_id=customer_code)
+        profile.billing_status = "active"
+        profile.save()
 
-            # Reset monthly credits if it's a new billing period
-            if profile.current_plan:
-                profile.reset_monthly_credits()
+        # Reset monthly credits if it's a new billing period
+        if profile.current_plan:
+            profile.reset_monthly_credits()
 
-        except Exception as e:
-            print(f"Error handling payment successful: {e}")
-    
+    def _resolve_profile_for_charge(self, data, metadata):
+        """Resolve the billing profile for a one-time charge, preferring the
+        user_id recorded at checkout, then the Paystack customer code."""
+        user_id = metadata.get("user_id")
+        if user_id:
+            profile = BillingProfile.objects.filter(user_id=user_id).first()
+            if profile:
+                return profile
+        customer_code = (data.get("customer") or {}).get("customer_code")
+        if customer_code:
+            return BillingProfile.objects.filter(
+                paystack_customer_id=customer_code
+            ).first()
+        return None
+
     def _handle_charge_success(self, data):
-        """Handle successful one-time charge (credit packages, etc.)"""
+        """Handle a successful one-time charge (credit packages / direct credits).
+
+        Credits are derived from the catalog package or the credit count recorded
+        at checkout — NEVER cast from the raw paid amount, which would assume a
+        single currency (the old "kobo to naira, 1 naira = 1 credit" was wrong;
+        the product bills GHS/USD via the FX layer).
+        """
         from .models import CreditPackagePurchase
-        
+
         reference = data.get("reference")
-        metadata = data.get("metadata", {})
-        
-        try:
-            # Check if this is a credit package purchase
-            if metadata.get("type") == "credit_package":
-                purchase_id = metadata.get("purchase_id")
-                
-                if purchase_id:
-                    purchase = CreditPackagePurchase.objects.get(id=purchase_id)
-                    
-                    if purchase.status == "pending":
-                        # Complete the purchase
-                        purchase.complete_purchase()
-                        
-                        print(f"Credit package purchase {purchase_id} completed successfully")
-            
-            # Handle other one-time payment types here
-            elif metadata.get("type") == "credit_purchase":
-                # Handle direct credit purchases (existing logic)
-                customer_code = data["customer"]["customer_code"]
-                profile = BillingProfile.objects.get(paystack_customer_id=customer_code)
-                
-                amount = data["amount"] / 100  # Convert from kobo to naira
-                credits = int(amount)  # 1 naira = 1 credit
-                
-                profile.add_credits(
-                    credits,
-                    f"Credit purchase via Paystack (Ref: {reference})"
+        metadata = data.get("metadata", {}) or {}
+        charge_type = metadata.get("type")
+
+        if charge_type == "credit_package":
+            purchase_id = metadata.get("purchase_id")
+            if not purchase_id:
+                logger.error("credit_package charge %s missing purchase_id", reference)
+                return
+            purchase = CreditPackagePurchase.objects.get(id=purchase_id)
+            if purchase.status == "pending":
+                # Credits come from purchase.credits_purchased (catalog package).
+                purchase.complete_purchase()
+                logger.info("Credit package purchase %s completed", purchase_id)
+
+        elif charge_type == "credit_purchase":
+            # Credits come from what was recorded at checkout
+            # (initialize_credit_purchase stores metadata['credits'] and
+            # metadata['user_id']) — not from an amount-to-credit cast.
+            credits = metadata.get("credits")
+            if credits is None:
+                logger.error(
+                    "credit_purchase charge %s missing 'credits' metadata; "
+                    "refusing to derive credits from the raw amount",
+                    reference,
                 )
-                
-        except Exception as e:
-            print(f"Error handling charge success: {e}")
+                return
+            profile = self._resolve_profile_for_charge(data, metadata)
+            if profile is None:
+                logger.error(
+                    "credit_purchase charge %s: no billing profile found", reference
+                )
+                return
+            profile.add_credits(
+                int(credits), f"Credit purchase via Paystack (Ref: {reference})"
+            )
+            logger.info(
+                "Added %s credits to profile %s (ref %s)",
+                credits,
+                profile.id,
+                reference,
+            )
+        else:
+            logger.info(
+                "charge.success with unhandled type=%s (ref %s)", charge_type, reference
+            )
 
 
     def get_usage_analytics(self, user):

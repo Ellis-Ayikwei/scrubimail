@@ -20,6 +20,9 @@ const Validation = () => {
   const [showDetails, setShowDetails] = useState(false);
   const [includeDetails, setIncludeDetails] = useState(false);
   const [validationMode, setValidationMode] = useState<'single' | 'bulk'>('single');
+  // Deep = full inline SMTP verification (can return "valid", ~2-8s). Off = fast
+  // syntax/DNS-only path (?mode=fast, sub-100ms, never confirms a mailbox).
+  const [deepMode, setDeepMode] = useState(true);
   
   // API Key selection states
   const [apiKeys, setApiKeys] = useState<APIKey[]>([]);
@@ -60,15 +63,17 @@ const Validation = () => {
       if (selectedApiKey) {
         headers['X-API-Key'] = selectedApiKey.key;
       }
-      const params = includeDetails ? { details: 'true' } : {};
-      const res = await axiosInstance.post('/validate/', { email }, { 
+      const params: Record<string, string> = {};
+      if (includeDetails) params.details = 'true';
+      if (!deepMode) params.mode = 'fast';
+      const res = await axiosInstance.post('/validate/', { email }, {
         headers,
-        params 
+        params
       });
       setResult(res.data);
       setShowDetails(false);
     } catch (err: any) {
-      setError(err.response?.data?.detail || 'Validation failed');
+      setError(err.message || 'Validation failed');
     } finally {
       setLoading(false);
     }
@@ -102,7 +107,7 @@ const Validation = () => {
       });
       setBulkTaskIds(res.data.task_ids || [res.data.job_id]);
     } catch (err: any) {
-      setError('Bulk validation failed');
+      setError(err.message || 'Bulk validation failed');
     } finally {
       setLoading(false);
     }
@@ -205,6 +210,39 @@ const Validation = () => {
           <Upload className="w-3.5 h-3.5" /> Bulk Upload
         </button>
       </div>
+
+      {/* Deep vs fast verification (single mode only) */}
+      {validationMode === 'single' && (
+        <div className="flex items-center justify-between bg-gray-50 border border-gray-200 rounded-sm px-3 py-2 dark:bg-[#1c2024] dark:border-[#3b4a41]/40">
+          <div className="flex flex-col">
+            <span className="font-mono uppercase tracking-[0.1em] text-[10px] text-gray-700 dark:text-[#bacbbf]">
+              {deepMode ? 'Deep verification' : 'Fast mode'}
+            </span>
+            <span className="font-mono text-[9px] text-gray-400 dark:text-[#bacbbf]/50">
+              {deepMode
+                ? 'Full inline SMTP check — can confirm the mailbox (~2-8s)'
+                : 'Syntax + DNS only — instant, never confirms a mailbox'}
+            </span>
+          </div>
+          <button
+            type="button"
+            role="switch"
+            aria-checked={deepMode}
+            onClick={() => setDeepMode((v) => !v)}
+            className={`relative w-10 h-5 rounded-full transition-colors ${
+              deepMode
+                ? 'bg-emerald-500 dark:bg-[#6effc0]/70'
+                : 'bg-gray-300 dark:bg-[#3b4a41]'
+            }`}
+          >
+            <span
+              className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white transition-transform ${
+                deepMode ? 'translate-x-5' : ''
+              }`}
+            />
+          </button>
+        </div>
+      )}
 
       <div className="grid lg:grid-cols-2 gap-5">
         <div className="space-y-4">

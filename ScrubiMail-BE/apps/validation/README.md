@@ -426,3 +426,67 @@ volumes:
 - **Email Support**: support@scrubimail.com
 - **Status Page**: status.scrubimail.com
 - **Community Forum**: community.scrubimail.com 
+## Error responses
+
+Every non-2xx API response uses one envelope:
+
+```json
+{
+  "success": false,
+  "error": {
+    "code": "validation_error",
+    "message": "email: This field is required.",
+    "details": [{ "field": "email", "issue": "This field is required." }],
+    "meta": {}
+  }
+}
+```
+
+- `code` is a stable, machine-readable value — branch on this, not on the HTTP
+  status or the message.
+- `message` is a human summary: the first detail as `"field: issue"`, or the
+  bare issue for non-field errors.
+- `details` is a flat list of `{field, issue}` with dotted field paths (e.g.
+  `profile.email`) for nested serializers.
+- `meta` is optional and carries extras such as a throttle `retry_after` or a
+  bulk-limit `limit`/`requested`/`upgrade_url` — never at the top level.
+
+### Error codes
+
+| code | HTTP | when |
+| --- | --- | --- |
+| `validation_error` | 400 | request body / query failed validation |
+| `authentication_required` | 401 | no valid credentials supplied |
+| `invalid_credentials` | 401 | credentials supplied but rejected |
+| `permission_denied` | 403 | authenticated but not allowed |
+| `not_found` | 404 | resource does not exist |
+| `insufficient_credits` | 402 | not enough credits for the request |
+| `rate_limit_exceeded` | 429 | throttled or bulk-per-request limit exceeded |
+| `internal_error` | 500 | unexpected server error (no internals exposed) |
+| `api_error` | any | fallback for anything unmapped |
+
+500 responses never include exception text or a stack trace; the full traceback
+is logged server-side only. These codes are covered by tests
+(`apps/validation/tests/test_error_envelope.py`) so they cannot change silently.
+
+## Realtime verification modes
+
+`POST /scrubimail/api/v1/validate/` performs **deep verification by default**:
+full mailbox check (syntax → DNS → list checks → one SMTP probe) inline, within
+a hard budget of `VALIDATION_REALTIME_BUDGET_SECONDS` (default 8s). It can
+return `status: "valid"`.
+
+- **deep** (default): may return `valid` / `invalid` / `catch_all`. If the
+  budget expires, the per-provider rate limiter denies a slot, or the SMTP
+  egress circuit breaker is open, it returns an honest `unknown` with
+  `sub_status` one of `timeout` / `rate_limited` / `smtp_unavailable` — it never
+  blocks past the budget and never fabricates `valid`.
+- **fast** (`?mode=fast` or `?deep=false`): syntax/DNS/list-only, sub-100ms,
+  never opens an SMTP connection. Use for form-field validation.
+
+A shared result cache (`emailval:result:{sha256(email)}`) is checked before any
+network work; repeat lookups return instantly with `"cached": true` and a
+`verified_at` timestamp. Deep Celery/bulk verifications write to the same cache,
+so background work warms the realtime path. Terminal results cache for
+`VALIDATION_RESULT_CACHE_TTL` (7 days); plain `unknown` for 1 day; transient
+failures (rate-limited/timeout/egress-down) are not cached.

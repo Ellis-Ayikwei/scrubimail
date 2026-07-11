@@ -42,9 +42,10 @@ const ValidationResults: React.FC<ValidationResultsProps> = ({
   const subStatus: string | undefined = result.sub_status;
   const score = typeof result.score === 'number' ? result.score : null;
 
-  // ZeroBounce-style verdict → icon + tone. Covers the new vocabulary
-  // (Valid / Invalid / Catch-All / Unknown / Do Not Mail / Spamtrap) plus the
-  // legacy Risky / High Risk labels.
+  // ZeroBounce-style verdict → icon + tone. Exactly five statuses now:
+  // Valid / Invalid / Catch-All / Unknown / Do Not Mail. Spam traps are folded
+  // into "Do Not Mail" (sub_status: spamtrap_detected), not a sixth status.
+  // Legacy Risky / High Risk labels are still tolerated for old records.
   const VERDICT_META: Record<
     string,
     { Icon: typeof CheckCircle; cls: string; chip: string }
@@ -54,7 +55,6 @@ const ValidationResults: React.FC<ValidationResultsProps> = ({
     'Catch-All': { Icon: Network, cls: 'text-amber-600 dark:text-[#f59e0b]', chip: 'bg-amber-50 border-amber-200 text-amber-800 dark:bg-[#f59e0b]/10 dark:border-[#f59e0b]/25 dark:text-[#f59e0b]' },
     Unknown: { Icon: HelpCircle, cls: 'text-gray-500 dark:text-[#bacbbf]', chip: 'bg-gray-100 border-gray-200 text-gray-700 dark:bg-white/5 dark:border-white/10 dark:text-[#bacbbf]' },
     'Do Not Mail': { Icon: Ban, cls: 'text-rose-600 dark:text-rose-400', chip: 'bg-rose-50 border-rose-200 text-rose-800 dark:bg-rose-500/10 dark:border-rose-500/25 dark:text-rose-300' },
-    Spamtrap: { Icon: AlertTriangle, cls: 'text-red-600 dark:text-[#ff4c4c]', chip: 'bg-red-50 border-red-200 text-red-800 dark:bg-[#ff4c4c]/10 dark:border-[#ff4c4c]/25 dark:text-[#ff4c4c]' },
     Risky: { Icon: AlertTriangle, cls: 'text-amber-600 dark:text-[#f59e0b]', chip: 'bg-amber-50 border-amber-200 text-amber-800 dark:bg-[#f59e0b]/10 dark:border-[#f59e0b]/25 dark:text-[#f59e0b]' },
     'High Risk': { Icon: AlertTriangle, cls: 'text-red-600 dark:text-[#ff4c4c]', chip: 'bg-red-50 border-red-200 text-red-800 dark:bg-[#ff4c4c]/10 dark:border-[#ff4c4c]/25 dark:text-[#ff4c4c]' },
   };
@@ -133,6 +133,14 @@ const ValidationResults: React.FC<ValidationResultsProps> = ({
                 Detailed
               </span>
             )}
+            {result.cached && (
+              <span
+                title="Served from cache — a prior verification of this address"
+                className="font-mono text-[9px] px-2 py-0.5 bg-sky-50 border border-sky-200 text-sky-700 rounded-sm uppercase tracking-[0.1em] dark:bg-sky-400/10 dark:border-sky-400/20 dark:text-sky-300"
+              >
+                Cached
+              </span>
+            )}
           </div>
           {score !== null && (
             <span className={`font-['JetBrains_Mono',monospace] font-bold text-xl ${scoreClass}`}>{score}</span>
@@ -168,6 +176,15 @@ const ValidationResults: React.FC<ValidationResultsProps> = ({
           )}
           {result.validation_time && (
             <Row label="Response Time" value={`${result.validation_time.toFixed(0)} ms`} />
+          )}
+          {result.mode && (
+            <Row label="Mode" value={result.mode === 'fast' ? 'Fast (syntax/DNS)' : 'Deep (SMTP)'} />
+          )}
+          {result.verified_at && (
+            <Row
+              label="Verified At"
+              value={new Date(result.verified_at).toLocaleString()}
+            />
           )}
         </div>
 

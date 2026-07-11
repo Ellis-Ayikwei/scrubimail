@@ -3,6 +3,7 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.decorators import action
 from django.shortcuts import get_object_or_404
+from django.urls import reverse
 from django.utils import timezone
 from django.db.models import Q, Avg, Count
 from django.db import models
@@ -28,6 +29,7 @@ from rest_framework.permissions import BasePermission
 from apps.billing.services import BillingService
 from apps.billing.models import CreditTransaction, EmailValidationUsage
 from backend.throttling import PlanBasedRateThrottle, BulkValidationThrottle, PlanFeatureThrottle
+from backend.api_exceptions import InsufficientCredits, BulkLimitExceeded
 
 
 class SingleEmailValidationView(APIView):
@@ -35,150 +37,94 @@ class SingleEmailValidationView(APIView):
     throttle_classes = [PlanBasedRateThrottle, PlanFeatureThrottle]
 
     def post(self, request):
-        """Single email validation with real-time option"""
+        """Single email validation.
+
+        DEEP by default: full mailbox verification runs inline within a hard time
+        budget (VALIDATION_REALTIME_BUDGET_SECONDS) and can return status=valid.
+        Pass ?mode=fast (or ?deep=false) for the sub-100ms syntax/DNS/list-only
+        path that never opens an SMTP connection. A shared result cache returns
+        repeat lookups instantly with "cached": true.
+        """
         serializer = EmailValidationSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
         email = serializer.validated_data["email"]
-        real_time = serializer.validated_data.get("real_time", False)
         user = request.user
+
+        # Fast mode is opt-in: ?mode=fast or ?deep=false (back-compat). Deep is
+        # the default so the endpoint can produce the product's core answer.
+        mode = request.query_params.get("mode", "").lower()
+        deep_q = request.query_params.get("deep", "").lower()
+        fast = mode == "fast" or deep_q in ("false", "0", "no")
 
         # Check if user has enough credits
         billing_service = BillingService()
         profile = billing_service.get_or_create_billing_profile(user)
 
         if not profile.can_use_credits(1):
-            return Response(
-                {"error": "Insufficient credits. Please purchase more credits."},
-                status=status.HTTP_402_PAYMENT_REQUIRED,
+            raise InsufficientCredits(
+                "Insufficient credits. Please purchase more credits."
             )
 
-        if real_time:
-            # Perform real-time validation. deep=False guarantees the SMTP
-            # probe (the only multi-second stage) is skipped, keeping this
-            # interactive path at ~20-50ms cold / sub-ms cached.
-            validator = AdvancedEmailValidator()
-            result = validator.validate_email(email, deep=False)
+        validator = AdvancedEmailValidator()
+        result, from_cache = validator.validate_email_realtime(email, fast=fast)
 
-            # Create validation record
-            validation = EmailValidation.objects.create(
-                email=email,
-                user=user,
-                status="completed",
-                score=result.score,
-                breakdown={
-                    "syntax": result.breakdown.get("syntax", {}),
-                    "dns": result.breakdown.get("dns", {}),
-                    "smtp": result.breakdown.get("smtp", {}),
-                    "reputation": result.breakdown.get("reputation", {}),
-                    "role_based": result.breakdown.get("role_based", {}),
-                    "risk_score": {
-                        "score": result.score,
-                        "verdict": result.verdict,
-                        "is_valid": result.is_valid,
-                    },
+        validation = EmailValidation.objects.create(
+            email=email,
+            user=user,
+            status="completed",
+            score=result.score,
+            breakdown={
+                "syntax": result.breakdown.get("syntax", {}),
+                "dns": result.breakdown.get("dns", {}),
+                "smtp": result.breakdown.get("smtp", {}),
+                "reputation": result.breakdown.get("reputation", {}),
+                "role_based": result.breakdown.get("role_based", {}),
+                "risk_score": {
+                    "score": result.score,
+                    "verdict": result.verdict,
+                    "is_valid": result.is_valid,
                 },
-                suggestions=result.suggestions,
-                warnings=result.warnings,
-                metadata=result.metadata,
-                job_type="api",
-            )
+            },
+            suggestions=result.suggestions,
+            warnings=result.warnings,
+            metadata=result.metadata,
+            job_type="api",
+        )
 
-            # Consume credits and create billing records
-            profile.consume_credits(1, f"Email validation: {email}")
+        # Consume credits and create billing records
+        profile.consume_credits(1, f"Email validation: {email}")
+        EmailValidationUsage.objects.create(
+            billing_profile=profile,
+            validation_request_id=str(validation.id),
+            credits_consumed=1,
+            cost_per_credit=0.01,
+            validation_type="single",
+            email_count=1,
+        )
 
-            # Create usage tracking record
-            EmailValidationUsage.objects.create(
-                billing_profile=profile,
-                validation_request_id=str(validation.id),
-                credits_consumed=1,
-                cost_per_credit=0.01,
-                validation_type="single",
-                email_count=1,
-            )
+        details = request.query_params.get("details", "false").lower() == "true"
+        response_data = {
+            "id": validation.id,
+            "email": email,
+            "status": "completed",
+            "score": result.score,
+            "verdict": result.verdict,
+            "is_valid": result.is_valid,
+            "verification_status": result.metadata.get("status"),
+            "sub_status": result.metadata.get("sub_status"),
+            "mode": "fast" if fast else "deep",
+            "cached": from_cache,
+            "verified_at": result.metadata.get("verified_at"),
+            "suggestions": result.suggestions,
+            "warnings": result.warnings,
+            "validation_time": result.metadata.get("validation_time", 0),
+        }
+        if details:
+            response_data["breakdown"] = validation.breakdown
+            response_data["metadata"] = result.metadata
 
-            # Check for ?details=true in query params
-            details = request.query_params.get("details", "false").lower() == "true"
-
-            response_data = {
-                "id": validation.id,
-                "email": email,
-                "status": "completed",
-                "score": result.score,
-                "verdict": result.verdict,
-                "is_valid": result.is_valid,
-                "verification_status": result.metadata.get("status"),
-                "sub_status": result.metadata.get("sub_status"),
-                "suggestions": result.suggestions,
-                "warnings": result.warnings,
-                "validation_time": result.metadata.get("validation_time", 0),
-            }
-            if details:
-                response_data["breakdown"] = validation.breakdown
-                response_data["metadata"] = result.metadata
-
-            return Response(response_data, status=status.HTTP_200_OK)
-        else:
-            # Non-real-time path: still validate synchronously using the
-            # validator directly (avoids Celery dependency) but with the
-            # same optimised AdvancedEmailValidator pipeline.
-            validator = AdvancedEmailValidator()
-            result = validator.validate_email(email)
-
-            validation = EmailValidation.objects.create(
-                email=email,
-                user=user,
-                status="completed",
-                score=result.score,
-                breakdown={
-                    "syntax": result.breakdown.get("syntax", {}),
-                    "dns": result.breakdown.get("dns", {}),
-                    "smtp": result.breakdown.get("smtp", {}),
-                    "reputation": result.breakdown.get("reputation", {}),
-                    "role_based": result.breakdown.get("role_based", {}),
-                    "risk_score": {
-                        "score": result.score,
-                        "verdict": result.verdict,
-                        "is_valid": result.is_valid,
-                    },
-                },
-                suggestions=result.suggestions,
-                warnings=result.warnings,
-                metadata=result.metadata,
-                job_type="single",
-            )
-
-            # Consume credits and create billing records
-            profile.consume_credits(1, f"Email validation: {email}")
-
-            EmailValidationUsage.objects.create(
-                billing_profile=profile,
-                validation_request_id=str(validation.id),
-                credits_consumed=1,
-                cost_per_credit=0.01,
-                validation_type="single",
-                email_count=1,
-            )
-
-            details = request.query_params.get("details", "false").lower() == "true"
-            response_data = {
-                "id": validation.id,
-                "email": email,
-                "status": "completed",
-                "score": result.score,
-                "verdict": result.verdict,
-                "is_valid": result.is_valid,
-                "verification_status": result.metadata.get("status"),
-                "sub_status": result.metadata.get("sub_status"),
-                "suggestions": result.suggestions,
-                "warnings": result.warnings,
-                "validation_time": result.metadata.get("validation_time", 0),
-            }
-            if details:
-                response_data["breakdown"] = validation.breakdown
-                response_data["metadata"] = result.metadata
-
-            return Response(response_data, status=status.HTTP_200_OK)
+        return Response(response_data, status=status.HTTP_200_OK)
 
 
 class BulkEmailValidationView(APIView):
@@ -189,149 +135,57 @@ class BulkEmailValidationView(APIView):
         """Bulk email validation with job tracking"""
         # Check if bulk limit was exceeded by throttle
         if hasattr(request, 'bulk_limit_exceeded') and request.bulk_limit_exceeded:
-            return Response(
-                {
-                    "error": f"Bulk validation limit exceeded. Your plan allows {request.bulk_limit} emails per request, but you requested {request.bulk_requested}. Please upgrade your plan or reduce the number of emails.",
-                    "limit": request.bulk_limit,
-                    "requested": request.bulk_requested,
-                    "upgrade_url": "/plans/",
-                },
-                status=status.HTTP_429_TOO_MANY_REQUESTS,
+            raise BulkLimitExceeded(
+                detail=(
+                    f"Bulk validation limit exceeded. Your plan allows "
+                    f"{request.bulk_limit} emails per request, but you requested "
+                    f"{request.bulk_requested}. Please upgrade your plan or reduce "
+                    f"the number of emails."
+                ),
+                limit=request.bulk_limit,
+                requested=request.bulk_requested,
+                upgrade_url="/plans/",
             )
-        
+
         serializer = BulkEmailValidationSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
         emails = serializer.validated_data["emails"]
         user = request.user
 
-        # Check if user has enough credits
+        # Check if user has enough credits. This is an upfront guard only — the
+        # task consumes credits per processed address (never here), so the job
+        # can't over-charge and a worker restart can't double-charge.
         billing_service = BillingService()
         profile = billing_service.get_or_create_billing_profile(user)
 
         required_credits = len(emails)
         if not profile.can_use_credits(required_credits):
-            return Response(
-                {
-                    "error": f"Insufficient credits. You need {required_credits} credits but only have {profile.credits_remaining}."
-                },
-                status=status.HTTP_402_PAYMENT_REQUIRED,
+            raise InsufficientCredits(
+                f"Insufficient credits. You need {required_credits} credits but "
+                f"only have {profile.credits_remaining}."
             )
 
-        # Create bulk job
+        # Create the job row and hand ALL processing to Celery. The request must
+        # never do the work inline — a large job would tie up a gunicorn worker
+        # for minutes and die on gateway timeout or deploy. Return 202 + job id
+        # immediately; the client polls BulkJobStatusView for progress.
         bulk_job = BulkValidationJob.objects.create(
             user=user, emails=emails, total_emails=len(emails), status="pending"
         )
+        bulk_validate_emails_task.delay(bulk_job.id)
 
-        # Process bulk validation directly (no Celery dependency)
-        try:
-            from concurrent.futures import ThreadPoolExecutor, as_completed
-
-            validator = AdvancedEmailValidator()
-            bulk_job.status = "processing"
-            bulk_job.save()
-
-            validation_records = []
-            details = request.query_params.get("details", "false").lower() == "true"
-
-            # This path runs inline in the HTTP request, so it must stay fast:
-            # deep=False skips the multi-second SMTP probe. For SMTP-verified
-            # bulk, route through the Celery task (bulk_validate_emails_task)
-            # and poll BulkJobStatusView instead.
-            def validate_one(email_addr):
-                return email_addr, validator.validate_email(email_addr, deep=False)
-
-            # Validate emails in parallel (up to 5 concurrent)
-            with ThreadPoolExecutor(max_workers=5) as executor:
-                futures = {executor.submit(validate_one, em): em for em in emails}
-                for future in as_completed(futures):
-                    try:
-                        email_addr, result = future.result()
-                        v = EmailValidation.objects.create(
-                            email=email_addr,
-                            user=user,
-                            status="completed",
-                            score=result.score,
-                            breakdown={
-                                "syntax": result.breakdown.get("syntax", {}),
-                                "dns": result.breakdown.get("dns", {}),
-                                "smtp": result.breakdown.get("smtp", {}),
-                                "reputation": result.breakdown.get("reputation", {}),
-                                "role_based": result.breakdown.get("role_based", {}),
-                                "risk_score": {
-                                    "score": result.score,
-                                    "verdict": result.verdict,
-                                    "is_valid": result.is_valid,
-                                },
-                            },
-                            suggestions=result.suggestions,
-                            warnings=result.warnings,
-                            metadata=result.metadata,
-                            job_type="bulk",
-                        )
-                        validation_records.append(v)
-                    except Exception:
-                        continue
-
-            bulk_job.status = "completed"
-            bulk_job.total_processed = len(validation_records)
-            bulk_job.progress = 100
-            bulk_job.save()
-
-            # Consume credits and create billing records
-            profile.consume_credits(
-                required_credits, f"Bulk email validation: {len(emails)} emails"
-            )
-
-            EmailValidationUsage.objects.create(
-                billing_profile=profile,
-                validation_request_id=str(bulk_job.id),
-                credits_consumed=required_credits,
-                cost_per_credit=0.01,
-                validation_type="bulk",
-                email_count=len(emails),
-            )
-
-            results = []
-            for v in validation_records:
-                item = {
-                    "id": v.id,
-                    "email": v.email,
-                    "status": v.status,
-                    "score": v.score,
-                    "verdict": v.breakdown.get("risk_score", {}).get("verdict"),
-                    "is_valid": v.breakdown.get("risk_score", {}).get("is_valid"),
-                    "suggestions": v.suggestions,
-                    "warnings": v.warnings,
-                    "validation_time": v.metadata.get("validation_time", 0),
-                }
-                if details:
-                    item["breakdown"] = v.breakdown
-                    item["metadata"] = v.metadata
-                results.append(item)
-
-            return Response(
-                {
-                    "job_id": bulk_job.id,
-                    "total_emails": len(emails),
-                    "status": "completed",
-                    "message": "Bulk validation completed successfully",
-                    "results": results,
-                },
-                status=status.HTTP_200_OK,
-            )
-        except Exception as e:
-            bulk_job.status = "failed"
-            bulk_job.save()
-            return Response(
-                {
-                    "job_id": bulk_job.id,
-                    "total_emails": len(emails),
-                    "status": "failed",
-                    "message": "Bulk validation failed",
-                },
-                status=status.HTTP_202_ACCEPTED,
-            )
+        status_path = reverse("bulk-job-status", args=[bulk_job.id])
+        return Response(
+            {
+                "job_id": bulk_job.id,
+                "total_emails": len(emails),
+                "status": "pending",
+                "message": "Bulk validation job accepted and queued for processing.",
+                "status_url": request.build_absolute_uri(status_path),
+            },
+            status=status.HTTP_202_ACCEPTED,
+        )
 
 
 class BulkJobStatusView(APIView):
@@ -341,10 +195,11 @@ class BulkJobStatusView(APIView):
         """Get bulk job status and progress"""
         job = get_object_or_404(BulkValidationJob, id=job_id, user=request.user)
 
-        # Get validation results for this job
-        validations = EmailValidation.objects.filter(
-            user=request.user, job_type="bulk", created_at__gte=job.created_at
-        ).order_by("-created_at")
+        # Results are linked to the job via the bulk_job FK — exact, not a fuzzy
+        # "bulk rows created after this job started" heuristic.
+        validations = EmailValidation.objects.filter(bulk_job=job).order_by(
+            "-created_at"
+        )
 
         # Calculate summary
         total_validations = validations.count()

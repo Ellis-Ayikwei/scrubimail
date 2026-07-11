@@ -172,6 +172,20 @@ CELERY_TASK_ROUTES = {
     "apps.validation.tasks.bulk_validate_emails_task": {"queue": "smtp_validation"},
 }
 
+# Scheduled (beat) tasks. The disposable-domain blocklist is refreshed weekly so
+# coverage keeps up with DEA services that rotate domains to evade static lists.
+from celery.schedules import crontab  # noqa: E402
+
+CELERY_BEAT_SCHEDULE = {
+    "refresh-disposable-domains-weekly": {
+        "task": "apps.validation.tasks.refresh_disposable_domains_task",
+        # Sundays at 03:00 UTC — off-peak. Keep it on the default queue (not the
+        # egress smtp_validation queue): it only downloads and writes a file.
+        "schedule": crontab(hour=3, minute=0, day_of_week=0),
+        "options": {"queue": "default"},
+    },
+}
+
 # Cache Configuration
 # Shared cache for DNS/MX and domain-reputation lookups so validation hits are
 # shared across all web/worker processes and survive restarts (vs. a per-process
@@ -539,6 +553,25 @@ PAYSTACK_MIN_GHS_MAJOR = os.getenv("PAYSTACK_MIN_GHS_MAJOR", "2.00")
 # Frontend base (Vite default :5173). Used for email links and Paystack callback fallbacks.
 FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:3000").rstrip("/")
 
+# --- OAuth / social login (Issue 11) ----------------------------------------
+# Where the OAuth callback redirects the browser after login. NO environment-
+# specific host or private IP is hardcoded in the auth code — it all comes from
+# here. The user-supplied ?redirect_uri is validated against the allowlist to
+# prevent an open redirect that would leak the one-time auth code.
+OAUTH_FRONTEND_CALLBACK_URL = os.getenv(
+    "OAUTH_FRONTEND_CALLBACK_URL", f"{FRONTEND_URL}/oauth/callback"
+)
+OAUTH_ALLOWED_REDIRECT_URIS = [
+    u.strip()
+    for u in os.getenv(
+        "OAUTH_ALLOWED_REDIRECT_URIS", OAUTH_FRONTEND_CALLBACK_URL
+    ).split(",")
+    if u.strip()
+]
+# The browser redirect carries only this opaque single-use code (never tokens);
+# the SPA exchanges it over POST within this many seconds.
+OAUTH_EXCHANGE_CODE_TTL = int(os.getenv("OAUTH_EXCHANGE_CODE_TTL", 120))
+
 # Paystack return URLs — default to same origin as FRONTEND_URL (override per env in production)
 PAYMENT_SUCCESS_URL = os.getenv(
     "PAYMENT_SUCCESS_URL", f"{FRONTEND_URL}/billing/payment/success"
@@ -613,11 +646,111 @@ VALIDATION_SMTP_FAILURE_THRESHOLD = int(
     os.getenv("VALIDATION_SMTP_FAILURE_THRESHOLD", 3)
 )
 VALIDATION_SMTP_BLOCK_TTL = int(os.getenv("VALIDATION_SMTP_BLOCK_TTL", 600))
-# Optional external disposable-domain feed (one domain per line), merged with
-# the bundled baseline. Point at a maintained 100k+ feed in production.
-VALIDATION_DISPOSABLE_DOMAINS_FILE = os.getenv(
-    "VALIDATION_DISPOSABLE_DOMAINS_FILE", None
+# Catch-all detection is cached per domain so we probe a garbage address at
+# most once per domain per TTL (default 24h), never once per deliverable
+# address. Reusing the live SMTP session (RSET + RCPT) keeps it to one
+# connection per address in the common case.
+VALIDATION_CATCHALL_TTL = int(os.getenv("VALIDATION_CATCHALL_TTL", 86400))
+
+# Per-kind cache TTLs (seconds) — replaces the old single 5-minute TTL so each
+# kind of lookup lives as long as it is actually stable.
+VALIDATION_CACHE_TTL_DNS = int(os.getenv("VALIDATION_CACHE_TTL_DNS", 21600))  # 6h
+VALIDATION_CACHE_TTL_REPUTATION = int(
+    os.getenv("VALIDATION_CACHE_TTL_REPUTATION", 86400)  # 24h
 )
+# NXDOMAIN / no-records answers change more often (domain just registered), so
+# cache them briefly.
+VALIDATION_CACHE_TTL_NEGATIVE_DNS = int(
+    os.getenv("VALIDATION_CACHE_TTL_NEGATIVE_DNS", 3600)  # 1h
+)
+
+# Greylisting (SMTP 450): the server asked us to retry later. Re-probe once after
+# this delay, up to this many times, before finalizing as unknown/greylisted.
+VALIDATION_GREYLIST_RETRY_DELAY = int(
+    os.getenv("VALIDATION_GREYLIST_RETRY_DELAY", 600)  # 10 min
+)
+VALIDATION_GREYLIST_MAX_RETRIES = int(os.getenv("VALIDATION_GREYLIST_MAX_RETRIES", 2))
+
+# Try up to this many MX hosts, but ONLY advancing to the next when the previous
+# failed to CONNECT — never re-probe a host that already answered.
+VALIDATION_SMTP_MAX_MX_HOSTS = int(os.getenv("VALIDATION_SMTP_MAX_MX_HOSTS", 3))
+
+# --- Realtime endpoint (deep verification inline, within a hard time budget) --
+# The customer-facing single-validation endpoint performs FULL verification by
+# default within this wall-clock budget. If the budget expires, the rate limiter
+# denies a slot, or the egress breaker is open, it returns an honest `unknown`
+# with the appropriate sub_status — never blocks past the budget, never fakes
+# `valid`. Pass ?mode=fast (or deep=false) for the sub-100ms syntax/DNS-only path.
+VALIDATION_REALTIME_BUDGET_SECONDS = int(
+    os.getenv("VALIDATION_REALTIME_BUDGET_SECONDS", 8)
+)
+# Shared result cache (keyed on sha256(email)) checked before any network work;
+# deep Celery verifications write to it too, so bulk work warms the realtime path.
+VALIDATION_RESULT_CACHE_TTL = int(
+    os.getenv("VALIDATION_RESULT_CACHE_TTL", 604800)  # 7 days for terminal results
+)
+VALIDATION_RESULT_CACHE_TTL_UNKNOWN = int(
+    os.getenv("VALIDATION_RESULT_CACHE_TTL_UNKNOWN", 86400)  # 1 day for unknown
+)
+
+# --- Per-provider SMTP rate limiting (protects the egress IP reputation) -----
+# Conservative on purpose: loosen later with data, never the reverse. Limits are
+# keyed on the MX provider fingerprint (google, microsoft, yahoo, proofpoint,
+# mimecast, other) and enforced via the shared Redis cache across all workers.
+VALIDATION_SMTP_RATE_LIMIT_ENABLED = (
+    os.getenv("VALIDATION_SMTP_RATE_LIMIT_ENABLED", "True") == "True"
+)
+VALIDATION_SMTP_MAX_CONCURRENT_PER_PROVIDER = int(
+    os.getenv("VALIDATION_SMTP_MAX_CONCURRENT_PER_PROVIDER", 2)
+)
+VALIDATION_SMTP_MAX_PROBES_PER_MINUTE_PER_PROVIDER = int(
+    os.getenv("VALIDATION_SMTP_MAX_PROBES_PER_MINUTE_PER_PROVIDER", 10)
+)
+VALIDATION_SMTP_MAX_PROBES_PER_MINUTE_GLOBAL = int(
+    os.getenv("VALIDATION_SMTP_MAX_PROBES_PER_MINUTE_GLOBAL", 20)
+)
+# On 421 (or this many repeated 4xx), pause probes to that provider this long.
+VALIDATION_SMTP_PROVIDER_COOLDOWN = int(
+    os.getenv("VALIDATION_SMTP_PROVIDER_COOLDOWN", 900)
+)
+VALIDATION_SMTP_SOFT_FAIL_THRESHOLD = int(
+    os.getenv("VALIDATION_SMTP_SOFT_FAIL_THRESHOLD", 3)
+)
+# Safety TTL on the per-provider concurrency counter (frees a crashed worker's
+# slot); and how long a rate-limited bulk address waits before the task retries.
+VALIDATION_SMTP_CONCURRENCY_TTL = int(
+    os.getenv("VALIDATION_SMTP_CONCURRENCY_TTL", 120)
+)
+# Merged disposable-domain feed (baseline + downloaded feeds), maintained by the
+# update_disposable_domains management command / weekly beat task. Defaults to a
+# writable file next to the bundled baseline (gitignored). Loaded on top of the
+# bundled baseline; workers reload it via mtime when the weekly refresh runs.
+VALIDATION_DISPOSABLE_DOMAINS_FILE = os.getenv(
+    "VALIDATION_DISPOSABLE_DOMAINS_FILE",
+    os.path.join(BASE_DIR, "apps", "validation", "data", "disposable_domains_external.txt"),
+)
+# Primary source for the weekly refresh (the maintained community dataset).
+VALIDATION_DISPOSABLE_SOURCE_URL = os.getenv(
+    "VALIDATION_DISPOSABLE_SOURCE_URL",
+    "https://raw.githubusercontent.com/disposable-email-domains/"
+    "disposable-email-domains/master/disposable_email_domains.txt",
+)
+# Optional extra feeds (comma-separated URLs), merged with the primary source.
+VALIDATION_DISPOSABLE_EXTRA_FEEDS = [
+    u.strip()
+    for u in os.getenv("VALIDATION_DISPOSABLE_EXTRA_FEEDS", "").split(",")
+    if u.strip()
+]
+
+# Bulk jobs run entirely in Celery (never inline in the HTTP request). Addresses
+# are processed in chunks of this size; progress is persisted after each chunk.
+VALIDATION_BULK_CHUNK_SIZE = int(os.getenv("VALIDATION_BULK_CHUNK_SIZE", 100))
+
+# Optional data-driven spam-trap domain list (one domain per line). A domain
+# here classifies as do_not_mail/spamtrap_detected. Empty by default — the
+# keyword heuristic is only a weak risk-score signal and never classifies, so
+# legitimate services (e.g. mailtrap.io) are not mislabelled as traps.
+VALIDATION_SPAMTRAP_DOMAINS_FILE = os.getenv("VALIDATION_SPAMTRAP_DOMAINS_FILE", None)
 
 # Prevent Heroku from running collectstatic on deploy
 if os.environ.get("DISABLE_COLLECTSTATIC", "") == "1":

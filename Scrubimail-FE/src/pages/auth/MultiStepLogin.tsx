@@ -22,7 +22,7 @@ import {
 import { LoginUser } from '../../store/authSlice';
 import { showMessage } from '../../utils/notifications';
 import { getDeviceInfo } from '../../utils/DeviceFingerPrint';
-import ssoService, { OAuthProviders } from '../../services/ssoService';
+import ssoService, { OAuthProviders, OAUTH_ERROR_MESSAGES } from '../../services/ssoService';
 import useSignIn from 'react-auth-kit/hooks/useSignIn';
 import totpService from '../../services/totpService';
 import AuthFooter from '../../components/AuthFooter';
@@ -84,52 +84,44 @@ const MultiStepLogin: React.FC = () => {
   };
 
   const handleOAuthCallback = async () => {
-    const callbackData = ssoService.handleCallbackFromUrl();
-    if (callbackData) {
-      try {
-        setLoading(true);
-        setError(null);
-        
-        // SSO login bypasses TOTP - directly sign in with tokens
-        // Fetch user data using the access token
-        const userResponse = await authAxiosInstance.get('/user/', {
-          headers: {
-            'Authorization': `Bearer ${callbackData.access_token}`
-          }
-        });
+    // The redirect carries only a single-use `code` (or an `error`) — never
+    // tokens. Exchange the code for tokens over POST.
+    const { code, error, provider } = ssoService.getCallbackParams();
 
-        const userData = userResponse.data;
+    if (error) {
+      setError(OAUTH_ERROR_MESSAGES[error] || 'Sign-in failed. Please try again.');
+      ssoService.clearCallbackFromUrl();
+      return;
+    }
+    if (!code) return;
 
-        if (signIn) {
-          const isSignedIn = signIn({
-            auth: {
-              token: callbackData.access_token,
-              type: 'Bearer',
-            },
-            refresh: callbackData.refresh_token,
-            userState: userData,
-          });
+    try {
+      setLoading(true);
+      setError(null);
 
-          if (isSignedIn) {
-            showMessage(`Successfully logged in with ${callbackData.provider}!`, 'success');
-            setCurrentStep('success');
-            
-            // Redirect after a short delay
-            setTimeout(() => {
-              navigate('/dashboard', { replace: true });
-            }, 1500);
-          } else {
-            setError('Failed to sign in with OAuth tokens');
-          }
-        }
-        
-        // Clear URL parameters
-        ssoService.clearCallbackFromUrl();
-      } catch (err: any) {
-        console.error('OAuth callback error:', err);
-        setError('Failed to complete OAuth login. Please try again.');
-        setLoading(false);
+      const data = await ssoService.exchangeCode(code);
+      const isSignedIn = signIn?.({
+        auth: { token: data.access_token, type: 'Bearer' },
+        refresh: data.refresh_token,
+        userState: data.user,
+      });
+      ssoService.clearCallbackFromUrl();
+
+      if (isSignedIn) {
+        showMessage(
+          provider ? `Successfully logged in with ${provider}!` : 'Successfully logged in!',
+          'success'
+        );
+        setCurrentStep('success');
+        setTimeout(() => navigate('/dashboard', { replace: true }), 1500);
+      } else {
+        setError('Failed to complete sign-in on this device.');
       }
+    } catch (err: any) {
+      console.error('OAuth callback error:', err);
+      setError(err?.message || 'Failed to complete OAuth login. Please try again.');
+    } finally {
+      setLoading(false);
     }
   };
   const ssoProviders = [

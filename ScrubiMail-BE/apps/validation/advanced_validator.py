@@ -1,10 +1,12 @@
 import os
 import re
+import hashlib
 import dns.resolver
 import smtplib
 import socket
 import time
 import logging
+from datetime import datetime, timezone as _dt_timezone
 from typing import Dict, List, Any, Optional
 from dataclasses import dataclass
 from concurrent.futures import ThreadPoolExecutor
@@ -24,7 +26,14 @@ try:
 except Exception:  # pragma: no cover - allow use outside Django
     _django_cache = None
 
+from .rate_limit import ProviderRateLimiter, provider_for_mx
+
 logger = logging.getLogger(__name__)
+
+
+def _now_iso() -> str:
+    """UTC verification timestamp for cached/realtime results."""
+    return datetime.now(_dt_timezone.utc).isoformat()
 
 
 def _conf(name: str, default: Any) -> Any:
@@ -57,15 +66,64 @@ _cache_ttl = 300  # 5 minutes
 # after several CONSECUTIVE total failures (systemic block) — a single slow MX
 # on an otherwise-working host must not disable verification for every domain.
 # Any successful connection resets the counter.
+#
+# Breaker state lives in the shared cache (Redis) so all gunicorn/Celery worker
+# processes trip together on their COMBINED failure count — module globals gave
+# each process its own copy, so each burned full timeouts before tripping. These
+# in-process values remain only as a fallback when Redis is unreachable.
 _smtp_egress_blocked_until = 0.0
 _smtp_consecutive_failures = 0
+_SMTP_BREAKER_BLOCK_KEY = "smtp:breaker_block"
+_SMTP_BREAKER_FAIL_KEY = "smtp:breaker_failcount"
 
 # Disposable-domain blocklist, loaded once from the bundled baseline plus an
 # optional external feed (VALIDATION_DISPOSABLE_DOMAINS_FILE).
 _DISPOSABLE_BASELINE = os.path.join(
     os.path.dirname(__file__), "data", "disposable_domains.txt"
 )
+# Bundled top consumer-mail domains, used for Damerau-Levenshtein typo suggestions.
+_TOP_DOMAINS_FILE = os.path.join(
+    os.path.dirname(__file__), "data", "top_domains.txt"
+)
 _disposable_domains: Optional[set] = None
+# mtime of the external feed file last loaded, so workers pick up a weekly
+# refresh (see update_disposable_domains) without a restart.
+_disposable_external_mtime: Optional[float] = None
+
+
+def _damerau_levenshtein(a: str, b: str, max_distance: int = 2) -> int:
+    """Optimal string alignment (Damerau-Levenshtein) distance between two
+    strings, counting insertions, deletions, substitutions AND adjacent
+    transpositions (so "gmial" -> "gmail" is distance 1). Returns early with
+    max_distance + 1 once the best possible distance exceeds max_distance."""
+    la, lb = len(a), len(b)
+    if abs(la - lb) > max_distance:
+        return max_distance + 1
+    # d[i][j] = distance between a[:i] and b[:j]
+    prev2 = None
+    prev = list(range(lb + 1))
+    for i in range(1, la + 1):
+        cur = [i] + [0] * lb
+        row_min = cur[0]
+        for j in range(1, lb + 1):
+            cost = 0 if a[i - 1] == b[j - 1] else 1
+            cur[j] = min(
+                prev[j] + 1,        # deletion
+                cur[j - 1] + 1,     # insertion
+                prev[j - 1] + cost,  # substitution
+            )
+            if (
+                i > 1
+                and j > 1
+                and a[i - 1] == b[j - 2]
+                and a[i - 2] == b[j - 1]
+            ):
+                cur[j] = min(cur[j], prev2[j - 2] + 1)  # transposition
+            row_min = min(row_min, cur[j])
+        if row_min > max_distance:
+            return max_distance + 1
+        prev2, prev = prev, cur
+    return prev[lb]
 
 
 def _load_domain_file(path: str) -> set:
@@ -84,10 +142,30 @@ def _load_domain_file(path: str) -> set:
     return domains
 
 
+def _external_disposable_mtime() -> Optional[float]:
+    external = _conf("VALIDATION_DISPOSABLE_DOMAINS_FILE", None)
+    if not external:
+        return None
+    try:
+        return os.path.getmtime(external)
+    except OSError:
+        return None
+
+
 def load_disposable_domains(force: bool = False) -> set:
-    """Load and cache the disposable-domain set (baseline + optional feed)."""
-    global _disposable_domains
-    if _disposable_domains is not None and not force:
+    """Load and cache the disposable-domain set (baseline + optional feed).
+
+    The set is reloaded when forced, when never loaded, or when the external
+    feed file's mtime changed on disk — so a weekly refresh written by the
+    update_disposable_domains command is picked up by long-lived workers
+    without a restart (the cache is keyed on the file's mtime)."""
+    global _disposable_domains, _disposable_external_mtime
+    current_mtime = _external_disposable_mtime()
+    if (
+        _disposable_domains is not None
+        and not force
+        and current_mtime == _disposable_external_mtime
+    ):
         return _disposable_domains
 
     domains = _load_domain_file(_DISPOSABLE_BASELINE)
@@ -97,6 +175,7 @@ def load_disposable_domains(force: bool = False) -> set:
         domains |= _load_domain_file(external)
 
     _disposable_domains = domains
+    _disposable_external_mtime = current_mtime
     logger.info("Loaded %d disposable domains", len(domains))
     return domains
 
@@ -162,8 +241,11 @@ class AdvancedEmailValidator:
             "zoho.com",
         }
 
-        # Spam-trap indicators. Matched as whole words (\b...\b) against the
-        # domain so substrings like "test" inside "greatest" do NOT match.
+        # Spam-trap keyword indicators. Matched as whole words (\b...\b) against
+        # the domain. NOTE: this is only a WEAK risk-score signal now — it never
+        # classifies an address (real traps don't name themselves, and keyword
+        # matching flags legitimate services like mailtrap.io). Classification as
+        # a trap is data-driven only (self.spam_trap_domains below).
         self.spam_trap_patterns = [
             "spam",
             "trap",
@@ -174,6 +256,11 @@ class AdvancedEmailValidator:
         self._spam_trap_regex = re.compile(
             r"\b(" + "|".join(self.spam_trap_patterns) + r")\b"
         )
+        # Extension point for a future data-driven trap list: an optional file of
+        # known spam-trap domains (one per line). Empty by default. A domain
+        # here classifies as do_not_mail/spamtrap_detected.
+        _trap_file = _conf("VALIDATION_SPAMTRAP_DOMAINS_FILE", None)
+        self.spam_trap_domains = _load_domain_file(_trap_file) if _trap_file else set()
 
         # SMTP probe configuration (override in settings for production).
         self.smtp_enabled = bool(_conf("VALIDATION_SMTP_ENABLED", True))
@@ -190,11 +277,36 @@ class AdvancedEmailValidator:
             _conf("VALIDATION_SMTP_FAILURE_THRESHOLD", 3)
         )
         self.smtp_block_ttl = int(_conf("VALIDATION_SMTP_BLOCK_TTL", 600))
+        # Catch-all status is cached per domain (Redis) so we probe a garbage
+        # address at most once per domain per this TTL, never once per address.
+        self.catchall_ttl = int(_conf("VALIDATION_CATCHALL_TTL", 86400))
+        # Per-kind cache TTLs (replaces the old single 5-minute TTL).
+        self.dns_ttl = int(_conf("VALIDATION_CACHE_TTL_DNS", 21600))
+        self.reputation_ttl = int(_conf("VALIDATION_CACHE_TTL_REPUTATION", 86400))
+        self.negative_dns_ttl = int(_conf("VALIDATION_CACHE_TTL_NEGATIVE_DNS", 3600))
+        # Try up to this many MX hosts (only on connection failure — see
+        # smtp_handshake).
+        self.max_mx_hosts = int(_conf("VALIDATION_SMTP_MAX_MX_HOSTS", 3))
+        # Per-provider probe rate limiter (concurrency + probes/min + cooldown).
+        self.rate_limiter = ProviderRateLimiter()
+        # Top consumer-mail domains for typo suggestions (Damerau-Levenshtein).
+        self.top_domains = _load_domain_file(_TOP_DOMAINS_FILE)
+        # Realtime endpoint: deep verification within a hard time budget, with a
+        # shared result cache (see validate_email_realtime).
+        self.realtime_budget = int(_conf("VALIDATION_REALTIME_BUDGET_SECONDS", 8))
+        self.result_cache_ttl = int(_conf("VALIDATION_RESULT_CACHE_TTL", 604800))
+        self.result_cache_ttl_unknown = int(
+            _conf("VALIDATION_RESULT_CACHE_TTL_UNKNOWN", 86400)
+        )
 
     # ------------------------------------------------------------------ cache
     def _get_cached(self, key: str) -> Optional[Any]:
         """Read from the shared Django cache (Redis), falling back to the
-        in-process dict if the cache backend is unavailable."""
+        in-process dict if the cache backend is unavailable.
+
+        Note a cached value of ``False`` (e.g. "not catch-all") is a real hit,
+        not a miss — only ``None`` means "not cached".
+        """
         if _django_cache is not None:
             try:
                 val = _django_cache.get(f"emailval:{key}")
@@ -203,17 +315,22 @@ class AdvancedEmailValidator:
             except Exception:
                 pass  # Redis down / misconfigured -> fall through to dict
         entry = _domain_cache.get(key)
-        if entry and time.time() - entry["ts"] < _cache_ttl:
+        if entry and time.time() - entry["ts"] < entry.get("ttl", _cache_ttl):
             return entry["val"]
         return None
 
-    def _set_cached(self, key: str, value: Any) -> None:
+    def _set_cached(self, key: str, value: Any, ttl: Optional[int] = None) -> None:
+        """Write to the shared cache with an explicit per-kind TTL.
+
+        `ttl` defaults to the legacy 5-minute value; callers pass longer,
+        per-kind TTLs (DNS, reputation, catch-all — see settings)."""
+        ttl = _cache_ttl if ttl is None else ttl
         if _django_cache is not None:
             try:
-                _django_cache.set(f"emailval:{key}", value, timeout=_cache_ttl)
+                _django_cache.set(f"emailval:{key}", value, timeout=ttl)
             except Exception:
                 pass  # degrade to the in-process dict below
-        _domain_cache[key] = {"val": value, "ts": time.time()}
+        _domain_cache[key] = {"val": value, "ts": time.time(), "ttl": ttl}
 
     # ----------------------------------------------------------------- syntax
     def _to_ascii_domain(self, domain: str) -> str:
@@ -293,29 +410,46 @@ class AdvancedEmailValidator:
             }
 
     def _generate_suggestions(self, email: str) -> List[str]:
-        """Generate email suggestions for common typos"""
-        suggestions = []
+        """Suggest a likely-intended address for common typos.
+
+        NEVER auto-corrects — only suggests. Uses Damerau-Levenshtein distance
+        (<= 2) against the bundled top consumer-domain list, plus explicit TLD
+        fixes (.con/.cmo -> .com, and .co -> .com only for known mail domains)."""
+        suggestions: List[str] = []
         if "@" not in email:
             return suggestions
         local, domain = email.rsplit("@", 1)
+        domain = domain.strip().lower()
+        if not local or not domain:
+            return suggestions
 
-        domain_suggestions = {
-            "gmai.com": "gmail.com",
-            "gmal.com": "gmail.com",
-            "gamil.com": "gmail.com",
-            "gmial.com": "gmail.com",
-            "hotmai.com": "hotmail.com",
-            "hotmal.com": "hotmail.com",
-            "outlok.com": "outlook.com",
-            "yaho.com": "yahoo.com",
-            "yhoo.com": "yahoo.com",
-        }
+        def _add(candidate: str) -> None:
+            fixed = f"{local}@{candidate}"
+            if candidate != domain and fixed not in suggestions:
+                suggestions.append(fixed)
 
-        if domain in domain_suggestions:
-            suggestions.append(f"{local}@{domain_suggestions[domain]}")
+        # Explicit TLD typo fixes (adjacent-key / transposition slips of .com).
+        for bad in (".con", ".cmo", ".vom", ".xom", ".ocm", ".comm", ".cim"):
+            if domain.endswith(bad):
+                _add(domain[: -len(bad)] + ".com")
+                break
+        # ".co" is a real TLD, so only suggest ".com" when the fixed form is a
+        # known mail domain (e.g. gmail.co -> gmail.com).
+        if domain.endswith(".co"):
+            candidate = domain[:-3] + ".com"
+            if candidate in self.top_domains:
+                _add(candidate)
 
-        if domain.endswith(".con") or domain.endswith(".cmo"):
-            suggestions.append(f"{local}@{domain[:-4]}.com")
+        # Nearest known consumer domain within Damerau-Levenshtein distance <= 2.
+        # Iterate deterministically so ties resolve the same way every time.
+        if domain not in self.top_domains:
+            best, best_dist = None, 3
+            for known in sorted(self.top_domains):
+                d = _damerau_levenshtein(domain, known, max_distance=2)
+                if d < best_dist:
+                    best, best_dist = known, d
+            if best is not None:
+                _add(best)
 
         return suggestions
 
@@ -388,6 +522,14 @@ class AdvancedEmailValidator:
 
             dns_score = self._calculate_dns_score(mx_records, a_records, dnssec_valid)
 
+            # Null MX (RFC 7505): a single MX of "." with preference 0 means the
+            # domain explicitly does NOT accept mail. Definitive — no SMTP needed.
+            null_mx = (
+                len(mx_records) == 1
+                and mx_records[0]["host"] in ("", ".")
+                and mx_records[0]["preference"] == 0
+            )
+
             result = {
                 "valid": len(mx_records) > 0 or len(a_records) > 0,
                 "a_records": a_records,
@@ -395,10 +537,15 @@ class AdvancedEmailValidator:
                 "mx_records": mx_records,
                 "cname_record": cname_record,
                 "dnssec_valid": dnssec_valid,
+                "null_mx": null_mx,
                 "score": dns_score,
             }
 
-            self._set_cached(cache_key, result)
+            # Per-kind TTL: real DNS is stable (6h); a negative answer (no MX and
+            # no A — e.g. a freshly registered / non-existent domain) is cached
+            # only briefly (1h) so it corrects itself quickly.
+            ttl = self.dns_ttl if (mx_records or a_records) else self.negative_dns_ttl
+            self._set_cached(cache_key, result, ttl=ttl)
             return result
 
         except Exception as e:
@@ -430,9 +577,66 @@ class AdvancedEmailValidator:
             score += 10
         return min(score, 100)
 
+    # --------------------------------------------------------- circuit breaker
+    def _breaker_is_open(self) -> bool:
+        """True if the SMTP egress breaker is tripped.
+
+        Redis is the source of truth when reachable (all workers see the same
+        block); only when Redis is down do we consult the in-process timestamp.
+        """
+        if _django_cache is not None:
+            try:
+                return bool(_django_cache.get(f"emailval:{_SMTP_BREAKER_BLOCK_KEY}"))
+            except Exception:
+                pass  # Redis down -> fall back to the in-process timestamp
+        return time.time() < _smtp_egress_blocked_until
+
+    def _breaker_record_success(self) -> None:
+        """Any successful connection resets the shared (and local) failure state."""
+        global _smtp_consecutive_failures, _smtp_egress_blocked_until
+        _smtp_consecutive_failures = 0
+        _smtp_egress_blocked_until = 0.0
+        if _django_cache is not None:
+            try:
+                _django_cache.delete(f"emailval:{_SMTP_BREAKER_FAIL_KEY}")
+                _django_cache.delete(f"emailval:{_SMTP_BREAKER_BLOCK_KEY}")
+            except Exception:
+                pass
+
+    def _breaker_record_failure(self) -> None:
+        """Count a total-egress failure across all workers; trip the breaker
+        once the COMBINED count reaches the threshold."""
+        global _smtp_consecutive_failures, _smtp_egress_blocked_until
+        _smtp_consecutive_failures += 1
+        count = _smtp_consecutive_failures  # in-process fallback count
+        if _django_cache is not None:
+            try:
+                key = f"emailval:{_SMTP_BREAKER_FAIL_KEY}"
+                if _django_cache.add(key, 1, timeout=self.smtp_block_ttl):
+                    count = 1
+                else:
+                    count = int(_django_cache.incr(key))
+            except Exception:
+                count = _smtp_consecutive_failures
+        if count >= self.smtp_failure_threshold:
+            _smtp_egress_blocked_until = time.time() + self.smtp_block_ttl
+            if _django_cache is not None:
+                try:
+                    _django_cache.set(
+                        f"emailval:{_SMTP_BREAKER_BLOCK_KEY}",
+                        1,
+                        timeout=self.smtp_block_ttl,
+                    )
+                except Exception:
+                    pass
+
     # ------------------------------------------------------------------ SMTP
     def smtp_handshake(
-        self, email: str, domain: str, mx_records: List[Dict]
+        self,
+        email: str,
+        domain: str,
+        mx_records: List[Dict],
+        timeout: Optional[int] = None,
     ) -> Dict[str, Any]:
         """SMTP RCPT-TO probe.
 
@@ -444,7 +648,6 @@ class AdvancedEmailValidator:
 
         `status` is one of: deliverable | undeliverable | unknown | skipped
         """
-        global _smtp_egress_blocked_until, _smtp_consecutive_failures
         results = {
             "valid": False,
             "status": "unknown",
@@ -467,120 +670,201 @@ class AdvancedEmailValidator:
             return results
 
         # Circuit breaker: if we recently found port 25 unreachable from this
-        # host, don't waste seconds re-timing-out — return unknown immediately.
-        if time.time() < _smtp_egress_blocked_until:
+        # host (shared across workers via Redis), don't waste seconds
+        # re-timing-out — return unknown immediately.
+        if self._breaker_is_open():
             results["status"] = "unknown"
             results["sub_status"] = "smtp_egress_blocked"
             results["error"] = "SMTP egress recently unreachable (circuit open)"
             return results
 
+        # Per-provider rate limit: reserve a probe slot before touching the
+        # network. If the bucket is empty or the provider is in cooldown, do NOT
+        # probe — return a rate-limited result the Celery task reschedules
+        # (self.retry) instead of blocking the worker or burning IP reputation.
+        provider = provider_for_mx(mx_records[0]["host"])
+        allowed, retry_after, reason = self.rate_limiter.try_acquire(provider)
+        if not allowed:
+            results["status"] = "unknown"
+            results["sub_status"] = "rate_limited"
+            results["rate_limited"] = True
+            results["retry_after"] = retry_after
+            results["provider"] = provider
+            results["error"] = f"Provider {provider} rate-limited ({reason})"
+            return results
+
         connection_succeeded = False
-
-        for mx in mx_records[:2]:
-            mx_host = mx["host"]
-            server = None
-            try:
-                server = smtplib.SMTP(timeout=self.smtp_timeout)
-                server.connect(mx_host, 25)
-                connection_succeeded = True
-                server.helo(self.smtp_helo_host)
-
-                if self.smtp_use_starttls and server.has_extn("starttls"):
-                    try:
-                        server.starttls()
-                        server.helo(self.smtp_helo_host)
-                    except Exception:
-                        pass  # fall back to plaintext probe
-
-                server.mail(self.smtp_mail_from)
-                code, message = server.rcpt(email)
-                message_str = message.decode("utf-8", errors="ignore")
-                results["response_codes"].append(
-                    {"mx": mx_host, "code": code, "message": message_str}
-                )
-
-                if code in (250, 251):
-                    results["valid"] = True
-                    results["status"] = "deliverable"
-                    results["sub_status"] = "mailbox_exists"
-                elif code in (450, 451, 452, 421):
-                    # Temporary failure / greylisting — indeterminate.
-                    results["greylisting"] = code == 450
-                    results["status"] = "unknown"
-                    results["sub_status"] = (
-                        "greylisted" if code == 450 else "antispam_block"
-                    )
-                elif code in (550, 551, 553, 554):
-                    lowered = message_str.lower()
-                    if any(
-                        p in lowered
-                        for p in [
-                            "user unknown",
-                            "no such user",
-                            "mailbox not found",
-                            "mailbox unavailable",
-                            "does not exist",
-                            "recipient rejected",
-                            "invalid recipient",
-                            "address rejected",
-                        ]
-                    ):
-                        results["ndr_patterns"].append(lowered)
-                        results["status"] = "undeliverable"
-                        results["sub_status"] = "mailbox_not_found"
-                    else:
-                        # Policy block / anti-spam refusal — not proof the
-                        # mailbox is missing.
-                        results["status"] = "unknown"
-                        results["sub_status"] = "antispam_block"
-                else:
-                    results["status"] = "unknown"
-                    results["sub_status"] = "unexpected_response"
-
+        try:
+            # Try up to max_mx_hosts, but we only ADVANCE to the next host on a
+            # connection failure (handled in the except clauses). Any SMTP answer
+            # ends the loop — re-probing another MX would add volume for no gain.
+            for mx in mx_records[: self.max_mx_hosts]:
+                mx_host = mx["host"]
+                server = None
                 try:
-                    server.quit()
-                except Exception:
-                    pass
+                    server = smtplib.SMTP(timeout=timeout or self.smtp_timeout)
+                    server.connect(mx_host, 25)
+                    connection_succeeded = True
+                    server.helo(self.smtp_helo_host)
 
-                # Stop after the first server that gave us a definitive answer.
-                if results["status"] in ("deliverable", "undeliverable"):
-                    break
+                    if self.smtp_use_starttls and server.has_extn("starttls"):
+                        try:
+                            server.starttls()
+                            server.helo(self.smtp_helo_host)
+                        except Exception:
+                            pass  # fall back to plaintext probe
 
-            except (socket.timeout, ConnectionRefusedError, OSError) as e:
-                results["errors"].append(f"MX {mx_host}: {str(e)}")
-                if server is not None:
+                    server.mail(self.smtp_mail_from)
+                    code, message = server.rcpt(email)
+                    message_str = message.decode("utf-8", errors="ignore")
+                    results["response_codes"].append(
+                        {"mx": mx_host, "code": code, "message": message_str}
+                    )
+
+                    if code in (250, 251):
+                        results["valid"] = True
+                        results["status"] = "deliverable"
+                        results["sub_status"] = "mailbox_exists"
+                    elif code in (450, 451, 452, 421):
+                        # Temporary failure / greylisting — indeterminate. A 421
+                        # (or repeated 4xx) is a reputation signal: pause probes
+                        # to this provider so we don't dig the hole deeper.
+                        results["greylisting"] = code == 450
+                        results["status"] = "unknown"
+                        results["sub_status"] = (
+                            "greylisted" if code == 450 else "antispam_block"
+                        )
+                        if code == 421:
+                            self.rate_limiter.trip_cooldown(provider)
+                        else:
+                            self.rate_limiter.note_soft_failure(provider)
+                    elif code in (550, 551, 553, 554):
+                        lowered = message_str.lower()
+                        if any(
+                            p in lowered
+                            for p in [
+                                "user unknown",
+                                "no such user",
+                                "mailbox not found",
+                                "mailbox unavailable",
+                                "does not exist",
+                                "recipient rejected",
+                                "invalid recipient",
+                                "address rejected",
+                            ]
+                        ):
+                            results["ndr_patterns"].append(lowered)
+                            results["status"] = "undeliverable"
+                            results["sub_status"] = "mailbox_not_found"
+                        else:
+                            # Policy block / anti-spam refusal — not proof the
+                            # mailbox is missing.
+                            results["status"] = "unknown"
+                            results["sub_status"] = "antispam_block"
+                    else:
+                        results["status"] = "unknown"
+                        results["sub_status"] = "unexpected_response"
+
+                    # Catch-all detection reuses THIS already-open session (RSET
+                    # + a second RCPT) so we never open a second connection per
+                    # address, and the result is cached per domain — see
+                    # _get_or_detect_catch_all. Do it before quitting.
+                    if results["status"] == "deliverable":
+                        results["catch_all"] = self._get_or_detect_catch_all(
+                            domain, mx_records, server=server
+                        )
+
                     try:
-                        server.close()
+                        server.quit()
                     except Exception:
                         pass
-                continue
-            except Exception as e:
-                results["errors"].append(f"MX {mx_host}: {str(e)}")
-                continue
 
-        if connection_succeeded:
-            # Egress works — reset the failure streak.
-            _smtp_consecutive_failures = 0
-        else:
-            # Couldn't reach any MX on port 25 (commonly blocked on cloud
-            # hosts). Report unknown rather than penalizing the address. Trip
-            # the breaker only after repeated failures (systemic block), so one
-            # slow MX on a healthy host doesn't disable SMTP for everything.
-            _smtp_consecutive_failures += 1
-            if _smtp_consecutive_failures >= self.smtp_failure_threshold:
-                _smtp_egress_blocked_until = time.time() + self.smtp_block_ttl
-            results["status"] = "unknown"
-            results["sub_status"] = "failed_smtp_connection"
-            results["error"] = "SMTP port 25 unreachable from this host"
+                    # This MX answered (any SMTP code) — we have our result for
+                    # this address. Never re-probe another MX for it.
+                    break
 
-        # Catch-all detection only when the mailbox itself looked deliverable.
-        if results["status"] == "deliverable":
-            results["catch_all"] = self._detect_catch_all(domain, mx_records)
+                except (socket.timeout, ConnectionRefusedError, OSError) as e:
+                    results["errors"].append(f"MX {mx_host}: {str(e)}")
+                    if server is not None:
+                        try:
+                            server.close()
+                        except Exception:
+                            pass
+                    continue
+                except Exception as e:
+                    results["errors"].append(f"MX {mx_host}: {str(e)}")
+                    continue
+
+            if connection_succeeded:
+                # Egress works — reset the shared failure streak.
+                self._breaker_record_success()
+            else:
+                # Couldn't reach any MX on port 25 (commonly blocked on cloud
+                # hosts). Report unknown rather than penalizing the address. The
+                # breaker trips only after the COMBINED (cross-worker) failure
+                # count reaches the threshold, so one slow MX on a healthy host
+                # doesn't disable SMTP for everything.
+                self._breaker_record_failure()
+                results["status"] = "unknown"
+                results["sub_status"] = "failed_smtp_connection"
+                results["error"] = "SMTP port 25 unreachable from this host"
+        finally:
+            # Always release the concurrency slot we reserved above.
+            self.rate_limiter.release(provider)
 
         return results
 
+    def _get_or_detect_catch_all(
+        self, domain: str, mx_records: List[Dict], server: Any = None
+    ) -> bool:
+        """Return whether `domain` is catch-all, using a cached result when
+        available and otherwise a SINGLE probe.
+
+        Caching (Redis, 24h by default) means we probe a given domain's
+        catch-all status at most once per TTL no matter how many addresses we
+        validate there — the old code fired one garbage-address probe per
+        deliverable address, a textbook verifier-abuse pattern that gets the
+        egress IP tempfailed/blocklisted. Both true and false results are
+        cached. When a live SMTP session is supplied we reuse it (RSET + a
+        second RCPT) so no extra connection is opened; we only fall back to a
+        fresh connection if that session cannot be reused.
+        """
+        cache_key = f"catchall:{domain}"
+        cached = self._get_cached(cache_key)
+        if cached is not None:
+            return bool(cached)
+
+        result: Optional[bool] = None
+        if server is not None:
+            result = self._probe_catch_all_on_session(server, domain)
+        if result is None:
+            result = self._detect_catch_all(domain, mx_records)
+
+        self._set_cached(cache_key, bool(result), ttl=self.catchall_ttl)
+        return bool(result)
+
+    def _probe_catch_all_on_session(self, server: Any, domain: str) -> Optional[bool]:
+        """Probe catch-all on an already-open SMTP session via RSET + RCPT.
+
+        Returns True/False on a clean result, or None if the session could not
+        be reused (the caller then falls back to a new connection). RSET aborts
+        the current mail transaction, so we must re-issue MAIL FROM before the
+        second RCPT (RFC 5321).
+        """
+        test_email = f"xq7z9k-{int(time.time())}@{domain}"
+        try:
+            server.rset()
+            server.mail(self.smtp_mail_from)
+            code, _ = server.rcpt(test_email)
+            return code in (250, 251)
+        except Exception:
+            return None
+
     def _detect_catch_all(self, domain: str, mx_records: List[Dict]) -> bool:
-        """Detect catch-all domains with a single random-address probe."""
+        """Detect catch-all with a single random-address probe on a NEW
+        connection. Fallback path only — the common case reuses the existing
+        session via _probe_catch_all_on_session. Caching is handled by the
+        caller (_get_or_detect_catch_all), so this must not cache."""
         if not mx_records:
             return False
 
@@ -622,13 +906,19 @@ class AdvancedEmailValidator:
 
         try:
             domain_lower = domain.lower()
-            is_disposable = domain_lower in self.disposable_domains
+            # Use the live set (reloads on feed refresh via mtime) rather than
+            # the snapshot captured at __init__, so long-lived workers see the
+            # weekly disposable-domain update without a restart.
+            is_disposable = domain_lower in load_disposable_domains()
             tld_risk = any(domain_lower.endswith(tld) for tld in self.risky_tlds)
             is_free_provider = domain_lower in self.free_providers
+            # Weak keyword signal (risk score only), plus the data-driven trap
+            # list (the only thing that classifies as a trap).
             spam_trap_risk = self._detect_spam_trap_patterns(domain_lower)
+            is_spam_trap = domain_lower in self.spam_trap_domains
 
             reputation_score = self._calculate_reputation_score(
-                is_disposable, tld_risk, is_free_provider, spam_trap_risk
+                is_disposable, tld_risk, is_free_provider, spam_trap_risk, is_spam_trap
             )
 
             result = {
@@ -638,10 +928,11 @@ class AdvancedEmailValidator:
                 "is_corporate": is_free_provider,
                 "is_free_provider": is_free_provider,
                 "spam_trap_risk": spam_trap_risk,
+                "is_spam_trap": is_spam_trap,
                 "reputation_score": reputation_score,
                 "risk_level": self._get_risk_level(reputation_score),
             }
-            self._set_cached(cache_key, result)
+            self._set_cached(cache_key, result, ttl=self.reputation_ttl)
             return result
 
         except Exception as e:
@@ -659,6 +950,7 @@ class AdvancedEmailValidator:
         tld_risk: bool,
         is_free_provider: bool,
         spam_trap_risk: float,
+        is_spam_trap: bool = False,
     ) -> int:
         score = 100
         if is_disposable:
@@ -667,8 +959,10 @@ class AdvancedEmailValidator:
             score -= 30
         if is_free_provider:
             score += 20
-        if spam_trap_risk > 0.5:
-            score -= 40
+        if is_spam_trap:
+            score -= 90  # data-driven trap: decisive
+        elif spam_trap_risk > 0.5:
+            score -= 5  # keyword heuristic: weak signal only
         return max(0, min(100, score))
 
     def _get_risk_level(self, score: int) -> str:
@@ -756,10 +1050,17 @@ class AdvancedEmailValidator:
             score -= 20
             deductions.append("High-risk TLD")
             explanations.append("Top-level domain has poor reputation")
-        if reputation.get("spam_trap_risk", 0) > 0.5:
-            score -= 30
-            deductions.append("Potential spam trap")
-            explanations.append("Email pattern matches known spam trap indicators")
+        if reputation.get("is_spam_trap", False):
+            score -= 40
+            deductions.append("Known spam trap")
+            explanations.append("Domain is on the configured spam-trap list")
+        elif reputation.get("spam_trap_risk", 0) > 0.5:
+            # Weak keyword heuristic only — small deduction, never decisive.
+            score -= 5
+            deductions.append("Spam-trap keyword signal")
+            explanations.append(
+                "Domain name contains spam-trap-like keywords (low confidence)"
+            )
 
         # Role-based detection
         role_result = validation_results.get("role_based", {})
@@ -789,12 +1090,14 @@ class AdvancedEmailValidator:
 
         # Keep the numeric score coherent with the status so we never report a
         # confident 100 next to an unverified/unknown address.
+        # Exactly five statuses, one naming convention (all snake_case). Spam
+        # traps are folded into do_not_mail (see _classify), so there is no
+        # sixth top-level status.
         ceilings = {
             "valid": (90, 100),
-            "catch-all": (40, 70),
+            "catch_all": (40, 70),
             "unknown": (0, 70),
             "do_not_mail": (0, 50),
-            "spamtrap": (0, 15),
             "invalid": (0, 20),
         }
         lo, hi = ceilings.get(status, (0, 100))
@@ -803,10 +1106,9 @@ class AdvancedEmailValidator:
         verdict = {
             "valid": "Valid",
             "invalid": "Invalid",
-            "catch-all": "Catch-All",
+            "catch_all": "Catch-All",
             "unknown": "Unknown",
             "do_not_mail": "Do Not Mail",
-            "spamtrap": "Spamtrap",
         }.get(status, "Unknown")
 
         return {
@@ -841,13 +1143,21 @@ class AdvancedEmailValidator:
         if not dns.get("valid", False):
             return "invalid", "no_dns_entries"
 
+        # 1b. Null MX (RFC 7505): domain explicitly refuses mail.
+        if dns.get("null_mx", False):
+            return "invalid", "does_not_accept_mail"
+
         # 2. Confirmed non-existent mailbox.
         if smtp_status == "undeliverable":
             return "invalid", "mailbox_not_found"
 
-        # 3. Toxic / do-not-mail signals.
-        if rep.get("spam_trap_risk", 0) > 0.5:
-            return "spamtrap", "spamtrap_detected"
+        # 3. Toxic / do-not-mail signals. Spam-trap is folded into do_not_mail
+        # (ZeroBounce convention: sub_status=spamtrap_detected) and is DATA-DRIVEN
+        # only — a domain on the configured trap list. The keyword heuristic is a
+        # weak risk-score signal, never a classification trigger, so legitimate
+        # services like mailtrap.io are not mislabelled.
+        if rep.get("is_spam_trap", False):
+            return "do_not_mail", "spamtrap_detected"
         if rep.get("is_disposable", False):
             return "do_not_mail", "disposable"
         if role.get("is_role_based", False):
@@ -856,14 +1166,134 @@ class AdvancedEmailValidator:
         # 4. Confirmed deliverable.
         if smtp_status == "deliverable":
             if smtp.get("catch_all", False):
-                return "catch-all", "accept_all"
+                return "catch_all", "accept_all"
             return "valid", "mailbox_exists"
 
         # 5. Everything else = we could not verify the mailbox.
         return "unknown", smtp.get("sub_status") or "no_smtp_check"
 
+    # ------------------------------------------------------------- realtime
+    def _probe_timeout(self, start_time: float, budget: Optional[float]) -> int:
+        """SMTP connect timeout for this probe, capped to the budget remaining so
+        one tarpit can't consume the whole realtime budget."""
+        if budget is None:
+            return self.smtp_timeout
+        remaining = budget - (time.time() - start_time)
+        return max(1, min(self.smtp_timeout, int(remaining)))
+
+    @staticmethod
+    def _result_key(email: str) -> str:
+        digest = hashlib.sha256(email.strip().lower().encode("utf-8")).hexdigest()
+        return f"result:{digest}"
+
+    def get_cached_result(self, email: str) -> Optional[ValidationResult]:
+        """Return a previously-completed verification for `email` from the shared
+        result cache, or None. Checked before any network work."""
+        payload = self._get_cached(self._result_key(email))
+        if not payload:
+            return None
+        return ValidationResult(
+            is_valid=payload["is_valid"],
+            score=payload["score"],
+            verdict=payload["verdict"],
+            breakdown=payload.get("breakdown", {}),
+            suggestions=payload.get("suggestions", []),
+            warnings=payload.get("warnings", []),
+            metadata=payload.get("metadata", {}),
+        )
+
+    def store_result(self, email: str, result: ValidationResult) -> None:
+        """Persist a COMPLETED verification to the shared result cache so both the
+        realtime endpoint and bulk/deep Celery work benefit. Transient failures
+        (rate-limited, timeout, egress unavailable) are not cached — the next
+        request should retry them."""
+        status = result.metadata.get("status")
+        sub_status = result.metadata.get("sub_status")
+        ttl = self._result_ttl(status, sub_status)
+        if ttl is None:
+            return
+        payload = {
+            "is_valid": result.is_valid,
+            "score": result.score,
+            "verdict": result.verdict,
+            "breakdown": result.breakdown,
+            "suggestions": result.suggestions,
+            "warnings": result.warnings,
+            "metadata": {
+                **result.metadata,
+                "verified_at": result.metadata.get("verified_at") or _now_iso(),
+            },
+        }
+        self._set_cached(self._result_key(email), payload, ttl=ttl)
+
+    _TRANSIENT_SUBSTATUSES = {
+        "rate_limited",
+        "timeout",
+        "smtp_unavailable",
+        "smtp_egress_blocked",
+        "failed_smtp_connection",
+        "exception_occurred",
+    }
+
+    def _result_ttl(self, status: Optional[str], sub_status: Optional[str]) -> Optional[int]:
+        if status in ("valid", "invalid", "catch_all", "do_not_mail"):
+            return self.result_cache_ttl
+        if status == "unknown" and sub_status not in self._TRANSIENT_SUBSTATUSES:
+            return self.result_cache_ttl_unknown
+        return None  # transient / non-terminal -> do not cache
+
+    def validate_email_realtime(
+        self, email: str, fast: bool = False, budget: Optional[float] = None
+    ):
+        """Customer-facing realtime verification. Deep by default within a hard
+        time budget; `fast=True` runs the syntax/DNS/list-only path.
+
+        Returns (ValidationResult, from_cache: bool). The result is honest —
+        `unknown` with sub_status timeout/rate_limited/smtp_unavailable when the
+        mailbox could not be confirmed within budget — never a fabricated valid.
+        """
+        budget = budget or self.realtime_budget
+
+        # 1. Result cache — before any network work.
+        cached = self.get_cached_result(email)
+        if cached is not None:
+            return cached, True
+
+        # 2. Only attempt SMTP from a worker with confirmed port-25 egress. The
+        # shared circuit breaker (Issue 6) is the signal: if it's open (or this
+        # isn't an egress worker), fall back to the fast path and report
+        # smtp_unavailable rather than burning the budget on timeouts.
+        egress_ok = self.smtp_enabled and not self._breaker_is_open()
+        if fast or not egress_ok:
+            result = self.validate_email(email, deep=False)
+            if not fast:
+                self._mark_smtp_unavailable(result)
+        else:
+            result = self.validate_email(email, deep=True, budget=budget)
+
+        # 3. Stamp the verification time and cache terminal results. Fast-mode
+        # results are never cached — they are not full verifications, so caching
+        # an unknown/no_smtp_check would poison a later deep lookup.
+        result.metadata["verified_at"] = _now_iso()
+        if not fast:
+            self.store_result(email, result)
+        return result, False
+
+    def _mark_smtp_unavailable(self, result: ValidationResult) -> None:
+        """Relabel a fast-path result whose SMTP stage was skipped because egress
+        is unavailable (breaker open / not an egress worker)."""
+        result.metadata["sub_status"] = "smtp_unavailable"
+        msg = "SMTP verification unavailable (egress down) — mailbox not confirmed"
+        if msg not in result.warnings:
+            result.warnings.append(msg)
+
     # -------------------------------------------------------------- pipeline
-    def validate_email(self, email: str, deep: Optional[bool] = None) -> ValidationResult:
+    def validate_email(
+        self,
+        email: str,
+        deep: Optional[bool] = None,
+        budget: Optional[float] = None,
+    ) -> ValidationResult:
         """Complete email validation pipeline.
 
         `deep` controls SMTP mailbox probing — the only slow (multi-second),
@@ -873,6 +1303,11 @@ class AdvancedEmailValidator:
           * deep=True   -> probe SMTP (subject to VALIDATION_SMTP_ENABLED).
             Use for async/bulk jobs where multi-second latency is acceptable.
           * deep=None   -> fall back to the VALIDATION_SMTP_ENABLED setting.
+
+        `budget` (seconds) bounds the realtime deep path: if the SMTP stage
+        would start after the budget is spent, it is skipped and reported as
+        unknown/timeout, and the probe's own connect timeout is capped to the
+        time remaining so a single tarpit can't consume the whole budget.
         """
         start_time = time.time()
         do_smtp = self.smtp_enabled if deep is None else (deep and self.smtp_enabled)
@@ -910,21 +1345,43 @@ class AdvancedEmailValidator:
             # cloud hosts where port 25 is blocked).
             mx_records = dns_result.get("mx_records", [])
             a_records = dns_result.get("a_records", [])
-            if not do_smtp:
+            if dns_result.get("null_mx", False):
+                # RFC 7505: the domain declared it accepts no mail. Definitive —
+                # skip SMTP entirely (an easy, certain "invalid").
+                smtp_result = {
+                    "valid": False,
+                    "status": "skipped",
+                    "sub_status": "null_mx",
+                    "catch_all": False,
+                    "greylisting": False,
+                }
+            elif not do_smtp:
                 smtp_result = {
                     "valid": False,
                     "status": "skipped",
                     "catch_all": False,
                     "greylisting": False,
                 }
+            elif budget is not None and (budget - (time.time() - start_time)) <= 0.5:
+                # Realtime budget spent before we could probe — honest timeout.
+                smtp_result = {
+                    "valid": False,
+                    "status": "unknown",
+                    "sub_status": "timeout",
+                    "catch_all": False,
+                    "greylisting": False,
+                }
             elif mx_records:
-                smtp_result = self.smtp_handshake(email, domain, mx_records)
+                smtp_result = self.smtp_handshake(
+                    email, domain, mx_records, timeout=self._probe_timeout(start_time, budget)
+                )
             elif a_records:
                 # Fallback to A record as implicit MX (RFC 5321 §5.1).
                 smtp_result = self.smtp_handshake(
                     email,
                     domain,
                     [{"host": domain, "preference": 0, "score": 30}],
+                    timeout=self._probe_timeout(start_time, budget),
                 )
             else:
                 smtp_result = {
@@ -959,18 +1416,29 @@ class AdvancedEmailValidator:
                 warnings.append("Role-based email detected")
             if smtp_result.get("catch_all", False):
                 warnings.append("Catch-all domain detected")
-            if reputation_result.get("spam_trap_risk", 0) > 0.5:
-                warnings.append("Potential spam trap detected")
+            if reputation_result.get("is_spam_trap", False):
+                warnings.append("Known spam trap — do not mail")
             if risk_result["status"] == "unknown":
                 warnings.append(
                     "Mailbox not confirmed — SMTP verification was inconclusive "
                     "or not performed (status: unknown, not 'valid')"
                 )
-            elif risk_result["status"] == "catch-all":
+            elif risk_result["status"] == "catch_all":
                 warnings.append(
                     "Catch-all domain — accepts all addresses, so the specific "
                     "mailbox cannot be confirmed"
                 )
+
+            metadata = {
+                "validation_time": time.time() - start_time,
+                "status": risk_result["status"],
+                "sub_status": risk_result["sub_status"],
+            }
+            # Surface a rate-limit signal so the async task can reschedule this
+            # address (self.retry) rather than finalize it — see tasks.py.
+            if smtp_result.get("rate_limited"):
+                metadata["rate_limited"] = True
+                metadata["retry_after"] = smtp_result.get("retry_after")
 
             return ValidationResult(
                 # Strict, ZeroBounce-style: only a SMTP-confirmed mailbox is valid.
@@ -980,11 +1448,7 @@ class AdvancedEmailValidator:
                 breakdown=validation_results,
                 suggestions=syntax_result.get("suggestions", []),
                 warnings=warnings,
-                metadata={
-                    "validation_time": time.time() - start_time,
-                    "status": risk_result["status"],
-                    "sub_status": risk_result["sub_status"],
-                },
+                metadata=metadata,
             )
 
         except Exception as e:
