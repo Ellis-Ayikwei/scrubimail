@@ -170,7 +170,13 @@ CELERY_TASK_DEFAULT_QUEUE = "default"
 CELERY_TASK_ROUTES = {
     "apps.validation.tasks.validate_email_task": {"queue": "smtp_validation"},
     "apps.validation.tasks.bulk_validate_emails_task": {"queue": "smtp_validation"},
+    "apps.validation.tasks.verify_email_deep_task": {"queue": "smtp_validation"},
 }
+# Record a STARTED state when a worker picks a task up. The realtime endpoint
+# uses it to tell "probe in progress, just slow" (STARTED) apart from "nobody
+# is consuming the queue" (still PENDING) when its wait times out — only the
+# latter trips the egress-unresponsive cooldown below.
+CELERY_TASK_TRACK_STARTED = True
 
 # Scheduled (beat) tasks. The disposable-domain blocklist is refreshed weekly so
 # coverage keeps up with DEA services that rotate domains to evade static lists.
@@ -675,14 +681,22 @@ VALIDATION_GREYLIST_MAX_RETRIES = int(os.getenv("VALIDATION_GREYLIST_MAX_RETRIES
 # failed to CONNECT — never re-probe a host that already answered.
 VALIDATION_SMTP_MAX_MX_HOSTS = int(os.getenv("VALIDATION_SMTP_MAX_MX_HOSTS", 3))
 
-# --- Realtime endpoint (deep verification inline, within a hard time budget) --
+# --- Realtime endpoint (deep verification within a hard time budget) ---------
 # The customer-facing single-validation endpoint performs FULL verification by
-# default within this wall-clock budget. If the budget expires, the rate limiter
-# denies a slot, or the egress breaker is open, it returns an honest `unknown`
-# with the appropriate sub_status — never blocks past the budget, never fakes
-# `valid`. Pass ?mode=fast (or deep=false) for the sub-100ms syntax/DNS-only path.
+# default within this wall-clock budget: the SMTP probe is enqueued to the
+# smtp_validation queue (the egress worker) and the request waits for the
+# verdict. If the budget expires, the rate limiter denies a slot, or the egress
+# breaker is open, it returns an honest `unknown` with the appropriate
+# sub_status — never blocks past the budget, never fakes `valid`. Pass
+# ?mode=fast (or deep=false) for the sub-100ms syntax/DNS-only path.
 VALIDATION_REALTIME_BUDGET_SECONDS = int(
     os.getenv("VALIDATION_REALTIME_BUDGET_SECONDS", 8)
+)
+# If a realtime wait times out while the probe is still unclaimed (no worker on
+# the smtp_validation queue), skip the wait for this many seconds so requests
+# degrade instantly instead of each burning the full budget. 0 disables.
+VALIDATION_EGRESS_UNRESPONSIVE_COOLDOWN = int(
+    os.getenv("VALIDATION_EGRESS_UNRESPONSIVE_COOLDOWN", 60)
 )
 # Shared result cache (keyed on sha256(email)) checked before any network work;
 # deep Celery verifications write to it too, so bulk work warms the realtime path.

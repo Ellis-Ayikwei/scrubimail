@@ -140,17 +140,31 @@ The workflow writes these into `.env.smtp-egress` on the box and runs
 
 ### Queue routing (already configured)
 
-`CELERY_TASK_ROUTES` sends `validate_email_task` / `bulk_validate_emails_task`
-to the **`smtp_validation`** queue. Only this egress worker consumes it; the
-Railway worker keeps consuming `default,embeddings` and never attempts SMTP.
+`CELERY_TASK_ROUTES` sends `validate_email_task`, `bulk_validate_emails_task`
+and `verify_email_deep_task` to the **`smtp_validation`** queue. Only this
+egress worker consumes it; the Railway worker keeps consuming
+`default,embeddings` and never attempts SMTP.
 
 > ⚠️ The box runs **only a worker** — no web, migrations, or collectstatic.
 > The main app owns the schema; both share one DB.
 
-### Still to wire (app side)
+### App-side wiring (how requests reach this worker)
 
-For tasks to actually reach this worker, the API must **enqueue** deep
-validations (`validate_email_task.delay(...)`) rather than validating inline.
-Today single/bulk validation runs synchronously in the request with
-`deep=False`. Decide which flow should be SMTP-verified and enqueue it to the
-`smtp_validation` queue.
+- **Single validation** (`POST /validate/`, deep by default): the API enqueues
+  `verify_email_deep_task` to `smtp_validation` and **waits for the verdict**
+  up to `VALIDATION_REALTIME_BUDGET_SECONDS`. In-budget answers return real
+  `valid`/`invalid`; repeat lookups hit the shared result cache instantly. If
+  the worker doesn't answer in time, the API returns an honest `unknown`
+  (`sub_status=smtp_unavailable`) and the probe still finishes in the
+  background to warm the cache. If the probe was never even claimed (queue has
+  no consumer), the API skips the wait for
+  `VALIDATION_EGRESS_UNRESPONSIVE_COOLDOWN` seconds so an egress outage
+  degrades to instant unknowns instead of every request burning the budget.
+- **Bulk validation**: the API enqueues `bulk_validate_emails_task`, which runs
+  entirely on this worker.
+
+So: if single validations keep returning `sub_status=smtp_unavailable`, this
+worker is not consuming the queue — check that it's running and that its
+`CELERY_BROKER_URL` / `CELERY_RESULT_BACKEND` point at the SAME Redis the main
+app uses (a Railway `*.railway.internal` URL is NOT reachable from this box —
+use the public TCP-proxy endpoint).

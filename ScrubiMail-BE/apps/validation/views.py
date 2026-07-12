@@ -19,6 +19,7 @@ from .serializers import (
     BulkJobSerializer,
 )
 from .tasks import validate_email_task, bulk_validate_emails_task
+from .services import verify_email_realtime
 from .advanced_validator import AdvancedEmailValidator
 from django_celery_results.models import TaskResult
 from rest_framework.permissions import IsAuthenticated
@@ -39,11 +40,15 @@ class SingleEmailValidationView(APIView):
     def post(self, request):
         """Single email validation.
 
-        DEEP by default: full mailbox verification runs inline within a hard time
-        budget (VALIDATION_REALTIME_BUDGET_SECONDS) and can return status=valid.
-        Pass ?mode=fast (or ?deep=false) for the sub-100ms syntax/DNS/list-only
-        path that never opens an SMTP connection. A shared result cache returns
-        repeat lookups instantly with "cached": true.
+        DEEP by default: the SMTP probe runs on the egress worker (the only
+        host with port-25 egress) and this request waits for the verdict within
+        a hard time budget (VALIDATION_REALTIME_BUDGET_SECONDS), so it can
+        return status=valid. If the worker can't answer in time the response is
+        an honest `unknown` (sub_status=smtp_unavailable) and the finished
+        probe warms the result cache for the next lookup. Pass ?mode=fast (or
+        ?deep=false) for the sub-100ms syntax/DNS/list-only path that never
+        touches SMTP. A shared result cache returns repeat lookups instantly
+        with "cached": true.
         """
         serializer = EmailValidationSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -66,8 +71,7 @@ class SingleEmailValidationView(APIView):
                 "Insufficient credits. Please purchase more credits."
             )
 
-        validator = AdvancedEmailValidator()
-        result, from_cache = validator.validate_email_realtime(email, fast=fast)
+        result, from_cache = verify_email_realtime(email, fast=fast)
 
         validation = EmailValidation.objects.create(
             email=email,
