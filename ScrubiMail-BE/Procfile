@@ -1,3 +1,8 @@
 release: python manage.py migrate --noinput && python manage.py collectstatic --noinput
-web: gunicorn backend.wsgi:application --workers ${WEB_CONCURRENCY:-1} --timeout 120 --bind 0.0.0.0:${PORT:-8000} --access-logfile - --error-logfile -
+# gthread + multiple threads is REQUIRED: the realtime validation endpoint
+# legitimately blocks up to VALIDATION_REALTIME_BUDGET_SECONDS waiting on the
+# egress worker's verdict. With sync workers (and WEB_CONCURRENCY defaulting to
+# 1), a single deep validation serializes EVERY other request behind it for up
+# to 8s — threads make that wait cost one thread, not the whole dyno.
+web: gunicorn backend.wsgi:application --workers ${WEB_CONCURRENCY:-2} --worker-class gthread --threads ${GUNICORN_THREADS:-8} --timeout 120 --bind 0.0.0.0:${PORT:-8000} --access-logfile - --error-logfile -
 worker: celery -A backend worker -l INFO --concurrency ${CELERY_CONCURRENCY:-2} --queues default,embeddings

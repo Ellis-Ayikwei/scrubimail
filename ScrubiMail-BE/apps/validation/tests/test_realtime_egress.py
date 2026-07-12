@@ -226,6 +226,31 @@ class RealtimeEgressServiceTests(SimpleTestCase):
             services._validator.get_cached_result("user@example.com")
         )
 
+    def test_locally_terminal_invalid_skips_queue(self):
+        # Bad syntax is settled by the local pre-flight — no queue round trip,
+        # and the terminal verdict is cached like a deep result.
+        with mock.patch.object(
+            tasks.verify_email_deep_task, "apply_async"
+        ) as enqueue:
+            result, from_cache = services.verify_email_realtime("not an email@@")
+
+        enqueue.assert_not_called()
+        self.assertFalse(from_cache)
+        self.assertEqual(result.metadata["status"], "invalid")
+        self.assertIsNotNone(
+            services._validator.get_cached_result("not an email@@")
+        )
+
+    def test_locally_terminal_disposable_skips_queue(self):
+        with mock.patch.object(
+            tasks.verify_email_deep_task, "apply_async"
+        ) as enqueue:
+            result, _ = services.verify_email_realtime("user@mailinator.com")
+
+        enqueue.assert_not_called()
+        self.assertEqual(result.metadata["status"], "do_not_mail")
+        self.assertEqual(result.metadata["sub_status"], "disposable")
+
     def test_fast_mode_never_enqueues(self):
         with mock.patch.object(
             tasks.verify_email_deep_task, "apply_async"
