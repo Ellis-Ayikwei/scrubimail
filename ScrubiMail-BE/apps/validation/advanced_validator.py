@@ -54,8 +54,8 @@ def _conf(name: str, default: Any) -> Any:
 # Module-level DNS resolver with short timeouts. Kept tight so a single slow
 # lookup can't blow the realtime p99 budget (worst case ~lifetime seconds).
 _dns_resolver = dns.resolver.Resolver()
-_dns_resolver.timeout = 2        # per-query timeout
-_dns_resolver.lifetime = 3       # total resolution lifetime
+_dns_resolver.timeout = 2  # per-query timeout
+_dns_resolver.lifetime = 3  # total resolution lifetime
 
 # Simple TTL cache for domain DNS/reputation results
 _domain_cache: Dict[str, Dict[str, Any]] = {}
@@ -82,9 +82,7 @@ _DISPOSABLE_BASELINE = os.path.join(
     os.path.dirname(__file__), "data", "disposable_domains.txt"
 )
 # Bundled top consumer-mail domains, used for Damerau-Levenshtein typo suggestions.
-_TOP_DOMAINS_FILE = os.path.join(
-    os.path.dirname(__file__), "data", "top_domains.txt"
-)
+_TOP_DOMAINS_FILE = os.path.join(os.path.dirname(__file__), "data", "top_domains.txt")
 _disposable_domains: Optional[set] = None
 # mtime of the external feed file last loaded, so workers pick up a weekly
 # refresh (see update_disposable_domains) without a restart.
@@ -108,16 +106,11 @@ def _damerau_levenshtein(a: str, b: str, max_distance: int = 2) -> int:
         for j in range(1, lb + 1):
             cost = 0 if a[i - 1] == b[j - 1] else 1
             cur[j] = min(
-                prev[j] + 1,        # deletion
-                cur[j - 1] + 1,     # insertion
+                prev[j] + 1,  # deletion
+                cur[j - 1] + 1,  # insertion
                 prev[j - 1] + cost,  # substitution
             )
-            if (
-                i > 1
-                and j > 1
-                and a[i - 1] == b[j - 2]
-                and a[i - 2] == b[j - 1]
-            ):
+            if i > 1 and j > 1 and a[i - 1] == b[j - 2] and a[i - 2] == b[j - 1]:
                 cur[j] = min(cur[j], prev2[j - 2] + 1)  # transposition
             row_min = min(row_min, cur[j])
         if row_min > max_distance:
@@ -273,9 +266,7 @@ class AdvancedEmailValidator:
         # Circuit breaker: trip after this many consecutive total failures,
         # then skip SMTP for this many seconds. Set threshold high (or TTL to 0)
         # on a host with reliable port-25 egress.
-        self.smtp_failure_threshold = int(
-            _conf("VALIDATION_SMTP_FAILURE_THRESHOLD", 3)
-        )
+        self.smtp_failure_threshold = int(_conf("VALIDATION_SMTP_FAILURE_THRESHOLD", 3))
         self.smtp_block_ttl = int(_conf("VALIDATION_SMTP_BLOCK_TTL", 600))
         # Catch-all status is cached per domain (Redis) so we probe a garbage
         # address at most once per domain per this TTL, never once per address.
@@ -586,10 +577,23 @@ class AdvancedEmailValidator:
         """
         if _django_cache is not None:
             try:
-                return bool(_django_cache.get(f"emailval:{_SMTP_BREAKER_BLOCK_KEY}"))
-            except Exception:
-                pass  # Redis down -> fall back to the in-process timestamp
-        return time.time() < _smtp_egress_blocked_until
+                is_open = bool(_django_cache.get(f"emailval:{_SMTP_BREAKER_BLOCK_KEY}"))
+                logger.debug("SMTP breaker check (redis): open=%s", is_open)
+                return is_open
+            except Exception as e:
+                logger.warning(
+                    "SMTP breaker check: redis unavailable (%s), falling back to "
+                    "in-process state",
+                    e,
+                )
+        is_open = time.time() < _smtp_egress_blocked_until
+        logger.debug(
+            "SMTP breaker check (in-process): open=%s blocked_until=%s now=%s",
+            is_open,
+            _smtp_egress_blocked_until,
+            time.time(),
+        )
+        return is_open
 
     def _breaker_record_success(self) -> None:
         """Any successful connection resets the shared (and local) failure state."""
@@ -600,8 +604,9 @@ class AdvancedEmailValidator:
             try:
                 _django_cache.delete(f"emailval:{_SMTP_BREAKER_FAIL_KEY}")
                 _django_cache.delete(f"emailval:{_SMTP_BREAKER_BLOCK_KEY}")
-            except Exception:
-                pass
+            except Exception as e:
+                logger.warning("SMTP breaker: failed to clear redis state: %s", e)
+        logger.info("SMTP breaker: reset after successful connection")
 
     def _breaker_record_failure(self) -> None:
         """Count a total-egress failure across all workers; trip the breaker
@@ -616,10 +621,25 @@ class AdvancedEmailValidator:
                     count = 1
                 else:
                     count = int(_django_cache.incr(key))
-            except Exception:
+            except Exception as e:
+                logger.warning(
+                    "SMTP breaker: redis incr failed (%s), using in-process count", e
+                )
                 count = _smtp_consecutive_failures
+        logger.warning(
+            "SMTP breaker: egress failure recorded (count=%s/%s)",
+            count,
+            self.smtp_failure_threshold,
+        )
         if count >= self.smtp_failure_threshold:
             _smtp_egress_blocked_until = time.time() + self.smtp_block_ttl
+            logger.error(
+                "SMTP breaker: TRIPPED after %s consecutive failures — "
+                "blocking SMTP probes for %ss (until %s)",
+                count,
+                self.smtp_block_ttl,
+                _smtp_egress_blocked_until,
+            )
             if _django_cache is not None:
                 try:
                     _django_cache.set(
@@ -627,8 +647,10 @@ class AdvancedEmailValidator:
                         1,
                         timeout=self.smtp_block_ttl,
                     )
-                except Exception:
-                    pass
+                except Exception as e:
+                    logger.warning(
+                        "SMTP breaker: failed to write block flag to redis: %s", e
+                    )
 
     # ------------------------------------------------------------------ SMTP
     def smtp_handshake(
@@ -658,12 +680,29 @@ class AdvancedEmailValidator:
             "errors": [],
         }
 
+        logger.debug(
+            "smtp_handshake: starting for email=%s domain=%s mx_count=%s timeout=%s",
+            email,
+            domain,
+            len(mx_records or []),
+            timeout,
+        )
+
         if not self.smtp_enabled:
+            logger.info(
+                "smtp_handshake: skipped for %s — VALIDATION_SMTP_ENABLED is False",
+                email,
+            )
             results["status"] = "skipped"
             results["sub_status"] = "no_smtp_check"
             return results
 
         if not mx_records:
+            logger.info(
+                "smtp_handshake: skipped for %s — no MX records for domain %s",
+                email,
+                domain,
+            )
             results["status"] = "unknown"
             results["sub_status"] = "no_mx_record"
             results["error"] = "No MX records available"
@@ -673,6 +712,11 @@ class AdvancedEmailValidator:
         # host (shared across workers via Redis), don't waste seconds
         # re-timing-out — return unknown immediately.
         if self._breaker_is_open():
+            logger.info(
+                "smtp_handshake: skipped for %s — SMTP egress circuit breaker is "
+                "OPEN (recent egress failures on port 25)",
+                email,
+            )
             results["status"] = "unknown"
             results["sub_status"] = "smtp_egress_blocked"
             results["error"] = "SMTP egress recently unreachable (circuit open)"
@@ -685,6 +729,14 @@ class AdvancedEmailValidator:
         provider = provider_for_mx(mx_records[0]["host"])
         allowed, retry_after, reason = self.rate_limiter.try_acquire(provider)
         if not allowed:
+            logger.info(
+                "smtp_handshake: skipped for %s — provider %s rate-limited "
+                "(reason=%s, retry_after=%s)",
+                email,
+                provider,
+                reason,
+                retry_after,
+            )
             results["status"] = "unknown"
             results["sub_status"] = "rate_limited"
             results["rate_limited"] = True
@@ -701,10 +753,19 @@ class AdvancedEmailValidator:
             for mx in mx_records[: self.max_mx_hosts]:
                 mx_host = mx["host"]
                 server = None
+                logger.debug(
+                    "smtp_handshake: connecting to MX %s:25 for %s (timeout=%s)",
+                    mx_host,
+                    email,
+                    timeout or self.smtp_timeout,
+                )
                 try:
                     server = smtplib.SMTP(timeout=timeout or self.smtp_timeout)
                     server.connect(mx_host, 25)
                     connection_succeeded = True
+                    logger.debug(
+                        "smtp_handshake: connected to MX %s for %s", mx_host, email
+                    )
                     server.helo(self.smtp_helo_host)
 
                     if self.smtp_use_starttls and server.has_extn("starttls"):
@@ -719,6 +780,14 @@ class AdvancedEmailValidator:
                     message_str = message.decode("utf-8", errors="ignore")
                     results["response_codes"].append(
                         {"mx": mx_host, "code": code, "message": message_str}
+                    )
+                    logger.debug(
+                        "smtp_handshake: RCPT TO response for %s from %s -> "
+                        "code=%s message=%s",
+                        email,
+                        mx_host,
+                        code,
+                        message_str,
                     )
 
                     if code in (250, 251):
@@ -784,6 +853,13 @@ class AdvancedEmailValidator:
                     break
 
                 except (socket.timeout, ConnectionRefusedError, OSError) as e:
+                    logger.warning(
+                        "smtp_handshake: connection failed to MX %s for %s — %s: %s",
+                        mx_host,
+                        email,
+                        type(e).__name__,
+                        e,
+                    )
                     results["errors"].append(f"MX {mx_host}: {str(e)}")
                     if server is not None:
                         try:
@@ -792,6 +868,13 @@ class AdvancedEmailValidator:
                             pass
                     continue
                 except Exception as e:
+                    logger.warning(
+                        "smtp_handshake: unexpected error on MX %s for %s — %s: %s",
+                        mx_host,
+                        email,
+                        type(e).__name__,
+                        e,
+                    )
                     results["errors"].append(f"MX {mx_host}: {str(e)}")
                     continue
 
@@ -804,6 +887,13 @@ class AdvancedEmailValidator:
                 # breaker trips only after the COMBINED (cross-worker) failure
                 # count reaches the threshold, so one slow MX on a healthy host
                 # doesn't disable SMTP for everything.
+                logger.warning(
+                    "smtp_handshake: FAILED to reach any of %s MX host(s) for %s "
+                    "on port 25 — errors: %s",
+                    min(len(mx_records), self.max_mx_hosts),
+                    email,
+                    results["errors"],
+                )
                 self._breaker_record_failure()
                 results["status"] = "unknown"
                 results["sub_status"] = "failed_smtp_connection"
@@ -812,6 +902,12 @@ class AdvancedEmailValidator:
             # Always release the concurrency slot we reserved above.
             self.rate_limiter.release(provider)
 
+        logger.debug(
+            "smtp_handshake: final result for %s -> status=%s sub_status=%s",
+            email,
+            results.get("status"),
+            results.get("sub_status"),
+        )
         return results
 
     def _get_or_detect_catch_all(
@@ -1235,7 +1331,9 @@ class AdvancedEmailValidator:
         "exception_occurred",
     }
 
-    def _result_ttl(self, status: Optional[str], sub_status: Optional[str]) -> Optional[int]:
+    def _result_ttl(
+        self, status: Optional[str], sub_status: Optional[str]
+    ) -> Optional[int]:
         if status in ("valid", "invalid", "catch_all", "do_not_mail"):
             return self.result_cache_ttl
         if status == "unknown" and sub_status not in self._TRANSIENT_SUBSTATUSES:
@@ -1263,8 +1361,26 @@ class AdvancedEmailValidator:
         # shared circuit breaker (Issue 6) is the signal: if it's open (or this
         # isn't an egress worker), fall back to the fast path and report
         # smtp_unavailable rather than burning the budget on timeouts.
-        egress_ok = self.smtp_enabled and not self._breaker_is_open()
+        breaker_open = self._breaker_is_open()
+        egress_ok = self.smtp_enabled and not breaker_open
+        logger.debug(
+            "validate_email_realtime: email=%s fast=%s smtp_enabled=%s "
+            "breaker_open=%s egress_ok=%s",
+            email,
+            fast,
+            self.smtp_enabled,
+            breaker_open,
+            egress_ok,
+        )
         if fast or not egress_ok:
+            if not fast:
+                logger.info(
+                    "validate_email_realtime: falling back to fast path for %s — "
+                    "smtp_enabled=%s breaker_open=%s",
+                    email,
+                    self.smtp_enabled,
+                    breaker_open,
+                )
             result = self.validate_email(email, deep=False)
             if not fast:
                 self._mark_smtp_unavailable(result)
@@ -1282,6 +1398,11 @@ class AdvancedEmailValidator:
     def _mark_smtp_unavailable(self, result: ValidationResult) -> None:
         """Relabel a fast-path result whose SMTP stage was skipped because egress
         is unavailable (breaker open / not an egress worker)."""
+        logger.warning(
+            "SMTP unavailable: relabeling result as smtp_unavailable "
+            "(previous sub_status=%s)",
+            result.metadata.get("sub_status"),
+        )
         result.metadata["sub_status"] = "smtp_unavailable"
         msg = "SMTP verification unavailable (egress down) — mailbox not confirmed"
         if msg not in result.warnings:
@@ -1373,7 +1494,10 @@ class AdvancedEmailValidator:
                 }
             elif mx_records:
                 smtp_result = self.smtp_handshake(
-                    email, domain, mx_records, timeout=self._probe_timeout(start_time, budget)
+                    email,
+                    domain,
+                    mx_records,
+                    timeout=self._probe_timeout(start_time, budget),
                 )
             elif a_records:
                 # Fallback to A record as implicit MX (RFC 5321 §5.1).

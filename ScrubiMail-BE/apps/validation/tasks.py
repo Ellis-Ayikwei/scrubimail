@@ -7,7 +7,7 @@ from email.mime.multipart import MIMEMultipart
 from celery import shared_task
 from django.conf import settings
 from .models import EmailValidation
-from .advanced_validator import AdvancedEmailValidator
+from .advanced_validator import AdvancedEmailValidator, _now_iso
 
 # Initialize the advanced validator
 validator = AdvancedEmailValidator()
@@ -83,6 +83,33 @@ def validate_email_task(self, email_validation_id):
 
     except Exception as exc:
         self.retry(exc=exc, countdown=2**self.request.retries)
+
+
+@shared_task
+def verify_email_deep_task(email):
+    """Deep (SMTP) mailbox verification for the realtime single-validation
+    endpoint. Routed to the `smtp_validation` queue, so it only ever runs on
+    the egress worker — the one host with outbound port 25 open.
+
+    No retries, unlike validate_email_task: the caller is an HTTP request
+    waiting on the verdict, so transient outcomes (greylisted, rate_limited,
+    timeout) are returned as an honest `unknown` rather than re-probed —
+    store_result skips them, so a later request re-verifies. Terminal verdicts
+    warm the shared result cache; even when the caller times out before the
+    probe finishes, the next lookup for this address is instant and confirmed.
+    """
+    result = validator.validate_email(email, deep=True)
+    result.metadata.setdefault("verified_at", _now_iso())
+    validator.store_result(email, result)
+    return {
+        "is_valid": result.is_valid,
+        "score": result.score,
+        "verdict": result.verdict,
+        "breakdown": result.breakdown,
+        "suggestions": result.suggestions,
+        "warnings": result.warnings,
+        "metadata": result.metadata,
+    }
 
 
 @shared_task(bind=True, max_retries=20)
