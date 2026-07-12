@@ -34,9 +34,12 @@ services:
       - --queues=smtp_validation
       - --hostname=smtp-egress@%h
     healthcheck:
-      test: ["CMD", "celery", "-A", "backend", "inspect", "ping", "-d", "smtp-egress@$${HOSTNAME}"]
+      # CMD-SHELL (not CMD): exec form runs no shell, so $HOSTNAME would never
+      # expand and the ping would target a literal "smtp-egress@$HOSTNAME"
+      # node that doesn't exist, marking a healthy worker unhealthy forever.
+      test: ["CMD-SHELL", "celery -A backend inspect ping -d smtp-egress@$$HOSTNAME -t 10"]
       interval: 60s
-      timeout: 15s
+      timeout: 20s
       retries: 3
       start_period: 30s
     logging:
