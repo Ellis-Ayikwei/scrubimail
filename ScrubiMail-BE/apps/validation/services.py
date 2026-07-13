@@ -16,7 +16,7 @@ from celery.exceptions import TimeoutError as CeleryTimeoutError
 from django.conf import settings
 from django.core.cache import cache as _shared_cache
 
-from .advanced_validator import AdvancedEmailValidator, ValidationResult
+from .advanced_validator import AdvancedEmailValidator, ValidationResult, _now_iso
 
 logger = logging.getLogger(__name__)
 
@@ -102,6 +102,17 @@ def verify_email_realtime(
     if cached is not None:
         return cached, True
 
+    # Local pre-flight (syntax/DNS/list checks, ~10-50ms, no SMTP): a large
+    # class of addresses is TERMINALLY classifiable without probing — bad
+    # syntax, non-existent domain, null MX, disposable, role-based. Settle
+    # those here and skip the queue round trip; only mailbox existence needs
+    # the egress worker. Terminal verdicts are cached like any deep result.
+    local = _validator.validate_email(email, deep=False)
+    if local.metadata.get("status") in ("invalid", "do_not_mail"):
+        local.metadata["verified_at"] = _now_iso()
+        _validator.store_result(email, local)
+        return local, False
+
     skip_wait = _egress_unresponsive()
     async_result = None
     try:
@@ -131,9 +142,9 @@ def verify_email_realtime(
         except Exception:
             logger.exception("Realtime egress verification failed for %s", email)
 
-    # Honest degradation: on a non-egress host this is the fast pipeline marked
+    # Honest degradation: return the local pre-flight result relabelled
     # smtp_unavailable — a transient sub_status, so it is never cached and the
     # next request attempts deep verification again.
-    return _validator.validate_email_realtime(
-        email, fast=False, budget=max(0.5, deadline - time.monotonic())
-    )
+    _validator._mark_smtp_unavailable(local)
+    local.metadata["verified_at"] = _now_iso()
+    return local, False
