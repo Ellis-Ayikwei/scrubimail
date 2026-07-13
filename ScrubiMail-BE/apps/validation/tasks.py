@@ -9,6 +9,7 @@ from celery import shared_task
 from django.conf import settings
 from .models import EmailValidation
 from .advanced_validator import AdvancedEmailValidator, _now_iso
+from .services import build_breakdown as _build_breakdown, persist_validation_record
 
 # The validator is instantiated lazily (on first use) rather than at import
 # time. Construction calls load_disposable_domains(), which reads files from
@@ -41,20 +42,24 @@ class _LazyValidator:
 validator = _LazyValidator()
 
 
-def _build_breakdown(result):
-    """Shared breakdown payload persisted by both the single and bulk paths."""
-    return {
-        "syntax": result.breakdown.get("syntax", {}),
-        "dns": result.breakdown.get("dns", {}),
-        "smtp": result.breakdown.get("smtp", {}),
-        "reputation": result.breakdown.get("reputation", {}),
-        "role_based": result.breakdown.get("role_based", {}),
-        "risk_score": {
-            "score": result.score,
-            "verdict": result.verdict,
-            "is_valid": result.is_valid,
-        },
-    }
+@shared_task(
+    bind=True,
+    max_retries=5,
+    acks_late=True,
+    autoretry_for=(Exception,),
+    retry_backoff=True,
+)
+def persist_validation_record_task(self, **kwargs):
+    """Write a completed realtime validation's rows off the request path.
+
+    Runs on the DEFAULT queue (the main app's worker), never the egress box —
+    this is database work, not SMTP work. acks_late + retries make it
+    at-least-once, and persist_validation_record is idempotent on the caller's
+    pre-generated validation_id, so a redelivery rewrites the same row instead
+    of double-recording a charge.
+    """
+    persist_validation_record(**kwargs)
+    return {"status": "completed", "validation_id": kwargs.get("validation_id")}
 
 
 @shared_task(bind=True, max_retries=3)

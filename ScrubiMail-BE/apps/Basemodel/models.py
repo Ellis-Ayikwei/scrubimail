@@ -55,8 +55,3 @@ class Basemodel(models.Model):
 
     class Meta:
         abstract = True
-
-    def save(self, *args, **kwargs):
-        print("BaseModel save starting...")
-        super().save(*args, **kwargs)
-        print("BaseModel save completed")

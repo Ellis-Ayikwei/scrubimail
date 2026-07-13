@@ -8,7 +8,6 @@ from django.shortcuts import get_object_or_404
 from django.urls import reverse
 from django.utils import timezone
 from django.db.models import Q, Avg, Count
-from django.db import models, transaction
 from .models import (
     EmailValidation,
     BulkValidationJob,
@@ -21,7 +20,7 @@ from .serializers import (
     BulkJobSerializer,
 )
 from .tasks import validate_email_task, bulk_validate_emails_task
-from .services import verify_email_realtime
+from .services import verify_email_realtime, record_validation
 from .advanced_validator import AdvancedEmailValidator
 from django_celery_results.models import TaskResult
 from rest_framework.permissions import IsAuthenticated
@@ -79,49 +78,37 @@ class SingleEmailValidationView(APIView):
         result, from_cache = verify_email_realtime(email, fast=fast)
         verify_ms = round((time.monotonic() - verify_started) * 1000)
 
-        # One transaction for record + billing: a single commit instead of one
-        # per write (fewer DB round trips), and the validation record, credit
-        # consumption and usage row land all-or-nothing.
         persist_started = time.monotonic()
-        with transaction.atomic():
-            validation = EmailValidation.objects.create(
-                email=email,
-                user=user,
-                status="completed",
-                score=result.score,
-                breakdown={
-                    "syntax": result.breakdown.get("syntax", {}),
-                    "dns": result.breakdown.get("dns", {}),
-                    "smtp": result.breakdown.get("smtp", {}),
-                    "reputation": result.breakdown.get("reputation", {}),
-                    "role_based": result.breakdown.get("role_based", {}),
-                    "risk_score": {
-                        "score": result.score,
-                        "verdict": result.verdict,
-                        "is_valid": result.is_valid,
-                    },
-                },
-                suggestions=result.suggestions,
-                warnings=result.warnings,
-                metadata=result.metadata,
-                job_type="api",
+
+        # Money stays ON the request path: the decrement is a single atomic
+        # UPDATE and its result is CHECKED here. can_use_credits() above is only
+        # an early-out — this is what actually reserves the credit, so two
+        # concurrent validations on a 1-credit account can't both succeed.
+        if not profile.consume_credits(1, "single"):
+            raise InsufficientCredits(
+                "Insufficient credits. Please purchase more credits."
             )
 
-            # Consume credits and create billing records
-            profile.consume_credits(1, f"Email validation: {email}")
-            EmailValidationUsage.objects.create(
-                billing_profile=profile,
-                validation_request_id=str(validation.id),
-                credits_consumed=1,
-                cost_per_credit=0.01,
-                validation_type="single",
-                email_count=1,
-            )
+        # Records go OFF the request path (~1ms to enqueue instead of ~4 blocking
+        # writes). The client already has the verdict in this response, so
+        # nothing user-facing waits on the row; a worker writes it a few hundred
+        # ms later and history/analytics read rows that are milliseconds old. The
+        # id is generated up front so the response can carry it immediately.
+        # If the broker is down the write falls back to inline — a spent credit
+        # must never end up without a record.
+        validation_id, breakdown = record_validation(
+            email=email,
+            result=result,
+            user_id=user.id,
+            billing_profile_id=profile.id,
+            job_type="api",
+            validation_type="single",
+        )
         persist_ms = round((time.monotonic() - persist_started) * 1000)
 
         details = request.query_params.get("details", "false").lower() == "true"
         response_data = {
-            "id": validation.id,
+            "id": validation_id,
             "email": email,
             "status": "completed",
             "score": result.score,
@@ -141,15 +128,16 @@ class SingleEmailValidationView(APIView):
             "validation_time": result.metadata.get("validation_time", 0),
             "request_time": round(time.monotonic() - request_started, 3),
             # Where request_time went: verify_ms = the verification itself
-            # (cache lookup / local pre-flight / egress wait); persist_ms =
-            # record + billing writes. A large gap between their sum and
+            # (cache lookup / local pre-flight / egress wait); persist_ms = the
+            # credit decrement plus enqueueing the record write (the row itself
+            # is written off-path). A large gap between their sum and
             # request_time (or between request_time and what the client
             # measures) points at billing pre-checks, auth/throttling, or the
             # network — not the validation pipeline.
             "timing": {"verify_ms": verify_ms, "persist_ms": persist_ms},
         }
         if details:
-            response_data["breakdown"] = validation.breakdown
+            response_data["breakdown"] = breakdown
             response_data["metadata"] = result.metadata
 
         return Response(response_data, status=status.HTTP_200_OK)
