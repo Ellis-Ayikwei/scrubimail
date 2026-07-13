@@ -1,4 +1,5 @@
 import re
+import threading
 import dns.resolver
 import smtplib
 import socket
@@ -9,8 +10,35 @@ from django.conf import settings
 from .models import EmailValidation
 from .advanced_validator import AdvancedEmailValidator, _now_iso
 
-# Initialize the advanced validator
-validator = AdvancedEmailValidator()
+# The validator is instantiated lazily (on first use) rather than at import
+# time. Construction calls load_disposable_domains(), which reads files from
+# disk; doing that eagerly means a hang/failure there blocks Celery worker
+# boot (and, if this module is ever imported by the web process, gunicorn
+# worker boot) before anything can run, with no traceback in the logs.
+_validator_instance = None
+_validator_lock = threading.Lock()
+
+
+def _get_validator():
+    """Return the process-wide validator, creating it on first use."""
+    global _validator_instance
+    if _validator_instance is None:
+        with _validator_lock:
+            if _validator_instance is None:
+                _validator_instance = AdvancedEmailValidator()
+    return _validator_instance
+
+
+class _LazyValidator:
+    """Proxy that resolves to the lazily-created validator on attribute
+    access, so existing call sites using the module-level `validator` name
+    keep working unchanged while still deferring instantiation."""
+
+    def __getattr__(self, name):
+        return getattr(_get_validator(), name)
+
+
+validator = _LazyValidator()
 
 
 def _build_breakdown(result):
