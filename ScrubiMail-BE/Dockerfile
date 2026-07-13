@@ -1,5 +1,7 @@
-# Backend image — used here to run the SMTP-egress Celery worker on a host
-# with outbound port 25 open (e.g. a Hetzner box). Same image can serve web too.
+# Backend image. Defaults to serving the web app (see CMD at the bottom).
+# docker-compose.smtp-egress.yml reuses this same image with an explicit command
+# to run the SMTP-egress Celery worker on a host with outbound port 25 open
+# (the Hetzner box).
 FROM python:3.12-slim
 
 ENV PYTHONUNBUFFERED=1 \
@@ -23,6 +25,16 @@ COPY . .
 RUN useradd --create-home --uid 10001 appuser
 USER appuser
 
-# Default: SMTP-egress validation worker. Overridable in compose.
-CMD ["celery", "-A", "backend", "worker", "-l", "INFO", \
-     "--concurrency=8", "--queues=smtp_validation", "--hostname=smtp-egress@%h"]
+# Default: serve the web app. This MUST stay a web server, because any platform
+# that builds this image without an explicit command (Railway auto-detects a
+# Dockerfile and then IGNORES the Procfile) runs this CMD — and if it isn't
+# listening on $PORT, the platform serves 502s.
+#
+# The SMTP-egress worker does NOT rely on this default: it sets its command
+# explicitly in docker-compose.smtp-egress.yml (celery ... --queues=smtp_validation).
+#
+# gthread + threads mirrors the Procfile `web:` line, and for the same reason:
+# the realtime endpoint blocks up to VALIDATION_REALTIME_BUDGET_SECONDS on the
+# egress worker's verdict, so a sync worker would serialize every other request
+# behind it.
+CMD ["sh", "-c", "gunicorn backend.wsgi:application --bind 0.0.0.0:${PORT:-8000} --workers ${WEB_CONCURRENCY:-2} --worker-class gthread --threads ${GUNICORN_THREADS:-8} --timeout 120 --access-logfile - --error-logfile -"]
