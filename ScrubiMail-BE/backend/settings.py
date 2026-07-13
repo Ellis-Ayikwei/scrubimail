@@ -171,6 +171,12 @@ CELERY_TASK_ROUTES = {
     "apps.validation.tasks.validate_email_task": {"queue": "smtp_validation"},
     "apps.validation.tasks.bulk_validate_emails_task": {"queue": "smtp_validation"},
     "apps.validation.tasks.verify_email_deep_task": {"queue": "smtp_validation"},
+    # Off-request-path record writes are DATABASE work, not SMTP work: they run
+    # on the main app's worker (default queue), NOT the egress box. Explicit so
+    # a future change to the default queue can't silently send DB writes to a
+    # worker that only consumes smtp_validation — the rows would never be
+    # written and users would be charged with no record.
+    "apps.validation.tasks.persist_validation_record_task": {"queue": "default"},
 }
 # Record a STARTED state when a worker picks a task up. The realtime endpoint
 # uses it to tell "probe in progress, just slow" (STARTED) apart from "nobody
@@ -250,11 +256,23 @@ ASGI_APPLICATION = "backend.asgi.application"
 
 import dj_database_url
 
-if os.getenv("ON_HEROKU") == "1":
+# Persistent connections. Without this Django opens (TCP + TLS + auth) and tears
+# down a Postgres connection on EVERY request — tens of ms co-located, hundreds
+# over a public endpoint, charged to the first query of the request and read as
+# "slow persist". Reused connections are health-checked so a stale one is
+# replaced rather than raising.
+CONN_MAX_AGE = int(os.getenv("DB_CONN_MAX_AGE", 600))
+
+# Any host that provides DATABASE_URL (Railway, Hetzner, Heroku) uses it; only
+# local dev falls back to the hardcoded localhost DB. Previously the pooling
+# settings were on the ON_HEROKU branch alone, so every other deployment ran
+# unpooled.
+if os.getenv("DATABASE_URL"):
     DATABASES = {
         "default": dj_database_url.config(
             default=os.getenv("DATABASE_URL"),
-            conn_max_age=600,
+            conn_max_age=CONN_MAX_AGE,
+            conn_health_checks=True,
             engine="django.db.backends.postgresql",
         )
     }
@@ -262,11 +280,13 @@ else:
     DATABASES = {
         "default": {
             "ENGINE": "django.db.backends.postgresql",
-            "NAME": "scrubimail",
-            "USER": "postgres",
-            "PASSWORD": "@Toshib123",
-            "HOST": "localhost",
-            "PORT": "5432",
+            "NAME": os.getenv("DB_NAME", "scrubimail"),
+            "USER": os.getenv("DB_USER", "postgres"),
+            "PASSWORD": os.getenv("DB_PASSWORD", "@Toshib123"),
+            "HOST": os.getenv("DB_HOST", "localhost"),
+            "PORT": os.getenv("DB_PORT", "5432"),
+            "CONN_MAX_AGE": CONN_MAX_AGE,
+            "CONN_HEALTH_CHECKS": True,
         }
     }
 
@@ -495,27 +515,6 @@ EMAIL_HOST_USER = os.getenv("EMAIL_HOST_USER")
 EMAIL_HOST_PASSWORD = os.getenv("EMAIL_HOST_PASSWORD")
 EMAIL_USE_TLS = os.getenv("EMAIL_USE_TLS", "True").lower() == "true"
 
-# Print email configuration for debugging
-print("=== Email Configuration ===")
-print(f"DEFAULT_FROM_EMAIL: {DEFAULT_FROM_EMAIL}")
-print(f"EMAIL_HOST: {EMAIL_HOST}")
-print(f"EMAIL_PORT: {EMAIL_PORT}")
-print(f"EMAIL_HOST_USER: {EMAIL_HOST_USER}")
-print(
-    f"EMAIL_HOST_PASSWORD: {'*' * len(EMAIL_HOST_PASSWORD) if EMAIL_HOST_PASSWORD else 'None'}"
-)
-print(f"EMAIL_USE_TLS: {EMAIL_USE_TLS}")
-print("=========================")
-print("=== CORS Configuration ===")
-print(f"CORS_ALLOWED_ORIGINS: {CORS_ALLOWED_ORIGINS}")
-print(f"CORS_ALLOWED_ORIGIN_REGEXES: {CORS_ALLOWED_ORIGIN_REGEXES}")
-print("=========================")
-print("=== ALLOWED_HOSTS ===")
-print(f"ALLOWED_HOSTS: {ALLOWED_HOSTS}")
-print("=========================")
-print("=== DEBUG ===")
-print(f"DEBUG: {DEBUG}")
-
 APPEND_SLASH = False
 
 # --- Paystack Configuration ---
@@ -530,7 +529,6 @@ PAYSTACK_SECRET_KEY = os.getenv(
 # Paystack Webhook Configuration
 PAYSTACK_WEBHOOK_SECRET = os.getenv("PAYSTACK_WEBHOOK_SECRET")
 
-print("Paystack WEBHOOK Key:", PAYSTACK_WEBHOOK_SECRET)
 # Paystack Configuration
 PAYSTACK_LIVE_MODE = False  # Set to True for production
 PAYSTACK_CURRENCY = (
