@@ -20,6 +20,10 @@ urlpatterns = [
     # Geocoding endpoints outside API path to bypass authentication issues
     # API routes with prefix
     path("", apps.ApiConnectionStatus.views.ApiConnectionStatusView.as_view()),
+    # Readiness probe — verifies the DB is actually reachable. Point the Railway
+    # health check at this, not at "/": "/" returns 200 even when every
+    # DB-backed route is hanging (and therefore 502ing).
+    path("health/", apps.ApiConnectionStatus.views.HealthCheckView.as_view()),
     path(
         "scrubimail/api/v1/",
         include(

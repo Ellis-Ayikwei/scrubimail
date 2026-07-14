@@ -1,3 +1,4 @@
+from decimal import Decimal
 from django.views.decorators.csrf import csrf_exempt
 from django.utils.decorators import method_decorator
 from rest_framework.views import APIView
@@ -137,11 +138,7 @@ class PlanUpgradeView(APIView):
             if getattr(request.user, "is_authenticated", False)
             else None
         )
-        payload = (
-            dict(request.data)
-            if hasattr(request.data, "keys")
-            else request.data
-        )
+        payload = dict(request.data) if hasattr(request.data, "keys") else request.data
         serializer = PlanUpgradeSerializer(data=request.data)
         if serializer.is_valid():
             billing_service = BillingService()

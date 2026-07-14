@@ -263,6 +263,14 @@ import dj_database_url
 # replaced rather than raising.
 CONN_MAX_AGE = int(os.getenv("DB_CONN_MAX_AGE", 600))
 
+# Fail fast when Postgres is unreachable. Django sets NO connect timeout by
+# default, so an unroutable host (e.g. pointing DATABASE_URL at Railway's PUBLIC
+# proxy from inside Railway, where it can't be dialled) makes psycopg block
+# until gunicorn's --timeout kills the worker — the request dies as an opaque
+# 502 with nothing in the app log. With a timeout it raises OperationalError in
+# seconds: a logged 500 that names the real problem.
+DB_OPTIONS = {"connect_timeout": int(os.getenv("DB_CONNECT_TIMEOUT", 5))}
+
 # Any host that provides DATABASE_URL (Railway, Hetzner, Heroku) uses it; only
 # local dev falls back to the hardcoded localhost DB. Previously the pooling
 # settings were on the ON_HEROKU branch alone, so every other deployment ran
@@ -276,6 +284,7 @@ if os.getenv("DATABASE_URL"):
             engine="django.db.backends.postgresql",
         )
     }
+    DATABASES["default"].setdefault("OPTIONS", {}).update(DB_OPTIONS)
 else:
     DATABASES = {
         "default": {
@@ -287,6 +296,7 @@ else:
             "PORT": os.getenv("DB_PORT", "5432"),
             "CONN_MAX_AGE": CONN_MAX_AGE,
             "CONN_HEALTH_CHECKS": True,
+            "OPTIONS": DB_OPTIONS,
         }
     }
 
