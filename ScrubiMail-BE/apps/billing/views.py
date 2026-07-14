@@ -20,6 +20,7 @@ import json
 import hashlib
 import hmac
 import logging
+import uuid
 
 logger = logging.getLogger(__name__)
 
@@ -783,7 +784,14 @@ class PurchaseCreditPackageView(APIView):
         # Get or create billing profile
         billing_profile, _ = BillingProfile.objects.get_or_create(user=request.user)
 
-        # Create purchase record
+        # paystack_reference is required + unique, so it must exist at creation.
+        # Use the client-supplied reference if given, otherwise mint one now and
+        # hand the SAME value to Paystack below, so the row and the gateway agree
+        # on one reference end-to-end.
+        reference = payment_reference or f"pkg_{uuid.uuid4().hex[:20]}"
+
+        # Create purchase record. payment_method has no column on this model, so
+        # it lives in metadata (read back when generating the invoice).
         purchase = CreditPackagePurchase.objects.create(
             user=request.user,
             billing_profile=billing_profile,
@@ -791,14 +799,13 @@ class PurchaseCreditPackageView(APIView):
             credits_purchased=package.credits,
             amount_paid=final_amount,  # Use discounted amount
             currency="NGN",
-            payment_method=payment_method,
-            payment_reference=payment_reference,
-            payment_provider=payment_method,
+            paystack_reference=reference,
             status="pending",
             metadata={
                 "original_amount": float(original_amount),
                 "discount_amount": float(discount_amount),
                 "promo_code": promo_code_str if promo_code else None,
+                "payment_method": payment_method,
             },
         )
 
@@ -840,6 +847,7 @@ class PurchaseCreditPackageView(APIView):
                 payment_data = paystack_service.initialize_payment(
                     email=request.user.email,
                     amount=final_amount,  # Use discounted amount
+                    reference=reference,  # reuse the row's reference at the gateway
                     metadata={
                         "purchase_id": str(purchase.id),
                         "package_id": str(package.id),
@@ -852,8 +860,9 @@ class PurchaseCreditPackageView(APIView):
                     },
                 )
 
-                purchase.payment_reference = payment_data.get("reference")
-                purchase.save()
+                # Paystack echoes our reference back; persist whatever it used.
+                purchase.paystack_reference = payment_data.get("reference") or reference
+                purchase.save(update_fields=["paystack_reference", "updated_at"])
 
                 return Response(
                     {
@@ -1788,12 +1797,14 @@ class GenerateInvoiceView(APIView):
                 )
 
                 # Update invoice
-                invoice.payment_reference = purchase.payment_reference
-                invoice.payment_method = purchase.payment_method
+                invoice.payment_reference = purchase.paystack_reference
+                invoice.payment_method = (purchase.metadata or {}).get(
+                    "payment_method", "paystack"
+                )
 
                 if purchase.status == "completed":
                     invoice.status = "paid"
-                    invoice.paid_date = purchase.completed_at
+                    invoice.paid_date = purchase.credits_added_date
 
                 invoice.save()
 

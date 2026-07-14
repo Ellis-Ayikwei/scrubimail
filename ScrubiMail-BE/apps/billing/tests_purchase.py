@@ -1,0 +1,131 @@
+"""Regression: the credit-package purchase flow against the lean model.
+
+The model was rewritten to a paystack_reference-based schema, but the view,
+serializer and complete_purchase() still referenced older field names
+(payment_method / payment_reference / payment_provider / completed_at) that no
+longer exist. That made POST /purchase-package/ 500 with a TypeError, and would
+have crashed the webhook completion, the serializer, and invoice generation too.
+
+These tests exercise each of those seams against the real model.
+"""
+
+from decimal import Decimal
+from unittest import mock
+
+from django.contrib.auth import get_user_model
+from django.test import TestCase
+from rest_framework.test import APIRequestFactory, force_authenticate
+
+from apps.billing.models import BillingProfile, CreditPackage, CreditPackagePurchase
+from apps.billing.serializers import CreditPackagePurchaseSerializer
+from apps.billing.views import PurchaseCreditPackageView
+
+
+class CreditPackagePurchaseFlowTests(TestCase):
+    def setUp(self):
+        self.factory = APIRequestFactory()
+        self.user = get_user_model().objects.create_user(
+            email="buyer@example.com", password="x"
+        )
+        self.package = CreditPackage.objects.create(
+            name="Starter",
+            credits=1000,
+            price=Decimal("10.00"),
+            currency="USD",
+            is_active=True,
+        )
+
+    def _post(self, data):
+        request = self.factory.post("/purchase-package/", data, format="json")
+        force_authenticate(request, user=self.user)
+        return PurchaseCreditPackageView.as_view()(request)
+
+    def test_purchase_creates_row_and_initializes_payment(self):
+        # The reported crash: create() used to be handed fields the model lacks.
+        fake_paystack = mock.Mock()
+        fake_paystack.initialize_payment.return_value = {
+            "authorization_url": "https://paystack/checkout/abc",
+            "reference": "pkg_generated_ref_123",
+            "access_code": "ac_1",
+        }
+        with mock.patch("apps.billing.views.PaystackService", return_value=fake_paystack):
+            response = self._post({"package_id": str(self.package.id)})
+
+        self.assertEqual(response.status_code, 200, response.data)
+        self.assertTrue(response.data["success"])
+
+        purchase = CreditPackagePurchase.objects.get()
+        self.assertEqual(purchase.credits_purchased, 1000)
+        self.assertEqual(purchase.status, "pending")
+        # The row carries a reference (satisfies the unique/non-null column)...
+        self.assertTrue(purchase.paystack_reference)
+        # ...and it is the SAME reference handed to the gateway.
+        passed_ref = fake_paystack.initialize_payment.call_args.kwargs["reference"]
+        self.assertEqual(purchase.paystack_reference, passed_ref)
+        # payment_method has no column; it is preserved in metadata.
+        self.assertEqual(purchase.metadata.get("payment_method"), "paystack")
+
+    def test_client_supplied_reference_is_used_verbatim(self):
+        # When the client supplies a reference, no gateway init happens and the
+        # row stores exactly that reference.
+        with mock.patch("apps.billing.views.PaystackService") as svc:
+            response = self._post(
+                {"package_id": str(self.package.id), "payment_reference": "ext_ref_99"}
+            )
+        self.assertEqual(response.status_code, 200, response.data)
+        svc.assert_not_called()
+        self.assertEqual(
+            CreditPackagePurchase.objects.get().paystack_reference, "ext_ref_99"
+        )
+
+    def test_complete_purchase_adds_credits_and_stamps_metadata(self):
+        profile = BillingProfile.objects.create(user=self.user, credits_remaining=0)
+        purchase = CreditPackagePurchase.objects.create(
+            user=self.user,
+            billing_profile=profile,
+            package=self.package,
+            credits_purchased=1000,
+            amount_paid=Decimal("10.00"),
+            currency="USD",
+            paystack_reference="pkg_complete_1",
+            status="pending",
+        )
+
+        self.assertTrue(purchase.complete_purchase())
+        purchase.refresh_from_db()
+        profile.refresh_from_db()
+
+        self.assertEqual(purchase.status, "completed")
+        self.assertIsNotNone(purchase.credits_added_date)  # completion marker
+        self.assertIn("completed_at", purchase.metadata)  # for serializer/invoice
+        self.assertEqual(profile.credits_remaining, 1000)
+
+    def test_serializer_exposes_legacy_field_shape(self):
+        # The frontend contract still expects these keys; they must serialize
+        # from the real columns / metadata without ImproperlyConfigured.
+        purchase = CreditPackagePurchase.objects.create(
+            user=self.user,
+            billing_profile=BillingProfile.objects.create(user=self.user),
+            package=self.package,
+            credits_purchased=1000,
+            amount_paid=Decimal("10.00"),
+            currency="USD",
+            paystack_reference="pkg_serialize_1",
+            status="pending",
+            metadata={"payment_method": "card"},
+        )
+        data = CreditPackagePurchaseSerializer(purchase).data
+
+        for key in (
+            "payment_method",
+            "payment_reference",
+            "payment_provider",
+            "purchased_at",
+            "completed_at",
+            "failed_at",
+            "refunded_at",
+        ):
+            self.assertIn(key, data)
+        self.assertEqual(data["payment_reference"], "pkg_serialize_1")
+        self.assertEqual(data["payment_method"], "card")
+        self.assertIsNone(data["completed_at"])  # not completed yet

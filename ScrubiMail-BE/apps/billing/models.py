@@ -627,14 +627,17 @@ class CreditPackagePurchase(Basemodel):
         from django.utils import timezone
         from datetime import timedelta
 
+        now = timezone.now()
         self.status = "completed"
-        self.completed_at = timezone.now()
+        # This model has no dedicated completed_at column; credits_added_date is
+        # the completion marker, and metadata carries an ISO copy for the API
+        # serializer / invoice generator.
+        self.credits_added_date = now
+        self.metadata = {**(self.metadata or {}), "completed_at": now.isoformat()}
 
         # Calculate expiry date
         if self.package.expiry_days:
-            self.credits_expiry_date = timezone.now() + timedelta(
-                days=self.package.expiry_days
-            )
+            self.credits_expiry_date = now + timedelta(days=self.package.expiry_days)
 
         self.save()
 
@@ -642,7 +645,7 @@ class CreditPackagePurchase(Basemodel):
         self.billing_profile.add_credits(
             amount=self.credits_purchased,
             description=f"Credit package purchase: {self.package.name}",
-            payment_reference=self.payment_reference,
+            payment_reference=self.paystack_reference,
             expiry_days=self.package.expiry_days if self.package.expiry_days else None,
         )
 

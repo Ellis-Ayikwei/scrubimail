@@ -1,3 +1,5 @@
+import uuid
+
 from rest_framework import serializers
 from django.utils import timezone
 from .models import (
@@ -336,9 +338,27 @@ class CreditPackageSerializer(serializers.ModelSerializer):
 
 
 class CreditPackagePurchaseSerializer(serializers.ModelSerializer):
-    """Serializer for credit package purchases"""
+    """Serializer for credit package purchases.
+
+    The model stores a lean schema (paystack_reference + metadata); the API
+    contract still exposes the older field names the frontend expects. Those are
+    surfaced here as read-only derived fields sourced from the real columns /
+    metadata, so no schema change is needed and the response shape is stable.
+    """
 
     package_details = CreditPackageSerializer(source="package", read_only=True)
+    # payment_reference is the model's paystack_reference under its API name.
+    payment_reference = serializers.CharField(
+        source="paystack_reference", read_only=True
+    )
+    # Status-transition timestamps + payment method aren't dedicated columns;
+    # complete_purchase() and the payment flow record them in metadata.
+    payment_method = serializers.SerializerMethodField()
+    payment_provider = serializers.SerializerMethodField()
+    purchased_at = serializers.DateTimeField(source="created_at", read_only=True)
+    completed_at = serializers.SerializerMethodField()
+    failed_at = serializers.SerializerMethodField()
+    refunded_at = serializers.SerializerMethodField()
 
     class Meta:
         model = CreditPackagePurchase
@@ -367,13 +387,24 @@ class CreditPackagePurchaseSerializer(serializers.ModelSerializer):
             "user",
             "billing_profile",
             "credits_purchased",
-            "purchased_at",
-            "completed_at",
-            "failed_at",
-            "refunded_at",
             "created_at",
             "updated_at",
         ]
+
+    def get_payment_method(self, obj):
+        return (obj.metadata or {}).get("payment_method", "paystack")
+
+    def get_payment_provider(self, obj):
+        return (obj.metadata or {}).get("payment_provider", "paystack")
+
+    def get_completed_at(self, obj):
+        return (obj.metadata or {}).get("completed_at")
+
+    def get_failed_at(self, obj):
+        return (obj.metadata or {}).get("failed_at")
+
+    def get_refunded_at(self, obj):
+        return (obj.metadata or {}).get("refunded_at")
 
     def create(self, validated_data):
         """Create purchase with automatic user and billing profile"""
@@ -391,6 +422,12 @@ class CreditPackagePurchaseSerializer(serializers.ModelSerializer):
         # Set amount and currency
         validated_data["amount_paid"] = package.get_effective_price()
         validated_data["currency"] = validated_data.get("currency", "NGN")
+
+        # paystack_reference is required + unique; mint one if the caller didn't
+        # supply it (the view path generates its own before initializing payment).
+        validated_data.setdefault(
+            "paystack_reference", f"pkg_{uuid.uuid4().hex[:20]}"
+        )
 
         return super().create(validated_data)
 
