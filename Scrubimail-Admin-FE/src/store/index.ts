@@ -9,7 +9,7 @@ const store = configureStore({
     themeConfig: themeConfigReducer,
     draftRequests: draftRequestsReducer,
   },
-  devTools: process.env.NODE_ENV !== 'production',
+  devTools: import.meta.env.MODE !== 'production',
 });
 
 export type RootState = ReturnType<typeof store.getState>;

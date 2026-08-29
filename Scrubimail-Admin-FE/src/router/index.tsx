@@ -1,21 +1,15 @@
 import { createBrowserRouter } from 'react-router-dom';
-import Layout from '../components/Layout';
-import AdminLayout from '../components/AdminLayout';
+import AdminShell from '@/components/layout/admin-shell';
 import { routes } from './routes';
 
-const finalRoutes = routes.map((route) => {
-    return {
-        ...route,
-        element:
-            route.layout === 'blank' ? (
-                route.element
-            ) : route.layout === 'admin' ? (
-                <AdminLayout>{route.element}</AdminLayout>
-            ) : (
-                <Layout>{route.element}</Layout>
-            ),
-    };
-});
+/**
+ * `blank` routes (auth, error pages) render bare; everything else is wrapped in
+ * the admin chrome.
+ */
+const finalRoutes = routes.map((route) => ({
+    ...route,
+    element: route.layout === 'blank' ? route.element : <AdminShell>{route.element}</AdminShell>,
+}));
 
 const router = createBrowserRouter(finalRoutes);
 

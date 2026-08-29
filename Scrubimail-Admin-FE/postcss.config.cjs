@@ -1,16 +1,13 @@
 module.exports = {
     plugins: {
-      tailwindcss: {},
-      autoprefixer: {},
+      '@tailwindcss/postcss': {},
      
     },
   };
   
 // module.exports = {
 //     plugins: {
-//       'postcss-import': {}, // Import CSS files before processing other plugins
-//       tailwindcss: {},      // Tailwind CSS
-//       autoprefixer: {},     // Autoprefix CSS for browser compatibility
+//       '@tailwindcss/postcss': {},      // Tailwind CSS
 //       'postcss-preset-mantine': {}, // Mantine-specific PostCSS setup
 //       'postcss-simple-vars': {}, // Process simple CSS variables if needed
 //     },

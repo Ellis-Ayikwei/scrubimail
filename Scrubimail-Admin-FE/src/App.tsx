@@ -1,53 +1,30 @@
-import { PropsWithChildren, useEffect, useState } from 'react';
-import { useDispatch, useSelector } from 'react-redux';
-import store, { AppDispatch, IRootState } from './store';
-import { toggleAnimation, toggleLayout, toggleLocale, toggleMenu, toggleNavbar, toggleRTL, toggleSemidark, toggleTheme } from './store/themeConfigSlice';
-import useAuthUser from 'react-auth-kit/hooks/useAuthUser';
-import { fetchDrafts } from './store/slices/draftRequestsSlice';
+import { PropsWithChildren, useEffect } from 'react';
+import { useSelector } from 'react-redux';
 import { ConfigProvider, theme as antTheme } from 'antd';
+import { IRootState } from './store';
+import { TooltipProvider } from '@/components/ui/tooltip';
+import { Toaster } from '@/components/ui/sonner';
 
-interface AuthUser {
-    user: {
-        id: string;
-    };
-}
-
+/**
+ * Applies the active colour scheme and hosts the app-wide providers.
+ *
+ * The antd ConfigProvider is transitional: pages are being migrated onto
+ * shadcn module by module, and it can be dropped once no page imports antd.
+ */
 function App({ children }: PropsWithChildren) {
-    const themeConfig = useSelector((state: IRootState) => state.themeConfig);
-    const dispatch = useDispatch<AppDispatch>();
-    const authUser = useAuthUser();
-    const user = authUser as AuthUser | null;
-    const drafts = useSelector((state: IRootState) => state.draftRequests.drafts);
+    const theme = useSelector((state: IRootState) => state.themeConfig.theme);
 
     useEffect(() => {
-        dispatch(toggleTheme((localStorage.getItem('theme') as any) || themeConfig.theme));
-        dispatch(toggleMenu((localStorage.getItem('menu') as any) || themeConfig.menu));
-        dispatch(toggleLayout((localStorage.getItem('layout') as any) || themeConfig.layout));
-        dispatch(toggleRTL((localStorage.getItem('rtlClass') as any) || themeConfig.rtlClass));
-        dispatch(toggleAnimation((localStorage.getItem('animation') as any) || themeConfig.animation));
-        dispatch(toggleNavbar((localStorage.getItem('navbar') as any) || themeConfig.navbar));
-        dispatch(toggleLocale(localStorage.getItem('i18nextLng') || themeConfig.locale));
-        dispatch(toggleSemidark(localStorage.getItem('semidark') === 'true' || themeConfig.semidark));
-    }, [dispatch, themeConfig.theme, themeConfig.menu, themeConfig.layout, themeConfig.rtlClass, themeConfig.animation, themeConfig.navbar, themeConfig.locale, themeConfig.semidark, drafts]);
-
-    // Apply dark mode class to HTML element
-    useEffect(() => {
-        if (themeConfig.theme === 'dark') {
-            document.documentElement.classList.add('dark');
-        } else {
-            document.documentElement.classList.remove('dark');
-        }
-    }, [themeConfig.theme]);
+        document.documentElement.classList.toggle('dark', theme === 'dark');
+        document.documentElement.style.colorScheme = theme;
+    }, [theme]);
 
     return (
-        <ConfigProvider theme={{ algorithm: themeConfig.theme === 'dark' ? antTheme.darkAlgorithm : antTheme.defaultAlgorithm }}>
-            <div
-                className={`${(store.getState().themeConfig.sidebar && 'toggle-sidebar') || ''} ${themeConfig.menu} ${themeConfig.layout} ${
-                    themeConfig.rtlClass
-                } main-section antialiased relative font-nunito text-sm font-normal`}
-            >
+        <ConfigProvider theme={{ algorithm: theme === 'dark' ? antTheme.darkAlgorithm : antTheme.defaultAlgorithm }}>
+            <TooltipProvider delay={200}>
                 {children}
-            </div>
+                <Toaster position="bottom-right" richColors closeButton />
+            </TooltipProvider>
         </ConfigProvider>
     );
 }

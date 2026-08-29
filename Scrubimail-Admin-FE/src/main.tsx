@@ -1,21 +1,9 @@
-import { ColorSchemeScript, MantineProvider } from '@mantine/core';
-import '@mantine/core/styles.layer.css';
-import { DatesProvider } from '@mantine/dates';
-import '@mantine/dates/styles.css';
-import { ContextMenuProvider } from 'mantine-contextmenu';
-import 'mantine-contextmenu/styles.css';
-import 'mantine-datatable/styles.layer.css';
 import React, { Suspense } from 'react';
 import createRefresh from 'react-auth-kit/createRefresh';
 import ReactDOM from 'react-dom/client';
-import './layout.css';
-// Perfect Scrollbar
-import 'react-perfect-scrollbar/dist/css/styles.css';
 
-// Tailwind css
-import './tailwind.css';
-
-
+// Tailwind + shadcn design tokens
+import './index.css';
 
 // i18n (needs to be bundled)
 import './i18n';
@@ -90,23 +78,14 @@ const authStore = createStore({
 
 ReactDOM.createRoot(document.getElementById('root') as HTMLElement).render(
     <React.StrictMode>
-        <Suspense fallback={<div className='flex justify-center items-center h-screen'><IconLoader /></div>}>
-            <ColorSchemeScript defaultColorScheme="auto" />
-            <MantineProvider withGlobalClasses>
-                <ContextMenuProvider zIndex={5000} shadow="md" borderRadius="md">
-                    <DatesProvider settings={{ locale: 'en' }}>
-                        <Provider store={store}>
-                            <AuthProvider store={authStore}>
-                                <App>
-                                    {/* <PersistGate loading={null} persistor={persistor}> */}
-                                    <RouterProvider router={router} />
-                                    {/* </PersistGate> */}
-                                </App>
-                            </AuthProvider>
-                        </Provider>
-                    </DatesProvider>
-                </ContextMenuProvider>
-            </MantineProvider>
+        <Suspense fallback={<div className="flex justify-center items-center h-screen"><IconLoader /></div>}>
+            <Provider store={store}>
+                <AuthProvider store={authStore}>
+                    <App>
+                        <RouterProvider router={router} />
+                    </App>
+                </AuthProvider>
+            </Provider>
         </Suspense>
     </React.StrictMode>
 );
