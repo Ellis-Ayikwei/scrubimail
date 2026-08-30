@@ -65,7 +65,7 @@ const ForgotPassword = () => {
             <h2 className="font-['Epilogue',sans-serif] font-black text-[#e0e3e8] text-2xl tracking-tight mb-2">
               {recoveryMethod === 'email' ? 'Check your inbox' : 'Account Recovered'}
             </h2>
-            <p className="font-mono text-xs text-[#bacbbf]/50 mb-6">
+            <p className="font-mono text-xs text-[#bacbbf]/75 mb-6">
               {recoveryMethod === 'email'
                 ? `A reset link has been sent to ${email}`
                 : 'Your backup phrase was verified successfully.'}
@@ -81,18 +81,18 @@ const ForgotPassword = () => {
               <div className="p-6 space-y-4">
                 {recoveryMethod === 'email' ? (
                   <>
-                    <p className="font-mono text-xs text-[#bacbbf]/60 leading-relaxed">
+                    <p className="font-mono text-xs text-[#bacbbf]/80 leading-relaxed">
                       Click the link in the email to reset your password. The link expires in 1 hour.
                     </p>
                     <p className="font-mono text-[9px] text-[#3b4a41]">
                       Didn't receive it? Check your spam folder or resend.
                     </p>
-                    <div className="bg-[#101418] border border-[#3b4a41]/30 rounded-sm p-3 font-mono text-[9px] text-[#bacbbf]/40">
+                    <div className="bg-[#101418] border border-[#3b4a41]/30 rounded-sm p-3 font-mono text-[9px] text-[#bacbbf]/70">
                       Redirect target: <span className="text-[#6effc0]/60">/reset-password?token=…</span>
                     </div>
                   </>
                 ) : (
-                  <p className="font-mono text-xs text-[#bacbbf]/60 leading-relaxed">
+                  <p className="font-mono text-xs text-[#bacbbf]/80 leading-relaxed">
                     You will be redirected to the password reset page to create a new password.
                   </p>
                 )}
@@ -105,7 +105,7 @@ const ForgotPassword = () => {
                   </button>
                   <Link
                     to="/login"
-                    className="block w-full text-center py-2.5 bg-transparent border border-[#3b4a41]/40 rounded-sm font-mono text-[10px] text-[#bacbbf]/50 uppercase tracking-[0.2em] hover:border-[#6effc0]/30 hover:text-[#e0e3e8] transition-all"
+                    className="block w-full text-center py-2.5 bg-transparent border border-[#3b4a41]/40 rounded-sm font-mono text-[10px] text-[#bacbbf]/75 uppercase tracking-[0.2em] hover:border-[#6effc0]/30 hover:text-[#e0e3e8] transition-all"
                   >
                     Back to Sign In
                   </Link>
@@ -132,7 +132,7 @@ const ForgotPassword = () => {
             </Link>
             <p className="font-['Space_Grotesk',sans-serif] uppercase tracking-[0.2em] text-[9px] text-[#6effc0] mb-1">Account Recovery</p>
             <h1 className="font-['Epilogue',sans-serif] font-black text-[#e0e3e8] text-2xl tracking-tight">Forgot your password?</h1>
-            <p className="font-mono text-xs text-[#bacbbf]/50 mt-1">Choose a recovery method to re-open your session.</p>
+            <p className="font-mono text-xs text-[#bacbbf]/75 mt-1">Choose a recovery method to re-open your session.</p>
           </div>
 
           {/* Card */}
@@ -147,7 +147,7 @@ const ForgotPassword = () => {
             <div className="p-6 space-y-5">
               {/* Method toggle */}
               <div>
-                <label className="block font-['Space_Grotesk',sans-serif] uppercase tracking-[0.15em] text-[9px] text-[#bacbbf]/50 mb-2">
+                <label className="block font-['Space_Grotesk',sans-serif] uppercase tracking-[0.15em] text-[9px] text-[#bacbbf]/75 mb-2">
                   Recovery Method
                 </label>
                 <div className="flex bg-[#101418] border border-[#3b4a41]/40 rounded-sm p-0.5">
@@ -162,7 +162,7 @@ const ForgotPassword = () => {
                       className={`flex-1 flex items-center justify-center gap-2 py-2 font-mono uppercase tracking-[0.1em] text-[10px] rounded-sm transition-all ${
                         recoveryMethod === id
                           ? 'bg-[#6effc0]/15 text-[#6effc0] border border-[#6effc0]/20'
-                          : 'text-[#bacbbf]/40 hover:text-[#bacbbf]'
+                          : 'text-[#bacbbf]/70 hover:text-[#bacbbf]'
                       }`}
                     >
                       <Icon className="w-3.5 h-3.5" /> {label}
@@ -175,7 +175,7 @@ const ForgotPassword = () => {
                 {/* Email input */}
                 {recoveryMethod === 'email' && (
                   <div>
-                    <label className="block font-['Space_Grotesk',sans-serif] uppercase tracking-[0.15em] text-[9px] text-[#bacbbf]/50 mb-1.5">
+                    <label className="block font-['Space_Grotesk',sans-serif] uppercase tracking-[0.15em] text-[9px] text-[#bacbbf]/75 mb-1.5">
                       Email Address
                     </label>
                     <div className="relative">
@@ -196,7 +196,7 @@ const ForgotPassword = () => {
                 {/* Backup phrase input */}
                 {recoveryMethod === 'backup' && (
                   <div>
-                    <label className="block font-['Space_Grotesk',sans-serif] uppercase tracking-[0.15em] text-[9px] text-[#bacbbf]/50 mb-1.5">
+                    <label className="block font-['Space_Grotesk',sans-serif] uppercase tracking-[0.15em] text-[9px] text-[#bacbbf]/75 mb-1.5">
                       Backup Recovery Phrase
                     </label>
                     <div className="relative">
@@ -249,7 +249,7 @@ const ForgotPassword = () => {
                 <div className="text-center">
                   <Link
                     to="/login"
-                    className="inline-flex items-center gap-1 font-mono text-[10px] text-[#bacbbf]/40 hover:text-[#6effc0] transition-colors uppercase tracking-[0.1em]"
+                    className="inline-flex items-center gap-1 font-mono text-[10px] text-[#bacbbf]/70 hover:text-[#6effc0] transition-colors uppercase tracking-[0.1em]"
                   >
                     <ArrowLeft className="w-3 h-3" /> Back to sign in
                   </Link>

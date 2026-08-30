@@ -22,11 +22,10 @@ import {
 import { LoginUser } from '../../store/authSlice';
 import { showMessage } from '../../utils/notifications';
 import { getDeviceInfo } from '../../utils/DeviceFingerPrint';
-import ssoService, { OAuthProviders, OAUTH_ERROR_MESSAGES } from '../../services/ssoService';
+import ssoService, { ProviderId, OAUTH_ERROR_MESSAGES } from '../../services/ssoService';
 import useSignIn from 'react-auth-kit/hooks/useSignIn';
 import totpService from '../../services/totpService';
 import AuthFooter from '../../components/AuthFooter';
-import authAxiosInstance from '../../services/authAxiosInstance';
 
 interface LoginStep {
   step: 'credentials' | 'totp' | 'success';
@@ -60,7 +59,8 @@ const MultiStepLogin: React.FC = () => {
   const [deviceInfo, setDeviceInfo] = useState<any>(null);
   
   // SSO states
-  const [ssoLoading, setSsoLoading] = useState<string | null>(null);
+  const [ssoLoading, setSsoLoading] = useState<ProviderId | null>(null);
+  const [availableProviders, setAvailableProviders] = useState<ProviderId[]>([]);
 
   useEffect(() => {
     // Get device info for fingerprinting
@@ -75,56 +75,27 @@ const MultiStepLogin: React.FC = () => {
   }, []);
 
   const loadSSOProviders = async () => {
-    try {
-      // Load providers if needed for availability checks
-      await ssoService.getProviders();
-    } catch (error) {
-      console.error('Failed to load SSO providers:', error);
-    }
+    // Only offer providers this deployment actually has credentials for.
+    setAvailableProviders(await ssoService.getAvailableProviders());
   };
 
   const handleOAuthCallback = async () => {
-    // The redirect carries only a single-use `code` (or an `error`) — never
-    // tokens. Exchange the code for tokens over POST.
-    const { code, error, provider } = ssoService.getCallbackParams();
+    // /oauth/callback owns the exchange (including the 2FA challenge). If a
+    // deployment points the provider redirect at /login instead, hand off there
+    // rather than duplicating that flow here.
+    const { code, error } = ssoService.getCallbackParams();
 
     if (error) {
       setError(OAUTH_ERROR_MESSAGES[error] || 'Sign-in failed. Please try again.');
       ssoService.clearCallbackFromUrl();
       return;
     }
-    if (!code) return;
-
-    try {
-      setLoading(true);
-      setError(null);
-
-      const data = await ssoService.exchangeCode(code);
-      const isSignedIn = signIn?.({
-        auth: { token: data.access_token, type: 'Bearer' },
-        refresh: data.refresh_token,
-        userState: data.user,
-      });
-      ssoService.clearCallbackFromUrl();
-
-      if (isSignedIn) {
-        showMessage(
-          provider ? `Successfully logged in with ${provider}!` : 'Successfully logged in!',
-          'success'
-        );
-        setCurrentStep('success');
-        setTimeout(() => navigate('/dashboard', { replace: true }), 1500);
-      } else {
-        setError('Failed to complete sign-in on this device.');
-      }
-    } catch (err: any) {
-      console.error('OAuth callback error:', err);
-      setError(err?.message || 'Failed to complete OAuth login. Please try again.');
-    } finally {
-      setLoading(false);
+    if (code) {
+      navigate(`/oauth/callback${window.location.search}`, { replace: true });
     }
   };
-  const ssoProviders = [
+
+  const ssoProviders: { id: ProviderId; name: string; icon: any; description: string; color: string; textColor: string }[] = [
     {
       id: 'github',
       name: 'GitHub',
@@ -133,14 +104,14 @@ const MultiStepLogin: React.FC = () => {
       color: 'bg-gray-900 hover:bg-gray-800',
       textColor: 'text-white'
     },
-    // {
-    //   id: 'gitlab',
-    //   name: 'GitLab',
-    //   icon: Gitlab,
-    //   description: 'Sign in with your GitLab account',
-    //   color: 'bg-orange-600 hover:bg-orange-700',
-    //   textColor: 'text-white'
-    // },
+    {
+      id: 'gitlab',
+      name: 'GitLab',
+      icon: Gitlab,
+      description: 'Sign in with your GitLab account',
+      color: 'bg-orange-600 hover:bg-orange-700',
+      textColor: 'text-white'
+    },
     {
       id: 'google',
       name: 'Google',
@@ -151,26 +122,16 @@ const MultiStepLogin: React.FC = () => {
     }
   ];
 
-  const handleSSO = async (providerId: string) => {
+  const visibleSsoProviders = ssoProviders.filter((p) => availableProviders.includes(p.id));
+
+  const handleSSO = async (providerId: ProviderId) => {
     try {
       setError(null);
       setSsoLoading(providerId);
-      
-      // Call the backend OAuth login endpoint
-      const response = await authAxiosInstance.get(`/oauth/${providerId}/login/?redirect_uri=${encodeURIComponent(window.location.origin + '/oauth/callback')}`);
-      
-      const data = await response.data;
-      
-      if (data.authorization_url) {
-        // Redirect to the OAuth provider's authorization URL
-        window.location.href = data.authorization_url;
-      } else {
-        setError('Failed to initiate OAuth login');
-        setSsoLoading(null);
-      }
+      await ssoService.startLogin(providerId);
     } catch (err: any) {
       console.error('OAuth login error:', err);
-      setError('OAuth login failed. Please try again.');
+      setError(err?.message || 'OAuth login failed. Please try again.');
       setSsoLoading(null);
     }
   };
@@ -383,16 +344,16 @@ Connecting to scrubi-terminal-1...
 
           <div className="p-8">
             {/* SSO — credentials step only */}
-            {currentStep === 'credentials' && (
+            {currentStep === 'credentials' && visibleSsoProviders.length > 0 && (
               <>
                 <div className="grid grid-cols-2 gap-3 mb-6">
-                  {ssoProviders.map((provider) => {
+                  {visibleSsoProviders.map((provider) => {
                     const IconComponent = provider.icon;
                     return (
                       <button
                         key={provider.id}
                         onClick={() => handleSSO(provider.id)}
-                        disabled={!!loading}
+                        disabled={!!loading || ssoLoading !== null}
                         className="flex items-center justify-center gap-2 px-4 py-2.5 bg-[#1c2024] border border-[#3b4a41]/30 rounded-sm hover:border-[#6effc0]/40 hover:text-[#6effc0] transition-all text-[#bacbbf] disabled:opacity-40"
                       >
                         {ssoLoading === provider.id ? (
@@ -498,14 +459,14 @@ Connecting to scrubi-terminal-1...
                   <button
                     type="button"
                     onClick={() => setUseBackupCode(false)}
-                    className={`flex-1 py-2 font-mono text-[10px] uppercase tracking-[0.1em] transition-all rounded-sm flex items-center justify-center gap-1.5 ${!useBackupCode ? 'bg-[#6effc0]/15 text-[#6effc0] border border-[#6effc0]/20' : 'text-[#bacbbf]/50 hover:text-[#bacbbf]'}`}
+                    className={`flex-1 py-2 font-mono text-[10px] uppercase tracking-[0.1em] transition-all rounded-sm flex items-center justify-center gap-1.5 ${!useBackupCode ? 'bg-[#6effc0]/15 text-[#6effc0] border border-[#6effc0]/20' : 'text-[#bacbbf]/75 hover:text-[#bacbbf]'}`}
                   >
                     <Smartphone className="w-3 h-3" /> Authenticator
                   </button>
                   <button
                     type="button"
                     onClick={() => setUseBackupCode(true)}
-                    className={`flex-1 py-2 font-mono text-[10px] uppercase tracking-[0.1em] transition-all rounded-sm flex items-center justify-center gap-1.5 ${useBackupCode ? 'bg-[#6effc0]/15 text-[#6effc0] border border-[#6effc0]/20' : 'text-[#bacbbf]/50 hover:text-[#bacbbf]'}`}
+                    className={`flex-1 py-2 font-mono text-[10px] uppercase tracking-[0.1em] transition-all rounded-sm flex items-center justify-center gap-1.5 ${useBackupCode ? 'bg-[#6effc0]/15 text-[#6effc0] border border-[#6effc0]/20' : 'text-[#bacbbf]/75 hover:text-[#bacbbf]'}`}
                   >
                     <Shield className="w-3 h-3" /> Backup Code
                   </button>
@@ -565,7 +526,7 @@ Connecting to scrubi-terminal-1...
                 </div>
                 <div>
                   <p className="font-['Epilogue',sans-serif] font-bold text-[#e0e3e8] text-lg mb-1">Authentication Complete</p>
-                  <p className="font-mono text-xs text-[#bacbbf]/60">Redirecting to dashboard...</p>
+                  <p className="font-mono text-xs text-[#bacbbf]/80">Redirecting to dashboard...</p>
                 </div>
                 <div className="flex items-center justify-center gap-2">
                   <Loader2 className="w-4 h-4 animate-spin text-[#6effc0]" />

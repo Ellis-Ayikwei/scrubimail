@@ -94,7 +94,7 @@ const ResetPassword = () => {
               <Loader2 className="w-8 h-8 text-[#6effc0] animate-spin" />
             </div>
             <p className="font-['Space_Grotesk',sans-serif] uppercase tracking-[0.2em] text-[9px] text-[#6effc0]">Validating Token</p>
-            <p className="font-mono text-xs text-[#bacbbf]/40">Verifying your reset link…</p>
+            <p className="font-mono text-xs text-[#bacbbf]/70">Verifying your reset link…</p>
           </div>
         </div>
         <AuthFooter />
@@ -118,7 +118,7 @@ const ResetPassword = () => {
               </div>
             </div>
             <h2 className="font-['Epilogue',sans-serif] font-black text-[#e0e3e8] text-2xl tracking-tight mb-2">Password Updated</h2>
-            <p className="font-mono text-xs text-[#bacbbf]/50 mb-6">Redirecting to sign in…</p>
+            <p className="font-mono text-xs text-[#bacbbf]/75 mb-6">Redirecting to sign in…</p>
 
             <div className="bg-[#181c20] border border-[#3b4a41]/40 rounded-sm overflow-hidden">
               <div className="flex items-center gap-1.5 px-4 py-2.5 bg-[#101418] border-b border-[#3b4a41]/40">
@@ -128,7 +128,7 @@ const ResetPassword = () => {
                 <span className="ml-3 font-mono text-[9px] text-[#3b4a41] uppercase tracking-[0.15em]">reset_success.sh</span>
               </div>
               <div className="p-6 space-y-4">
-                <p className="font-mono text-xs text-[#bacbbf]/60 leading-relaxed">
+                <p className="font-mono text-xs text-[#bacbbf]/80 leading-relaxed">
                   All sessions have been invalidated for security. Please sign in with your new password.
                 </p>
                 <Link
@@ -159,7 +159,7 @@ const ResetPassword = () => {
               </div>
             </div>
             <h2 className="font-['Epilogue',sans-serif] font-black text-[#e0e3e8] text-2xl tracking-tight mb-2">Invalid Link</h2>
-            <p className="font-mono text-xs text-[#bacbbf]/50 mb-6">{error}</p>
+            <p className="font-mono text-xs text-[#bacbbf]/75 mb-6">{error}</p>
             <Link to="/forgot-password" className="inline-flex items-center gap-1.5 font-mono text-[10px] text-[#6effc0] hover:underline uppercase tracking-[0.1em]">
               <ArrowLeft className="w-3 h-3" /> Request a new link
             </Link>
@@ -183,7 +183,7 @@ const ResetPassword = () => {
             </Link>
             <p className="font-['Space_Grotesk',sans-serif] uppercase tracking-[0.2em] text-[9px] text-[#6effc0] mb-1">Security Reset</p>
             <h1 className="font-['Epilogue',sans-serif] font-black text-[#e0e3e8] text-2xl tracking-tight">Reset your password</h1>
-            <p className="font-mono text-xs text-[#bacbbf]/50 mt-1">Define a new credential for your terminal session.</p>
+            <p className="font-mono text-xs text-[#bacbbf]/75 mt-1">Define a new credential for your terminal session.</p>
           </div>
 
           {/* Card */}
@@ -207,7 +207,7 @@ const ResetPassword = () => {
 
                 {/* New Password */}
                 <div>
-                  <label className="block font-['Space_Grotesk',sans-serif] uppercase tracking-[0.15em] text-[9px] text-[#bacbbf]/50 mb-1.5">
+                  <label className="block font-['Space_Grotesk',sans-serif] uppercase tracking-[0.15em] text-[9px] text-[#bacbbf]/75 mb-1.5">
                     New Password
                   </label>
                   <div className="relative">
@@ -235,7 +235,7 @@ const ResetPassword = () => {
 
                 {/* Confirm Password */}
                 <div>
-                  <label className="block font-['Space_Grotesk',sans-serif] uppercase tracking-[0.15em] text-[9px] text-[#bacbbf]/50 mb-1.5">
+                  <label className="block font-['Space_Grotesk',sans-serif] uppercase tracking-[0.15em] text-[9px] text-[#bacbbf]/75 mb-1.5">
                     Confirm Password
                   </label>
                   <div className="relative">
@@ -284,7 +284,7 @@ const ResetPassword = () => {
                 <div className="text-center">
                   <Link
                     to="/login"
-                    className="inline-flex items-center gap-1 font-mono text-[10px] text-[#bacbbf]/40 hover:text-[#6effc0] transition-colors uppercase tracking-[0.1em]"
+                    className="inline-flex items-center gap-1 font-mono text-[10px] text-[#bacbbf]/70 hover:text-[#6effc0] transition-colors uppercase tracking-[0.1em]"
                   >
                     <ArrowLeft className="w-3 h-3" /> Back to sign in
                   </Link>

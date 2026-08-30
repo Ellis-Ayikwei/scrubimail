@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import Logo from '../../components/Logo';
 import {
@@ -11,6 +11,7 @@ import {
   AlertCircle,
   CheckCircle,
   Github,
+  Gitlab,
   Chrome,
   Zap,
 } from 'lucide-react';
@@ -18,13 +19,22 @@ import { useDispatch, useSelector } from 'react-redux';
 import { RegisterUser } from '../../store/authSlice';
 import { RootState } from '../../store/index';
 import AuthFooter from '../../components/AuthFooter';
+import ssoService, { ProviderId } from '../../services/ssoService';
+
+// Icons are a presentation detail; which of these are actually offered comes
+// from the server, so a provider without credentials is never shown.
+const SSO_PROVIDERS: { id: ProviderId; label: string; Icon: typeof Github }[] = [
+  { id: 'github', label: 'GitHub', Icon: Github },
+  { id: 'gitlab', label: 'GitLab', Icon: Gitlab },
+  { id: 'google', label: 'Google', Icon: Chrome },
+];
 
 const inputCls =
   'w-full pl-9 pr-3 py-2.5 bg-white dark:bg-[#101418] border border-gray-300 dark:border-[#3b4a41]/40 rounded-sm font-mono text-xs text-gray-900 dark:text-[#e0e3e8] placeholder-gray-400 dark:placeholder-[#3b4a41] focus:border-emerald-500/50 dark:focus:border-[#6effc0]/50 focus:outline-none transition-colors disabled:opacity-50';
 const inputClsPw =
   'w-full pl-9 pr-10 py-2.5 bg-white dark:bg-[#101418] border border-gray-300 dark:border-[#3b4a41]/40 rounded-sm font-mono text-xs text-gray-900 dark:text-[#e0e3e8] placeholder-gray-400 dark:placeholder-[#3b4a41] focus:border-emerald-500/50 dark:focus:border-[#6effc0]/50 focus:outline-none transition-colors disabled:opacity-50';
 const labelCls =
-  "block font-['Space_Grotesk',sans-serif] uppercase tracking-[0.15em] text-[9px] text-gray-500 dark:text-[#bacbbf]/50 mb-1.5";
+  "block font-['Space_Grotesk',sans-serif] uppercase tracking-[0.15em] text-[9px] text-gray-600 dark:text-[#bacbbf]/75 mb-1.5";
 
 const Register = () => {
   const [formData, setFormData] = useState({
@@ -37,6 +47,9 @@ const Register = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [success, setSuccess] = useState(false);
+  const [ssoLoading, setSsoLoading] = useState<ProviderId | null>(null);
+  const [ssoError, setSsoError] = useState<string | null>(null);
+  const [availableProviders, setAvailableProviders] = useState<ProviderId[]>([]);
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const selectedPlanId = searchParams.get('plan');
@@ -44,6 +57,16 @@ const Register = () => {
 
   const dispatch = useDispatch();
   const { loading, error: authError, message } = useSelector((state: RootState) => state.auth);
+
+  useEffect(() => {
+    let cancelled = false;
+    ssoService.getAvailableProviders().then((ids) => {
+      if (!cancelled) setAvailableProviders(ids);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -77,16 +100,18 @@ const Register = () => {
     }
   };
 
-  const handleSSO = async (providerId: string) => {
+  // Go through ssoService (which is pointed at the API host) rather than a
+  // path-relative fetch — the SPA and the API are different origins, so
+  // `/api/...` resolved against the frontend and 404'd silently.
+  const handleSSO = async (providerId: ProviderId) => {
     try {
-      const response = await fetch(
-        `/api/auth/oauth/${providerId}/login/?redirect_uri=${encodeURIComponent(window.location.origin + '/oauth/callback')}`,
-        { method: 'GET', credentials: 'include' }
-      );
-      const data = await response.json();
-      if (data.authorization_url) window.location.href = data.authorization_url;
-    } catch (err) {
+      setSsoError(null);
+      setSsoLoading(providerId);
+      await ssoService.startLogin(providerId);
+    } catch (err: any) {
       console.error('OAuth error:', err);
+      setSsoError(err?.message || 'Could not start sign-in with that provider.');
+      setSsoLoading(null);
     }
   };
 
@@ -127,7 +152,7 @@ const Register = () => {
               <h2 className="font-['Epilogue',sans-serif] font-black text-gray-900 dark:text-[#e0e3e8] text-2xl tracking-tight">
                 Account Created
               </h2>
-              <p className="font-mono text-xs text-gray-500 dark:text-[#bacbbf]/50 mt-2">Redirecting to sign in…</p>
+              <p className="font-mono text-xs text-gray-600 dark:text-[#bacbbf]/75 mt-2">Redirecting to sign in…</p>
             </div>
 
             <div className={cardShell}>
@@ -135,7 +160,7 @@ const Register = () => {
                 <span className="w-2 h-2 rounded-full bg-red-400/80" />
                 <span className="w-2 h-2 rounded-full bg-amber-400/80" />
                 <span className="w-2 h-2 rounded-full bg-emerald-500/80 dark:bg-[#6effc0]/60" />
-                <span className="ml-3 font-mono text-[9px] text-gray-500 dark:text-[#3b4a41] uppercase tracking-[0.15em]">
+                <span className="ml-3 font-mono text-[9px] text-gray-600 dark:text-[#3b4a41] uppercase tracking-[0.15em]">
                   register_success.sh
                 </span>
               </div>
@@ -196,7 +221,7 @@ Content-Type: application/json
             <h1 className="font-['Epilogue',sans-serif] font-black text-gray-900 dark:text-[#e0e3e8] text-2xl tracking-tight">
               Create your account
             </h1>
-            <p className="font-mono text-xs text-gray-500 dark:text-[#bacbbf]/50 mt-1">
+            <p className="font-mono text-xs text-gray-600 dark:text-[#bacbbf]/75 mt-1">
               Join thousands of developers using ScrubiMail
             </p>
             {selectedPlanName && (
@@ -214,36 +239,53 @@ Content-Type: application/json
               <span className="w-2 h-2 rounded-full bg-red-400/80" />
               <span className="w-2 h-2 rounded-full bg-amber-400/80" />
               <span className="w-2 h-2 rounded-full bg-emerald-500/80 dark:bg-[#6effc0]/60" />
-              <span className="ml-3 font-mono text-[9px] text-gray-500 dark:text-[#3b4a41] uppercase tracking-[0.15em]">
+              <span className="ml-3 font-mono text-[9px] text-gray-600 dark:text-[#3b4a41] uppercase tracking-[0.15em]">
                 register.sh — scrubimail
               </span>
             </div>
 
             <div className="p-6 space-y-5">
-              <div className="grid grid-cols-2 gap-2">
-                {[
-                  { id: 'github', label: 'GitHub', Icon: Github },
-                  { id: 'google', label: 'Google', Icon: Chrome },
-                ].map(({ id, label, Icon }) => (
-                  <button
-                    key={id}
-                    type="button"
-                    onClick={() => handleSSO(id)}
-                    disabled={loading}
-                    className="flex items-center justify-center gap-2 py-2.5 bg-gray-50 dark:bg-[#101418] border border-gray-200 dark:border-[#3b4a41]/40 rounded-sm font-mono text-[10px] text-gray-600 dark:text-[#bacbbf]/70 hover:border-emerald-300 dark:hover:border-[#6effc0]/30 hover:text-gray-900 dark:hover:text-[#e0e3e8] transition-all disabled:opacity-40 disabled:cursor-not-allowed uppercase tracking-[0.1em]"
-                  >
-                    <Icon className="w-3.5 h-3.5" /> {label}
-                  </button>
-                ))}
-              </div>
+              {availableProviders.length > 0 && (
+                <>
+                  <div className="grid grid-cols-2 gap-2">
+                    {SSO_PROVIDERS.filter(({ id }) => availableProviders.includes(id)).map(
+                      ({ id, label, Icon }) => (
+                        <button
+                          key={id}
+                          type="button"
+                          onClick={() => handleSSO(id)}
+                          disabled={loading || ssoLoading !== null}
+                          className="flex items-center justify-center gap-2 py-2.5 bg-gray-50 dark:bg-[#101418] border border-gray-200 dark:border-[#3b4a41]/40 rounded-sm font-mono text-[10px] text-gray-600 dark:text-[#bacbbf]/70 hover:border-emerald-300 dark:hover:border-[#6effc0]/30 hover:text-gray-900 dark:hover:text-[#e0e3e8] transition-all disabled:opacity-40 disabled:cursor-not-allowed uppercase tracking-[0.1em]"
+                        >
+                          {ssoLoading === id ? (
+                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                          ) : (
+                            <Icon className="w-3.5 h-3.5" />
+                          )}{' '}
+                          {label}
+                        </button>
+                      )
+                    )}
+                  </div>
 
-              <div className="flex items-center gap-3">
-                <div className="flex-1 h-px bg-gray-200 dark:bg-[#3b4a41]/30" />
-                <span className="font-mono text-[9px] text-gray-400 dark:text-[#3b4a41] uppercase tracking-[0.15em]">
-                  or email
-                </span>
-                <div className="flex-1 h-px bg-gray-200 dark:bg-[#3b4a41]/30" />
-              </div>
+                  {ssoError && (
+                    <div className="flex items-start gap-2 bg-red-50 dark:bg-[#ff4c4c]/10 border border-red-200 dark:border-[#ff4c4c]/30 rounded-sm p-3">
+                      <AlertCircle className="w-3.5 h-3.5 text-red-600 dark:text-[#ff4c4c] flex-shrink-0 mt-0.5" />
+                      <p className="font-mono text-[10px] text-red-700 dark:text-[#ff4c4c] leading-relaxed">
+                        {ssoError}
+                      </p>
+                    </div>
+                  )}
+
+                  <div className="flex items-center gap-3">
+                    <div className="flex-1 h-px bg-gray-200 dark:bg-[#3b4a41]/30" />
+                    <span className="font-mono text-[9px] text-gray-400 dark:text-[#3b4a41] uppercase tracking-[0.15em]">
+                      or email
+                    </span>
+                    <div className="flex-1 h-px bg-gray-200 dark:bg-[#3b4a41]/30" />
+                  </div>
+                </>
+              )}
 
               {authError && (
                 <div className="flex items-start gap-2 bg-red-50 dark:bg-[#ff4c4c]/10 border border-red-200 dark:border-[#ff4c4c]/30 rounded-sm p-3">
@@ -361,7 +403,7 @@ Content-Type: application/json
                     disabled={loading}
                     className="mt-0.5 w-3.5 h-3.5 accent-emerald-600 dark:accent-[#6effc0] bg-white dark:bg-[#101418] border-gray-300 dark:border-[#3b4a41]/40 rounded-sm disabled:opacity-50"
                   />
-                  <span className="font-mono text-[9px] text-gray-500 dark:text-[#bacbbf]/50 leading-relaxed">
+                  <span className="font-mono text-[9px] text-gray-600 dark:text-[#bacbbf]/75 leading-relaxed">
                     I agree to the{' '}
                     <Link to="/terms" className="text-emerald-700 dark:text-[#6effc0] hover:underline">
                       Terms of Service
@@ -388,7 +430,7 @@ Content-Type: application/json
                 </button>
               </form>
 
-              <p className="text-center font-mono text-[10px] text-gray-400 dark:text-[#bacbbf]/40">
+              <p className="text-center font-mono text-[10px] text-gray-400 dark:text-[#bacbbf]/70">
                 Already have an account?{' '}
                 <Link to="/login" className="text-emerald-700 dark:text-[#6effc0] hover:underline">
                   Sign in

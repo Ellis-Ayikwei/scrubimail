@@ -14,6 +14,8 @@ import 'react-perfect-scrollbar/dist/css/styles.css';
 
 // Tailwind css
 import './tailwind.css';
+// shadcn design tokens (additive; brand-colored, collision-safe)
+import './styles/shadcn.css';
 
 
 

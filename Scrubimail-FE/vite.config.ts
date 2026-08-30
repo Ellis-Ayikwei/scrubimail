@@ -6,7 +6,12 @@ import { visualizer } from 'rollup-plugin-visualizer';
 // https://vitejs.dev/config/
 export default defineConfig({
     server: {
-        // port: 3000,
+        // Pinned, not left to Vite's default: the OAuth redirect_uri this app
+        // sends is window.location.origin + /oauth/callback, and it must match
+        // the backend's OAUTH_ALLOWED_REDIRECT_URIS exactly. A floating port
+        // silently falls back to the default callback and the login dead-ends.
+        port: 3000,
+        strictPort: true,
         host: true,
     },
     plugins: [

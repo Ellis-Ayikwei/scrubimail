@@ -5,6 +5,8 @@ import AuthRedirect from '../components/AuthRedirect';
 // Lazy load pages for better performance
 const Homepage = lazy(() => import('../pages/Homepage'));
 const Dashboard = lazy(() => import('../pages/Dashboard'));
+const DashboardV2 = lazy(() => import('../pages/app/DashboardV2'));
+const ValidationV2 = lazy(() => import('../pages/app/ValidationV2'));
 const Validation = lazy(() => import('../pages/Validation/index'));
 const History = lazy(() => import('../pages/History'));
 const ApiKeys = lazy(() => import('../pages/APIKeys'));
@@ -29,7 +31,6 @@ const Register = lazy(() => import('../pages/auth/Register'));
 const ForgotPassword = lazy(() => import('../pages/auth/ForgotPassword'));
 const ResetPassword = lazy(() => import('../pages/auth/ResetPassword'));
 const OAuthCallback = lazy(() => import('../pages/auth/OAuthCallback'));
-const SSO = lazy(() => import('../pages/auth/SSO'));
 
 const MultiStepLogin = lazy(() => import('../pages/auth/MultiStepLogin'));
 const Changelog = lazy(() => import('../pages/Changelog'));
@@ -127,12 +128,6 @@ const routes = [
         layout: 'blank',
     },
     {
-        path: '/sso',
-        element: <SSO />,
-        layout: 'blank',
-    },
-    
-    {
         path: '/multi-login',
         element: (
             <AuthRedirect>
@@ -153,23 +148,25 @@ const routes = [
     },
 
     // Protected routes for authenticated users
+    // New shadcn customer UI — its own shell (AppShell) provides the chrome, so
+    // these use the 'blank' layout (no legacy sidebar/header wrapper).
     {
         path: '/dashboard',
         element: (
             <ProtectedRoute>
-                <Dashboard />
+                <DashboardV2 />
             </ProtectedRoute>
         ),
-        layout: 'default',
+        layout: 'blank',
     },
     {
         path: '/validate',
         element: (
             <ProtectedRoute>
-                <Validation />
+                <ValidationV2 />
             </ProtectedRoute>
         ),
-        layout: 'default',
+        layout: 'blank',
     },
     {
         path: '/history',
