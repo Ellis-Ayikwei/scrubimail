@@ -166,6 +166,22 @@ class ValidationService {
     return response.data;
   }
 
+  // Delete a single validation from history
+  async deleteValidation(validationId: string): Promise<void> {
+    await axiosInstance.delete(`/status/${validationId}/`);
+  }
+
+  // Clear validation history. With no params this deletes ALL of the user's
+  // validations; passing filters (status/date) clears only that subset.
+  async clearValidationHistory(params?: {
+    start_date?: string;
+    end_date?: string;
+    status?: string;
+  }): Promise<{ deleted: number }> {
+    const response = await axiosInstance.delete('/history/', { params });
+    return response.data;
+  }
+
   // Get validation analytics
   async getValidationAnalytics(params?: {
     start_date?: string;

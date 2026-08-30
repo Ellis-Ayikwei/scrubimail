@@ -17,9 +17,12 @@ import {
   User,
   ChevronDown,
   Menu as MenuIcon,
-  Zap,
+  Blocks,
+  FileText,
 } from 'lucide-react';
 
+import Logo from '@/components/Logo';
+import SidebarUsage from '@/components/app/SidebarUsage';
 import { cn } from '@/lib/utils';
 import { toggleTheme } from '@/store/themeConfigSlice';
 import { IRootState, AppDispatch } from '@/store';
@@ -32,8 +35,11 @@ export const NAV = [
   { label: 'Validate', to: '/validate', icon: CheckCircle2 },
   { label: 'Bulk Upload', to: '/bulk-upload', icon: FileUp },
   { label: 'History', to: '/history', icon: History },
-  { label: 'Analytics', to: '/analytics', icon: BarChart3 },
+  // Labelled "Usage" to match what the page shows (credits and API usage).
+  { label: 'Usage', to: '/analytics', icon: BarChart3 },
   { label: 'API Keys', to: '/apikeys', icon: KeyRound },
+  { label: 'Integrations', to: '/integrations', icon: Blocks },
+  { label: 'API Docs', to: '/api-docs', icon: FileText },
   { label: 'Billing', to: '/billing', icon: CreditCard },
 ];
 
@@ -99,13 +105,9 @@ export function AppShell({ children, title }: AppShellProps) {
         sidebarOpen ? 'translate-x-0' : '-translate-x-full'
       )}
     >
-      <div className="flex h-14 items-center gap-2 px-5">
-        <img
-          src="/assets/images/scrubimail-logo-icon.png"
-          alt="ScrubiMail"
-          className="size-7 rounded-md object-contain"
-        />
-        <span className="font-semibold tracking-tight">Scrubimail</span>
+      <div className="flex h-14 items-center px-5">
+        {/* Logo owns the current asset and inverts itself on dark surfaces. */}
+        <Logo to="/dashboard" className="h-6 w-auto" />
       </div>
       <Separator />
       <nav className="flex-1 space-y-1 overflow-y-auto p-3">
@@ -132,13 +134,7 @@ export function AppShell({ children, title }: AppShellProps) {
       </nav>
       <Separator />
       <div className="p-3">
-        <Link
-          to="/billing"
-          className="flex items-center justify-center gap-2 rounded-lg bg-primary px-3 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
-        >
-          <Zap className="size-4" />
-          Upgrade plan
-        </Link>
+        <SidebarUsage />
       </div>
     </aside>
   );

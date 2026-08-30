@@ -1,9 +1,10 @@
 import React, { useEffect, useState } from 'react';
 import {
   Search, Download, RefreshCw, ChevronLeft, ChevronRight,
-  TerminalSquare, Filter, TrendingUp
+  TerminalSquare, Filter, TrendingUp, Trash2, MoreVertical
 } from 'lucide-react';
 import axiosInstance from '../services/axiosInstance';
+import { validationService } from '../services/validationService';
 
 // ── Design tokens ──────────────────────────────────────────────────────────────
 const CARD = 'bg-[#1c2024] border border-[#3b4a41]/40 rounded-sm';
@@ -39,8 +40,47 @@ const History: React.FC = () => {
   const [summary, setSummary]     = useState({ total: 0, valid: 0, invalid: 0, risky: 0, bounced: 0 });
   const [page, setPage]           = useState(1);
   const [totalPages, setTotalPages] = useState(1);
+  // Row action menu + delete state
+  const [openMenu, setOpenMenu]   = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [clearing, setClearing]   = useState(false);
+  const [confirmClear, setConfirmClear] = useState(false);
 
   useEffect(() => { fetchHistory(); }, []);
+
+  // Delete a single validation. Optimistically drops the row, then rolls it
+  // back and surfaces the error if the request fails.
+  const handleDeleteOne = async (id: string) => {
+    if (!id) return;
+    setOpenMenu(null);
+    setDeletingId(id);
+    const prev = rows;
+    setRows(rows.filter(r => r.id !== id));
+    setSummary(s => ({ ...s, total: Math.max(0, s.total - 1) }));
+    try {
+      await validationService.deleteValidation(id);
+    } catch (e: any) {
+      setRows(prev);
+      setError(e?.response?.data?.detail ?? e?.message ?? 'Failed to delete entry');
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
+  // Clear ALL of the user's validation history.
+  const handleClearAll = async () => {
+    setConfirmClear(false);
+    setClearing(true);
+    try {
+      await validationService.clearValidationHistory();
+      setRows([]);
+      setSummary({ total: 0, valid: 0, invalid: 0, risky: 0, bounced: 0 });
+    } catch (e: any) {
+      setError(e?.response?.data?.detail ?? e?.message ?? 'Failed to clear history');
+    } finally {
+      setClearing(false);
+    }
+  };
 
   const fetchHistory = async () => {
     setLoading(true);
@@ -102,6 +142,34 @@ const History: React.FC = () => {
             <Download className="w-3.5 h-3.5" />
             <span className="font-label uppercase tracking-[0.1em] text-[10px]">Export CSV</span>
           </button>
+
+          {/* Clear all — two-step inline confirm (no data lost to a stray click) */}
+          {confirmClear ? (
+            <div className="flex items-center gap-1.5">
+              <span className={`${MONO} text-[10px] text-[#ff4c4c]`}>Delete all {summary.total || rows.length}?</span>
+              <button
+                onClick={handleClearAll}
+                className="px-2 py-1.5 bg-[#ff4c4c]/15 border border-[#ff4c4c]/30 rounded-sm text-[#ff4c4c] font-label uppercase tracking-[0.1em] text-[10px] hover:bg-[#ff4c4c]/25 transition-colors"
+              >
+                Confirm
+              </button>
+              <button
+                onClick={() => setConfirmClear(false)}
+                className="px-2 py-1.5 bg-[#1c2024] border border-[#3b4a41]/40 rounded-sm text-[#bacbbf] font-label uppercase tracking-[0.1em] text-[10px] hover:text-[#e0e3e8] transition-colors"
+              >
+                Cancel
+              </button>
+            </div>
+          ) : (
+            <button
+              onClick={() => setConfirmClear(true)}
+              disabled={clearing || rows.length === 0}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-[#1c2024] border border-[#3b4a41]/40 rounded-sm text-[#bacbbf] hover:text-[#ff4c4c] hover:border-[#ff4c4c]/30 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+            >
+              <Trash2 className={`w-3.5 h-3.5 ${clearing ? 'animate-pulse' : ''}`} />
+              <span className={LABEL}>Clear All</span>
+            </button>
+          )}
         </div>
       </div>
 
@@ -218,7 +286,7 @@ const History: React.FC = () => {
                         const cfg = VERDICT_CFG[v] ?? VERDICT_CFG.invalid;
                         const score = r.score ?? (v === 'valid' ? 90 : v === 'risky' ? 55 : 10);
                         return (
-                          <tr key={i} className="hover:bg-[#262a2f] transition-colors group">
+                          <tr key={r.id ?? i} className="hover:bg-[#262a2f] transition-colors group">
                             <td className="px-4 py-3">
                               <p className={`${MONO} text-[10px] text-[#bacbbf]`}>
                                 {r.created_at
@@ -252,9 +320,36 @@ const History: React.FC = () => {
                               </span>
                             </td>
                             <td className="px-4 py-3">
-                              <button className="p-1 text-[#3b4a41] hover:text-[#6effc0] transition-colors">
-                                <span className={`${MONO} text-[11px]`}>⋮</span>
-                              </button>
+                              <div className="relative">
+                                <button
+                                  onClick={() => setOpenMenu(openMenu === r.id ? null : r.id)}
+                                  disabled={deletingId === r.id}
+                                  aria-haspopup="menu"
+                                  aria-expanded={openMenu === r.id}
+                                  aria-label="Row actions"
+                                  className="p-1 text-[#3b4a41] hover:text-[#6effc0] disabled:opacity-40 transition-colors"
+                                >
+                                  {deletingId === r.id
+                                    ? <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                                    : <MoreVertical className="w-3.5 h-3.5" />}
+                                </button>
+                                {openMenu === r.id && (
+                                  <>
+                                    {/* click-catcher closes the menu on any outside click */}
+                                    <div className="fixed inset-0 z-40" onClick={() => setOpenMenu(null)} />
+                                    <div role="menu" className="absolute right-0 top-full z-50 mt-1 w-32 rounded-sm border border-[#3b4a41]/40 bg-[#1c2024] py-1 shadow-lg">
+                                      <button
+                                        role="menuitem"
+                                        onClick={() => handleDeleteOne(r.id)}
+                                        className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-[#ff4c4c] hover:bg-[#ff4c4c]/10 transition-colors"
+                                      >
+                                        <Trash2 className="w-3 h-3" />
+                                        <span className="font-label uppercase tracking-[0.1em] text-[10px]">Delete</span>
+                                      </button>
+                                    </div>
+                                  </>
+                                )}
+                              </div>
                             </td>
                           </tr>
                         );

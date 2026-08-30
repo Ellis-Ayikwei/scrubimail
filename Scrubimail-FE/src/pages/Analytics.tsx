@@ -4,9 +4,9 @@ import { validationService, ValidationAnalytics } from '../services/validationSe
 import { billingService, UsageStats } from '../services/billingService';
 import axiosInstance from '../services/axiosInstance';
 
-const CARD = 'bg-[#1c2024] border border-[#3b4a41]/40 rounded-sm';
-const LABEL = "font-['Space_Grotesk',sans-serif] uppercase tracking-[0.1em] text-[10px] text-[#bacbbf]";
-const MONO = "font-['JetBrains_Mono',monospace]";
+const CARD = 'bg-card border border-border/40 rounded-sm';
+const LABEL = "font-label uppercase tracking-[0.1em] text-[10px] text-muted-foreground";
+const MONO = "font-mono";
 
 const DAYS_MAP: Record<string, number> = { '7d': 7, '30d': 30, '90d': 90 };
 
@@ -15,13 +15,13 @@ const scoreStatus = (score: number) =>
 
 const statusStyle = (s: string) =>
   s === 'DELIVERABLE'
-    ? 'bg-[#6effc0]/10 text-[#6effc0] border-[#6effc0]/20'
+    ? 'bg-primary/10 text-primary border-primary/20'
     : s === 'BOUNCED'
-    ? 'bg-[#ff4c4c]/10 text-[#ff4c4c] border-[#ff4c4c]/20'
-    : 'bg-[#f59e0b]/10 text-[#f59e0b] border-[#f59e0b]/20';
+    ? 'bg-destructive/10 text-destructive border-destructive/20'
+    : 'bg-warning/10 text-warning border-warning/20';
 
 const Skeleton: React.FC<{ className?: string }> = ({ className = '' }) => (
-  <div className={`bg-[#31353a] rounded animate-pulse ${className}`} />
+  <div className={`bg-muted rounded animate-pulse ${className}`} />
 );
 
 const Analytics: React.FC = () => {
@@ -72,11 +72,11 @@ const Analytics: React.FC = () => {
   const avgScore = overview?.avg_score ?? 0;
 
   const statCards = [
-    { label: 'Total Validations', value: totalV.toLocaleString(),         color: 'text-[#e0e3e8]' },
-    { label: 'Deliverable',       value: validV.toLocaleString(),          color: 'text-[#6effc0]' },
-    { label: 'Invalid / Bounce',  value: invalidV.toLocaleString(),        color: 'text-[#ff4c4c]' },
-    { label: 'Success Rate',      value: `${successRate.toFixed(1)}%`,     color: 'text-[#6effc0]' },
-    { label: 'Avg Score',         value: Math.round(avgScore).toString(),  color: 'text-[#bacbbf]' },
+    { label: 'Total Validations', value: totalV.toLocaleString(),         color: 'text-foreground' },
+    { label: 'Deliverable',       value: validV.toLocaleString(),          color: 'text-primary' },
+    { label: 'Invalid / Bounce',  value: invalidV.toLocaleString(),        color: 'text-destructive' },
+    { label: 'Success Rate',      value: `${successRate.toFixed(1)}%`,     color: 'text-primary' },
+    { label: 'Avg Score',         value: Math.round(avgScore).toString(),  color: 'text-muted-foreground' },
   ];
 
   // Normalise chart — use daily_stats, fallback to usage.daily_usage
@@ -115,20 +115,20 @@ const Analytics: React.FC = () => {
   };
 
   return (
-    <div className="space-y-5" style={{ fontFamily: 'Inter, sans-serif' }}>
+    <div className="space-y-5">
 
       {/* Header */}
       <div className="flex items-start justify-between flex-wrap gap-4">
         <div>
-          <p className={`${LABEL} text-[#6effc0] mb-0.5`} style={{ letterSpacing: '0.2em', fontSize: 9 }}>API Usage</p>
-          <h1 className="font-['Epilogue',sans-serif] font-black text-[#e0e3e8] text-2xl tracking-tight">Analytics</h1>
+          <p className={`${LABEL} text-primary mb-0.5`} style={{ letterSpacing: '0.2em', fontSize: 9 }}>API Usage</p>
+          <h1 className="font-headline font-black text-foreground text-2xl tracking-tight">Analytics</h1>
           <p className={`${LABEL} mt-0.5`}>Track email validation performance and usage patterns</p>
         </div>
         <div className="flex items-center gap-2">
           <select
             value={dateRange}
             onChange={e => setDateRange(e.target.value)}
-            className="bg-[#1c2024] border border-[#3b4a41]/40 rounded-sm px-3 py-2 text-[#bacbbf] font-mono text-xs focus:border-[#6effc0]/50 focus:outline-none"
+            className="bg-card border border-border/40 rounded-sm px-3 py-2 text-muted-foreground font-mono text-xs focus:border-primary/50 focus:outline-none"
           >
             <option value="7d">Last 7 days</option>
             <option value="30d">Last 30 days</option>
@@ -137,7 +137,7 @@ const Analytics: React.FC = () => {
           <button
             onClick={fetchAll}
             disabled={loading}
-            className="p-2 border border-[#3b4a41]/40 rounded-sm text-[#bacbbf] hover:text-[#6effc0] hover:border-[#6effc0]/40 transition-colors disabled:opacity-40"
+            className="p-2 border border-border/40 rounded-sm text-muted-foreground hover:text-primary hover:border-primary/40 transition-colors disabled:opacity-40"
           >
             <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
           </button>
@@ -145,7 +145,7 @@ const Analytics: React.FC = () => {
       </div>
 
       {error && (
-        <div className="bg-[#ff4c4c]/10 border border-[#ff4c4c]/30 rounded-sm p-3 font-mono text-xs text-[#ff4c4c]">
+        <div className="bg-destructive/10 border border-destructive/30 rounded-sm p-3 font-mono text-xs text-destructive">
           {error}
         </div>
       )}
@@ -165,13 +165,13 @@ const Analytics: React.FC = () => {
 
       {/* Bar chart — real daily_stats */}
       <div className={`${CARD} overflow-hidden`}>
-        <div className="flex items-center justify-between px-5 py-3 border-b border-[#3b4a41]/30">
+        <div className="flex items-center justify-between px-5 py-3 border-b border-border/30">
           <p className={LABEL}>Validation Volume</p>
           <div className="flex items-center gap-4">
-            {[['Valid', '#6effc0'], ['Invalid', '#ff4c4c'], ['Risky', '#f59e0b']].map(([l, c]) => (
+            {[['Valid', 'var(--primary)'], ['Invalid', 'var(--destructive)'], ['Risky', 'var(--warning)']].map(([l, c]) => (
               <div key={l} className="flex items-center gap-1.5">
                 <span className="w-2 h-2 rounded-full" style={{ backgroundColor: c }} />
-                <span className="font-mono text-[9px] text-[#bacbbf]/60 uppercase tracking-[0.1em]">{l}</span>
+                <span className="font-mono text-[9px] text-muted-foreground/60 uppercase tracking-[0.1em]">{l}</span>
               </div>
             ))}
           </div>
@@ -184,7 +184,7 @@ const Analytics: React.FC = () => {
               ))}
             </div>
           ) : chartRows.length === 0 ? (
-            <p className="font-mono text-xs text-[#3b4a41] text-center py-10">No data for this period</p>
+            <p className="font-mono text-xs text-muted-foreground/70 text-center py-10">No data for this period</p>
           ) : (
             <div className="flex items-end gap-1.5 h-32">
               {chartRows.map((d, i) => {
@@ -193,11 +193,11 @@ const Analytics: React.FC = () => {
                 return (
                   <div key={i} className="flex-1 flex flex-col gap-0.5 items-stretch" style={{ height: '100%' }}>
                     <div className="flex flex-col justify-end flex-1 gap-px">
-                      {d.risky > 0  && <div className="w-full rounded-sm" style={{ height: `${(d.risky  / total) * h}%`, minHeight: 2, backgroundColor: '#f59e0b', opacity: 0.8 }} />}
-                      {d.invalid > 0 && <div className="w-full rounded-sm" style={{ height: `${(d.invalid / total) * h}%`, minHeight: 2, backgroundColor: '#ff4c4c', opacity: 0.8 }} />}
-                      {d.valid > 0  && <div className="w-full rounded-sm" style={{ height: `${(d.valid  / total) * h}%`, minHeight: 2, backgroundColor: '#6effc0', opacity: 0.8 }} />}
+                      {d.risky > 0  && <div className="w-full rounded-sm" style={{ height: `${(d.risky  / total) * h}%`, minHeight: 2, backgroundColor: 'var(--warning)', opacity: 0.8 }} />}
+                      {d.invalid > 0 && <div className="w-full rounded-sm" style={{ height: `${(d.invalid / total) * h}%`, minHeight: 2, backgroundColor: 'var(--destructive)', opacity: 0.8 }} />}
+                      {d.valid > 0  && <div className="w-full rounded-sm" style={{ height: `${(d.valid  / total) * h}%`, minHeight: 2, backgroundColor: 'var(--primary)', opacity: 0.8 }} />}
                     </div>
-                    <p className="font-mono text-[7px] text-[#3b4a41] text-center mt-1">
+                    <p className="font-mono text-[7px] text-muted-foreground/70 text-center mt-1">
                       {new Date(d.date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })}
                     </p>
                   </div>
@@ -213,26 +213,26 @@ const Analytics: React.FC = () => {
 
         {/* Email status breakdown */}
         <div className={CARD}>
-          <div className="px-4 py-3 border-b border-[#3b4a41]/30">
+          <div className="px-4 py-3 border-b border-border/30">
             <p className={LABEL}>Email Status Breakdown</p>
           </div>
           <div className="p-4 space-y-3">
             {[
-              { label: 'Deliverable',        count: validV,   color: '#6effc0' },
-              { label: 'Invalid / Bounce',   count: invalidV, color: '#ff4c4c' },
-              { label: 'Risky / Catch-All',  count: riskyV,   color: '#f59e0b' },
+              { label: 'Deliverable',        count: validV,   color: 'var(--primary)' },
+              { label: 'Invalid / Bounce',   count: invalidV, color: 'var(--destructive)' },
+              { label: 'Risky / Catch-All',  count: riskyV,   color: 'var(--warning)' },
             ].map(({ label, count, color }) => {
               const pct = totalV > 0 ? Math.round((count / totalV) * 100) : 0;
               return (
                 <div key={label}>
                   <div className="flex justify-between mb-1">
-                    <span className="font-mono text-[10px] text-[#bacbbf]">{label}</span>
+                    <span className="font-mono text-[10px] text-muted-foreground">{label}</span>
                     {loading
                       ? <Skeleton className="h-3 w-10" />
                       : <span className="font-mono text-[10px]" style={{ color }}>{pct}% · {count.toLocaleString()}</span>
                     }
                   </div>
-                  <div className="w-full h-1.5 bg-[#101418] rounded-full overflow-hidden">
+                  <div className="w-full h-1.5 bg-muted/40 rounded-full overflow-hidden">
                     <div className="h-full rounded-full transition-all duration-700" style={{ width: loading ? '0%' : `${pct}%`, backgroundColor: color }} />
                   </div>
                 </div>
@@ -243,21 +243,21 @@ const Analytics: React.FC = () => {
 
         {/* Top domains */}
         <div className={CARD}>
-          <div className="px-4 py-3 border-b border-[#3b4a41]/30">
+          <div className="px-4 py-3 border-b border-border/30">
             <p className={LABEL}>Top Domains</p>
           </div>
           <div className="p-4 space-y-2">
             {loading ? (
               Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-6 w-full" />)
             ) : topDomains.length === 0 ? (
-              <p className="font-mono text-xs text-[#3b4a41] py-4 text-center">No domain data</p>
+              <p className="font-mono text-xs text-muted-foreground/70 py-4 text-center">No domain data</p>
             ) : (
               topDomains.slice(0, 8).map((d: any) => (
                 <div key={d.domain} className="flex items-center justify-between">
-                  <span className="font-mono text-[10px] text-[#bacbbf] truncate">{d.domain}</span>
+                  <span className="font-mono text-[10px] text-muted-foreground truncate">{d.domain}</span>
                   <div className="flex items-center gap-3 flex-shrink-0">
-                    <span className="font-mono text-[10px] text-[#3b4a41]">{d.count.toLocaleString()}</span>
-                    <span className="font-mono text-[10px] text-[#6effc0]">{Math.round(d.avg_score)}</span>
+                    <span className="font-mono text-[10px] text-muted-foreground/70">{d.count.toLocaleString()}</span>
+                    <span className="font-mono text-[10px] text-primary">{Math.round(d.avg_score)}</span>
                   </div>
                 </div>
               ))
@@ -272,7 +272,7 @@ const Analytics: React.FC = () => {
           <div className="flex items-center justify-between mb-3">
             <p className={LABEL}>Credit Usage — This Month</p>
             {!loading && usage && (
-              <span className="font-mono text-[10px] text-[#bacbbf]">
+              <span className="font-mono text-[10px] text-muted-foreground">
                 {usage.this_month?.credits_used?.toLocaleString() ?? 0} credits used
               </span>
             )}
@@ -285,9 +285,9 @@ const Analytics: React.FC = () => {
               const total = (usage.total_validations ?? 0) > 0 ? usage.total_validations : used || 1;
               const pct = Math.min((used / total) * 100, 100);
               return (
-                <div className="w-full h-2 bg-[#101418] rounded-full overflow-hidden">
+                <div className="w-full h-2 bg-muted/40 rounded-full overflow-hidden">
                   <div
-                    className="h-full bg-[#6effc0] rounded-full transition-all duration-700"
+                    className="h-full bg-primary rounded-full transition-all duration-700"
                     style={{ width: `${pct}%` }}
                   />
                 </div>
@@ -299,17 +299,17 @@ const Analytics: React.FC = () => {
 
       {/* Recent validations table */}
       <div className={`${CARD} overflow-hidden`}>
-        <div className="flex items-center justify-between px-4 py-3 border-b border-[#3b4a41]/30">
+        <div className="flex items-center justify-between px-4 py-3 border-b border-border/30">
           <p className={LABEL}>Recent Validations</p>
           <button
             onClick={exportCSV}
             disabled={loading || recentHistory.length === 0}
-            className="flex items-center gap-1 font-mono text-[9px] text-[#6effc0] hover:underline disabled:opacity-40 uppercase tracking-[0.1em]"
+            className="flex items-center gap-1 font-mono text-[9px] text-primary hover:underline disabled:opacity-40 uppercase tracking-[0.1em]"
           >
             <Download className="w-3 h-3" /> Export CSV
           </button>
         </div>
-        <div className="divide-y divide-[#3b4a41]/20">
+        <div className="divide-y divide-border">
           {loading ? (
             Array.from({ length: 5 }).map((_, i) => (
               <div key={i} className="flex items-center gap-4 px-4 py-3">
@@ -320,7 +320,7 @@ const Analytics: React.FC = () => {
               </div>
             ))
           ) : recentHistory.length === 0 ? (
-            <p className="font-mono text-xs text-[#3b4a41] text-center py-8">No recent validations</p>
+            <p className="font-mono text-xs text-muted-foreground/70 text-center py-8">No recent validations</p>
           ) : (
             recentHistory.map((r, i) => {
               const status = scoreStatus(r.score ?? 0);
@@ -328,13 +328,13 @@ const Analytics: React.FC = () => {
                 ? new Date(r.created_at).toLocaleString('en-GB', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })
                 : '—';
               return (
-                <div key={i} className="flex items-center gap-4 px-4 py-3 hover:bg-[#262a2f] transition-colors text-xs font-mono">
-                  <span className="flex-1 text-[#e0e3e8] truncate">{r.email}</span>
+                <div key={i} className="flex items-center gap-4 px-4 py-3 hover:bg-muted transition-colors text-xs font-mono">
+                  <span className="flex-1 text-foreground truncate">{r.email}</span>
                   <span className={`px-2 py-0.5 rounded-sm uppercase tracking-[0.08em] text-[9px] border flex-shrink-0 ${statusStyle(status)}`}>
                     {status}
                   </span>
-                  <span className="text-[#bacbbf] w-8 text-center flex-shrink-0">{r.score ?? '—'}</span>
-                  <span className="text-[#3b4a41] w-28 text-right flex-shrink-0 hidden sm:block">{ts}</span>
+                  <span className="text-muted-foreground w-8 text-center flex-shrink-0">{r.score ?? '—'}</span>
+                  <span className="text-muted-foreground/70 w-28 text-right flex-shrink-0 hidden sm:block">{ts}</span>
                 </div>
               );
             })

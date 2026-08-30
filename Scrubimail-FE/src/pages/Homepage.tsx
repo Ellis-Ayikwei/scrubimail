@@ -166,7 +166,9 @@ function ScoreRing({ score, color }: { score: number; color: string }) {
 
 type Phase = "typing" | "loading" | "done";
 function LiveValidator() {
-  const samples = ["ada@stripe.com", "info@acme.io", "user@mailinator.com", "jordan@gmail.com"];
+  // Demo inputs only — the validator below is a deterministic client-side mock
+  // (see validateEmail); it never calls the API. Cycled purely for animation.
+  const samples = ["amara@tradehut.store", "info@morevans.co.uk", "user@mailinator.com", "jordan@gmail.com"];
   const [value, setValue] = useState(samples[0]);
   const [phase, setPhase] = useState<Phase>("done");
   const [result, setResult] = useState<ValidationResult>(() => validateEmail(samples[0]));
@@ -380,20 +382,19 @@ function Hero() {
 /* ============================== trust strip ============================== */
 
 function TrustStrip() {
-  const logos = ["Northwind", "Lumen", "Cascade", "Vela", "Quanta", "Beacon"];
+  const customers = ["TradeHut Store", "Morevans UK"];
   return (
     <section className="border-y border-zinc-200/70 bg-zinc-50/60 py-8 dark:border-white/[0.06] dark:bg-white/[0.015]">
       <div className="mx-auto max-w-7xl px-5 sm:px-8">
-        <p className="text-center text-xs font-medium uppercase tracking-[0.18em] text-zinc-400">Trusted by growth &amp; platform teams who care about deliverability</p>
-        <div className="mt-6 grid grid-cols-3 items-center gap-y-6 opacity-70 sm:grid-cols-6">
-          {logos.map((l) => (
-            <div key={l} className="flex items-center justify-center gap-2 text-zinc-400 dark:text-zinc-500">
+        <p className="text-center text-xs font-medium uppercase tracking-[0.18em] text-zinc-400">Trusted by teams who care about deliverability</p>
+        <div className="mt-6 flex flex-wrap items-center justify-center gap-x-12 gap-y-6">
+          {customers.map((c) => (
+            <div key={c} className="flex items-center justify-center gap-2 text-zinc-600 dark:text-zinc-300">
               <span className="h-4 w-4 rounded bg-zinc-300 dark:bg-zinc-600" />
-              <span className="font-['Epilogue'] text-[15px] font-bold tracking-tight">{l}</span>
+              <span className="font-['Epilogue'] text-[15px] font-bold tracking-tight">{c}</span>
             </div>
           ))}
         </div>
-        <p className="mt-5 text-center text-[11px] text-zinc-400">Logos shown are illustrative placeholders.</p>
       </div>
     </section>
   );
@@ -403,7 +404,7 @@ function TrustStrip() {
 
 function StatsBand() {
   const stats = [
-    { v: "~30ms", l: "Typical response", s: "Sub-millisecond on cache hits" },
+    { v: "~300ms", l: "Full verification", s: "Sub-100ms on the fast path & cache hits" },
     { v: "8", l: "Checks per validation", s: "Syntax → MX → SMTP → risk score" },
     { v: "0–100", l: "Composite risk score", s: "Clear Valid / Risky / Invalid verdict" },
     { v: "REST", l: "API + bulk pipeline", s: "Single, CSV & NDJSON" },
@@ -578,7 +579,7 @@ function Developer() {
         <Reveal>
           <Eyebrow>Developer-first</Eyebrow>
           <h2 className="mt-3 font-['Epilogue'] text-3xl font-extrabold tracking-tight text-white sm:text-[2.6rem]">One request. A complete verdict.</h2>
-          <p className="mt-4 text-lg leading-relaxed text-zinc-400">A single REST call returns every signal and a composite score — typically in about 30&nbsp;milliseconds. Authenticate with an API key, validate one address or stream millions.</p>
+          <p className="mt-4 text-lg leading-relaxed text-zinc-400">A single REST call returns every signal and a composite score — typically in a few hundred&nbsp;milliseconds. Authenticate with an API key, validate one address or a bulk list.</p>
           <ul className="mt-6 space-y-3">
             {points.map(([Ic, t, d]) => (
               <li key={t} className="flex items-start gap-3">
@@ -829,7 +830,11 @@ export default function Homepage() {
         <HowItWorks />
         <Developer />
         <Pricing />
-        <Testimonials />
+        {/* Testimonials hidden until we have real, approved customer quotes —
+            the previous cards were fabricated ("illustrative") personas.
+            Restore <Testimonials /> once TradeHut Store / Morevans UK (or others)
+            provide quotes we can attribute. */}
+        {/* <Testimonials /> */}
         <Security />
         <FinalCTA />
       </main>
