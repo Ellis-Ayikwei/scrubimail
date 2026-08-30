@@ -9,6 +9,7 @@ import {
   FileUp,
   Clock,
   Key,
+  RefreshCw,
 } from 'lucide-react';
 
 import axiosInstance from '@/services/axiosInstance';
@@ -20,6 +21,9 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
+import { Switch } from '@/components/ui/switch';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import ApiKeyPicker from '@/components/app/ApiKeyPicker';
 
 type Tone = 'valid' | 'invalid' | 'unknown';
@@ -30,6 +34,18 @@ const TONE_META: Record<Tone, { icon: typeof CheckCircle2; label: string; classN
   unknown: { icon: HelpCircle, label: 'Unknown', className: 'text-muted-foreground' },
 };
 
+/** Badge tone per bulk job state returned by /bulk-status/. */
+const BULK_TONE: Record<string, 'success' | 'destructive' | 'warning' | 'info' | 'secondary'> = {
+  completed: 'success',
+  success: 'success',
+  failed: 'destructive',
+  error: 'destructive',
+  pending: 'warning',
+  queued: 'warning',
+  processing: 'info',
+  started: 'info',
+};
+
 const ValidationV2: React.FC = () => {
   const [email, setEmail] = useState('');
   const [deep, setDeep] = useState(true);
@@ -37,6 +53,12 @@ const ValidationV2: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<any>(null);
+
+  const [mode, setMode] = useState<'single' | 'bulk'>('single');
+  const [bulkFile, setBulkFile] = useState<File | null>(null);
+  const [bulkTaskIds, setBulkTaskIds] = useState<string[]>([]);
+  const [bulkStatus, setBulkStatus] = useState<any[]>([]);
+  const [bulkChecking, setBulkChecking] = useState(false);
 
   // API key selection — the validation request is attributed to the chosen key.
   const [apiKeys, setApiKeys] = useState<APIKey[]>([]);
@@ -81,6 +103,10 @@ const ValidationV2: React.FC = () => {
     }
   };
 
+  /** JWT always goes via the interceptor; the API key is additional. */
+  const authHeaders = (): Record<string, string> =>
+    selectedApiKey ? { 'X-API-Key': selectedApiKey.key } : {};
+
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!email.trim()) return;
@@ -91,15 +117,80 @@ const ValidationV2: React.FC = () => {
       const params: Record<string, string> = {};
       if (!deep) params.mode = 'fast';
       if (details) params.details = 'true';
-      // JWT always goes via the interceptor; the API key is additional.
-      const headers: Record<string, string> = {};
-      if (selectedApiKey) headers['X-API-Key'] = selectedApiKey.key;
-      const res = await axiosInstance.post('/validate/', { email: email.trim() }, { headers, params });
+      const res = await axiosInstance.post(
+        '/validate/',
+        { email: email.trim() },
+        { headers: authHeaders(), params }
+      );
       setResult(res.data);
     } catch (err: any) {
       setError(err?.response?.data?.detail || err?.message || 'Validation failed');
     } finally {
       setLoading(false);
+    }
+  };
+
+  /**
+   * Accepts a CSV (first column, header row tolerated) or a JSON array of
+   * either strings or objects carrying an `email` field.
+   */
+  const parseEmails = (text: string, filename: string): string[] => {
+    if (filename.toLowerCase().endsWith('.json')) {
+      const parsed = JSON.parse(text);
+      if (!Array.isArray(parsed)) throw new Error('JSON file must contain an array of addresses');
+      return parsed
+        .map((entry: any) => (typeof entry === 'string' ? entry : entry?.email))
+        .filter((value: unknown): value is string => typeof value === 'string' && value.includes('@'))
+        .map((value) => value.trim());
+    }
+
+    return text
+      .split(/\r?\n/)
+      .map((line) => line.split(',')[0]?.trim().replace(/^["']|["']$/g, '') ?? '')
+      // Dropping non-matching lines also discards a header row like "email".
+      .filter((value) => value.includes('@'));
+  };
+
+  const handleBulkUpload = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!bulkFile) return;
+    setLoading(true);
+    setError(null);
+    setBulkStatus([]);
+    try {
+      const emails = parseEmails(await bulkFile.text(), bulkFile.name);
+      if (emails.length === 0) {
+        setError('No email addresses found in that file.');
+        return;
+      }
+      const params: Record<string, string> = {};
+      if (details) params.details = 'true';
+      const res = await axiosInstance.post('/validate-bulk/', { emails }, { headers: authHeaders(), params });
+      setBulkTaskIds(res.data.task_ids || [res.data.job_id]);
+    } catch (err: any) {
+      setError(err?.response?.data?.detail || err?.message || 'Bulk validation failed');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const checkBulkStatus = async () => {
+    setBulkChecking(true);
+    try {
+      // Collect first, then set once, so a failed lookup can't leave a partial list.
+      const results = await Promise.all(
+        bulkTaskIds.map(async (taskId) => {
+          try {
+            const res = await axiosInstance.get(`/bulk-status/${taskId}/`, { headers: authHeaders() });
+            return res.data;
+          } catch {
+            return { job_id: taskId, status: 'unknown', progress: 0 };
+          }
+        })
+      );
+      setBulkStatus(results);
+    } finally {
+      setBulkChecking(false);
     }
   };
 
@@ -139,74 +230,168 @@ const ValidationV2: React.FC = () => {
           </div>
         )}
 
-        <Card>
-          <CardContent className="p-5">
-            <form onSubmit={submit} className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="email">Email address</Label>
-                <div className="flex flex-col gap-2 sm:flex-row">
-                  <Input
-                    id="email"
-                    type="email"
-                    placeholder="name@company.com"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    disabled={loading}
-                    autoFocus
-                  />
-                  <Button type="submit" disabled={loading || !email.trim()} className="sm:w-36">
-                    <Zap />
-                    {loading ? 'Checking…' : 'Validate'}
+        <Tabs value={mode} onValueChange={(value) => setMode(value as 'single' | 'bulk')}>
+          <TabsList className="w-full">
+            <TabsTrigger value="single" className="flex-1">
+              <Zap />
+              Single email
+            </TabsTrigger>
+            <TabsTrigger value="bulk" className="flex-1">
+              <FileUp />
+              Bulk upload
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="single">
+            <Card>
+              <CardContent className="p-5">
+                <form onSubmit={submit} className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="email">Email address</Label>
+                    <div className="flex flex-col gap-2 sm:flex-row">
+                      <Input
+                        id="email"
+                        type="email"
+                        placeholder="name@company.com"
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        disabled={loading}
+                        autoFocus
+                      />
+                      <Button type="submit" disabled={loading || !email.trim()} className="sm:w-36">
+                        <Zap />
+                        {loading ? 'Checking…' : 'Validate'}
+                      </Button>
+                    </div>
+                  </div>
+
+                  {/* Deep vs fast */}
+                  <div className="flex items-center justify-between gap-3 rounded-lg border border-border bg-muted/40 px-3 py-2.5">
+                    <Label htmlFor="deep-mode" className="flex-1 cursor-pointer">
+                      <span className="block text-sm font-medium">
+                        {deep ? 'Deep verification' : 'Fast mode'}
+                      </span>
+                      <span className="block text-xs font-normal text-muted-foreground">
+                        {deep
+                          ? 'Full SMTP mailbox check — can confirm the address (~2–8s)'
+                          : 'Syntax + DNS only — instant, never confirms a mailbox'}
+                      </span>
+                    </Label>
+                    <Switch id="deep-mode" checked={deep} onCheckedChange={setDeep} />
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <Checkbox id="single-details" checked={details} onCheckedChange={(v) => setDetails(v === true)} />
+                    <Label htmlFor="single-details" className="text-sm font-normal text-muted-foreground">
+                      Include full breakdown
+                    </Label>
+                  </div>
+                </form>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="bulk">
+            <Card>
+              <CardContent className="p-5">
+                <form onSubmit={handleBulkUpload} className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="bulk-file">Address list</Label>
+                    <label
+                      htmlFor="bulk-file"
+                      className="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-border p-6 transition-colors hover:border-primary/50 hover:bg-primary/5"
+                    >
+                      <FileUp className="size-5 text-muted-foreground" />
+                      <span className="text-center text-sm">
+                        {bulkFile ? (
+                          <span className="font-medium text-primary">{bulkFile.name}</span>
+                        ) : (
+                          <>
+                            <span className="font-medium">Click to upload</span>
+                            <span className="mt-0.5 block text-xs text-muted-foreground">
+                              CSV (first column) or JSON array
+                            </span>
+                          </>
+                        )}
+                      </span>
+                      <input
+                        id="bulk-file"
+                        type="file"
+                        accept=".csv,.json,text/csv,application/json"
+                        onChange={(e) => setBulkFile(e.target.files?.[0] || null)}
+                        className="hidden"
+                      />
+                    </label>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <Checkbox id="bulk-details" checked={details} onCheckedChange={(v) => setDetails(v === true)} />
+                    <Label htmlFor="bulk-details" className="text-sm font-normal text-muted-foreground">
+                      Include full breakdown
+                    </Label>
+                  </div>
+
+                  <Button type="submit" disabled={loading || !bulkFile} className="w-full">
+                    <FileUp />
+                    {loading ? 'Uploading…' : 'Upload & validate'}
                   </Button>
-                </div>
-              </div>
+                </form>
 
-              {/* Deep vs fast */}
-              <button
-                type="button"
-                onClick={() => setDeep((v) => !v)}
-                className="flex w-full items-center justify-between rounded-lg border border-border bg-muted/40 px-3 py-2.5 text-left transition-colors hover:bg-muted"
-              >
-                <span>
-                  <span className="block text-sm font-medium">
-                    {deep ? 'Deep verification' : 'Fast mode'}
-                  </span>
-                  <span className="block text-xs text-muted-foreground">
-                    {deep
-                      ? 'Full SMTP mailbox check — can confirm the address (~2–8s)'
-                      : 'Syntax + DNS only — instant, never confirms a mailbox'}
-                  </span>
-                </span>
-                <span
-                  className={cn(
-                    'relative h-5 w-9 shrink-0 rounded-full transition-colors',
-                    deep ? 'bg-primary' : 'bg-muted-foreground/40'
-                  )}
-                >
-                  <span
-                    className={cn(
-                      'absolute top-0.5 left-0.5 size-4 rounded-full bg-white transition-transform',
-                      deep && 'translate-x-4'
+                {/* Job status */}
+                {bulkTaskIds.length > 0 && (
+                  <div className="mt-5 border-t border-border pt-4">
+                    <div className="mb-3 flex items-center justify-between">
+                      <p className="text-sm font-medium">
+                        Bulk jobs
+                        <span className="ml-1.5 text-xs font-normal text-muted-foreground">
+                          ({bulkTaskIds.length})
+                        </span>
+                      </p>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={checkBulkStatus}
+                        disabled={bulkChecking}
+                      >
+                        <RefreshCw className={cn(bulkChecking && 'animate-spin')} />
+                        Refresh
+                      </Button>
+                    </div>
+
+                    {bulkStatus.length === 0 ? (
+                      <p className="text-xs text-muted-foreground">
+                        Job queued. Choose Refresh to check progress.
+                      </p>
+                    ) : (
+                      <ul className="space-y-2">
+                        {bulkStatus.map((job, index) => (
+                          <li
+                            key={String(job.job_id ?? job.task_id ?? index)}
+                            className="flex items-center justify-between gap-3 rounded-lg border border-border bg-muted/40 p-2.5"
+                          >
+                            <span className="min-w-0 truncate font-mono text-xs">
+                              {job.job_id ?? job.task_id ?? '—'}
+                            </span>
+                            <span className="flex shrink-0 items-center gap-2">
+                              <Badge variant={BULK_TONE[job.status] ?? 'secondary'}>{job.status ?? 'unknown'}</Badge>
+                              <span className="w-9 text-right font-mono text-xs text-muted-foreground">
+                                {job.progress ?? 0}%
+                              </span>
+                            </span>
+                          </li>
+                        ))}
+                      </ul>
                     )}
-                  />
-                </span>
-              </button>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+        </Tabs>
 
-              <label className="flex items-center gap-2 text-sm text-muted-foreground">
-                <input
-                  type="checkbox"
-                  checked={details}
-                  onChange={(e) => setDetails(e.target.checked)}
-                  className="size-4 rounded border-border text-primary focus:ring-ring"
-                />
-                Include full breakdown
-              </label>
-            </form>
-          </CardContent>
-        </Card>
-
-        {/* Result */}
-        {result && (
+        {/* Result — single-email only; bulk reports through the job list. */}
+        {mode === 'single' && result && (
           <Card>
             <CardHeader className="flex-row items-center justify-between">
               <div className="flex items-center gap-2">
@@ -254,8 +439,10 @@ const ValidationV2: React.FC = () => {
                 <FileUp className="size-4" />
               </div>
               <div>
-                <p className="text-sm font-medium">Validating a whole list?</p>
-                <p className="text-xs text-muted-foreground">Upload a CSV for bulk verification.</p>
+                <p className="text-sm font-medium">Working with a large list?</p>
+                <p className="text-xs text-muted-foreground">
+                  The full bulk workspace adds history and downloadable results.
+                </p>
               </div>
             </div>
             <Link to="/bulk-upload" className={cn(buttonVariants({ variant: 'outline', size: 'sm' }))}>
