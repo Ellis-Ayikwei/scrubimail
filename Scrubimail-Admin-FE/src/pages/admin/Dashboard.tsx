@@ -1,18 +1,18 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Area, AreaChart, Bar, BarChart, CartesianGrid, Cell, Pie, PieChart, XAxis, YAxis } from 'recharts';
-import { ArrowRight, DollarSign, MailCheck, RefreshCw, TrendingUp, Users } from 'lucide-react';
+import { AlertTriangle, ArrowRight, DollarSign, MailCheck, RefreshCw, TrendingUp, Users } from 'lucide-react';
 
 import axiosInstance from '@/services/axiosInstance';
 import {
     DataTable,
     type DataTableColumn,
-    ErrorState,
     PageHeader,
     StatCard,
     StatCardGrid,
     StatusBadge,
 } from '@/components/admin';
+import { Alert, AlertAction, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -215,15 +215,6 @@ const AdminDashboard: React.FC = () => {
         },
     ];
 
-    if (error && !loading) {
-        return (
-            <>
-                <PageHeader title="Dashboard" description="Overview of users, revenue and validation activity." />
-                <ErrorState title="Failed to load dashboard data" description={error} onRetry={fetchDashboardData} />
-            </>
-        );
-    }
-
     return (
         <>
             <PageHeader
@@ -236,6 +227,23 @@ const AdminDashboard: React.FC = () => {
                     </Button>
                 }
             />
+
+            {/*
+             * A failing stats endpoint must not blank the page: the rest of the
+             * dashboard still renders with whatever loaded, as it did before.
+             */}
+            {error && !loading && (
+                <Alert variant="destructive">
+                    <AlertTriangle />
+                    <AlertTitle>Couldn’t refresh dashboard data</AlertTitle>
+                    <AlertDescription>{error}</AlertDescription>
+                    <AlertAction>
+                        <Button variant="outline" size="sm" onClick={fetchDashboardData}>
+                            Retry
+                        </Button>
+                    </AlertAction>
+                </Alert>
+            )}
 
             <StatCardGrid>
                 <StatCard

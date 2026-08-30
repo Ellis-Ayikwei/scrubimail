@@ -1,17 +1,24 @@
 import {
+    Activity,
+    ArrowLeftRight,
     BarChart3,
     Bell,
+    CircleHelp,
     CreditCard,
     FileText,
     KeyRound,
     LayoutDashboard,
+    LifeBuoy,
+    ListChecks,
     MailCheck,
+    MessageSquare,
     Package,
     Receipt,
     ScrollText,
     Settings,
     ShieldCheck,
     TicketPercent,
+    TrendingUp,
     Users,
     Wallet,
     type LucideIcon,
@@ -55,7 +62,10 @@ export const NAV_SECTIONS: NavSection[] = [
     },
     {
         title: 'Validation',
-        items: [{ path: '/admin/validations', label: 'Validations', icon: MailCheck }],
+        items: [
+            { path: '/admin/validations', label: 'Validations', icon: MailCheck },
+            { path: '/admin/manage/validations', label: 'Validation Explorer', icon: ListChecks },
+        ],
     },
     {
         title: 'Billing',
@@ -67,6 +77,8 @@ export const NAV_SECTIONS: NavSection[] = [
             { path: '/admin/billing/invoices', label: 'Invoices', icon: Receipt },
             { path: '/admin/manage/payments', label: 'Payments', icon: Wallet },
             { path: '/admin/billing/usage-alerts', label: 'Usage Alerts', icon: Bell },
+            { path: '/admin/revenue', label: 'Revenue', icon: TrendingUp },
+            { path: '/admin/transactions', label: 'Transactions', icon: ArrowLeftRight },
         ],
     },
     {
@@ -74,7 +86,11 @@ export const NAV_SECTIONS: NavSection[] = [
         items: [
             { path: '/admin/changelog', label: 'Changelog', icon: ScrollText },
             { path: '/admin/notifications', label: 'Notifications', icon: Bell },
+            { path: '/admin/activity', label: 'Activity', icon: Activity },
+            { path: '/admin/messages', label: 'Messages', icon: MessageSquare },
+            { path: '/admin/support', label: 'Support', icon: LifeBuoy },
             { path: '/admin/settings', label: 'Settings', icon: Settings },
+            { path: '/admin/help', label: 'Help', icon: CircleHelp },
         ],
     },
 ];

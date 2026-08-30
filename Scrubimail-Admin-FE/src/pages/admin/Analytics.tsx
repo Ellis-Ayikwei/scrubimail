@@ -1,12 +1,13 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Area, AreaChart, CartesianGrid, Cell, Pie, PieChart, XAxis, YAxis } from 'recharts';
-import { Activity, CreditCard, DollarSign, Download, Mail, RefreshCw, Users } from 'lucide-react';
+import { Activity, AlertTriangle, CreditCard, DollarSign, Download, Mail, RefreshCw, Users } from 'lucide-react';
 import { toast } from 'sonner';
 import dayjs from 'dayjs';
 
 import axiosInstance from '@/services/axiosInstance';
-import { ErrorState, PageHeader, StatCard, StatCardGrid } from '@/components/admin';
+import { PageHeader, StatCard, StatCardGrid } from '@/components/admin';
 import { EmptyState } from '@/components/admin/states';
+import { Alert, AlertAction, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -192,15 +193,6 @@ const AdminAnalytics: React.FC = () => {
         </>
     );
 
-    if (error && !loading) {
-        return (
-            <>
-                <PageHeader title="Analytics" description="Insights into your email validation service." />
-                <ErrorState title="Failed to load analytics" description={error} onRetry={fetchAnalytics} />
-            </>
-        );
-    }
-
     return (
         <>
             <PageHeader
@@ -208,6 +200,20 @@ const AdminAnalytics: React.FC = () => {
                 description="Insights into your email validation service."
                 actions={actions}
             />
+
+            {/* Degrade gracefully: a failed fetch must not blank the whole page. */}
+            {error && !loading && (
+                <Alert variant="destructive">
+                    <AlertTriangle />
+                    <AlertTitle>Couldn’t refresh analytics</AlertTitle>
+                    <AlertDescription>{error}</AlertDescription>
+                    <AlertAction>
+                        <Button variant="outline" size="sm" onClick={fetchAnalytics}>
+                            Retry
+                        </Button>
+                    </AlertAction>
+                </Alert>
+            )}
 
             <StatCardGrid>
                 <StatCard
