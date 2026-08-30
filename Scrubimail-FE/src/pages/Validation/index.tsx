@@ -7,6 +7,12 @@ import ValidationResults from './components/ValidationResults';
 import QuickStats from './components/QuickStats';
 import ApiKeyModal from './components/ApiKeyModal';
 import HelpCard from './components/HelpCard';
+import { VAL_LABEL } from './components/validationTheme';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Button } from '@/components/ui/button';
+import { Label } from '@/components/ui/label';
+import { Switch } from '@/components/ui/switch';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 
 const Validation = () => {
@@ -144,103 +150,75 @@ const Validation = () => {
   };
 
   return (
-    <div className="space-y-5" style={{ fontFamily: 'Inter, sans-serif' }}>
+    <div className="space-y-5">
       {/* Header */}
       <div className="flex items-start justify-between flex-wrap gap-4">
         <div>
-          <p className="font-['Space_Grotesk',sans-serif] uppercase tracking-[0.2em] text-[9px] text-emerald-600 dark:text-[#6effc0] mb-0.5">
+          <p className="text-success font-label uppercase tracking-[0.2em] text-[9px] mb-0.5">
             Verification Engine
           </p>
-          <h1 className="font-['Epilogue',sans-serif] font-black text-gray-900 dark:text-[#e0e3e8] text-2xl tracking-tight">
+          <h1 className="font-headline text-2xl font-black tracking-tight">
             Email Validation
           </h1>
-          <p className="font-['Space_Grotesk',sans-serif] uppercase tracking-[0.1em] text-[10px] text-gray-600 dark:text-[#bacbbf] mt-0.5">
+          <p className="text-muted-foreground font-label uppercase tracking-[0.1em] text-[10px] mt-0.5">
             VERSION 4.2.0 // DEEP_SMTP_INSPECTION_ACTIVE
           </p>
         </div>
         <div className="flex flex-col items-end gap-2">
           <div className="flex items-center gap-2">
-            <span className="font-['Space_Grotesk',sans-serif] uppercase tracking-[0.1em] text-[10px] text-gray-600 dark:text-[#bacbbf]">
+            <span className="text-muted-foreground font-label uppercase tracking-[0.1em] text-[10px]">
               API Key:
             </span>
-            <span className="font-['JetBrains_Mono',monospace] text-[10px] text-emerald-700 dark:text-[#6effc0]">
+            <span className="text-success font-mono text-[10px]">
               {selectedApiKey ? maskApiKey(selectedApiKey.key) : 'None selected'}
             </span>
           </div>
-          <button
+          <Button
             type="button"
+            variant="outline"
+            size="xs"
             onClick={() => setShowApiKeyModal(true)}
-            className="flex items-center gap-1.5 border border-gray-200 text-gray-600 font-mono uppercase tracking-[0.1em] text-[10px] px-3 py-1.5 rounded-sm hover:border-emerald-400 hover:text-emerald-700 transition-colors dark:border-[#3b4a41]/40 dark:text-[#bacbbf] dark:hover:border-[#6effc0]/40 dark:hover:text-[#6effc0]"
+            className="font-mono tracking-[0.1em] uppercase"
           >
-            <Key className="w-3 h-3" /> Select Key
-          </button>
+            <Key /> Select Key
+          </Button>
         </div>
       </div>
 
       {/* Error */}
       {error && (
-        <div className="bg-red-50 border border-red-200 rounded-sm p-3 flex items-center gap-2 text-red-700 font-mono text-xs dark:bg-[#ff4c4c]/10 dark:border-[#ff4c4c]/30 dark:text-[#ff4c4c]">
-          <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0" />
-          {error}
-        </div>
+        <Alert variant="destructive">
+          <AlertTriangle />
+          <AlertDescription className="font-mono text-xs">{error}</AlertDescription>
+        </Alert>
       )}
 
       {/* Mode toggle */}
-      <div className="flex bg-gray-100 border border-gray-200 rounded-sm p-0.5 dark:bg-[#1c2024] dark:border-[#3b4a41]/40">
-        <button
-          type="button"
-          onClick={() => setValidationMode('single')}
-          className={`flex-1 flex items-center justify-center gap-2 py-2 font-mono uppercase tracking-[0.1em] text-[10px] rounded-sm transition-all ${
-            validationMode === 'single'
-              ? 'bg-emerald-100 text-emerald-900 border border-emerald-300 dark:bg-[#6effc0]/15 dark:text-[#6effc0] dark:border-[#6effc0]/20'
-              : 'text-gray-400 hover:text-gray-700 dark:text-[#bacbbf]/50 dark:hover:text-[#bacbbf]'
-          }`}
-        >
-          <Mail className="w-3.5 h-3.5" /> Single Email
-        </button>
-        <button
-          type="button"
-          onClick={() => setValidationMode('bulk')}
-          className={`flex-1 flex items-center justify-center gap-2 py-2 font-mono uppercase tracking-[0.1em] text-[10px] rounded-sm transition-all ${
-            validationMode === 'bulk'
-              ? 'bg-emerald-100 text-emerald-900 border border-emerald-300 dark:bg-[#6effc0]/15 dark:text-[#6effc0] dark:border-[#6effc0]/20'
-              : 'text-gray-400 hover:text-gray-700 dark:text-[#bacbbf]/50 dark:hover:text-[#bacbbf]'
-          }`}
-        >
-          <Upload className="w-3.5 h-3.5" /> Bulk Upload
-        </button>
-      </div>
+      <Tabs value={validationMode} onValueChange={(value) => setValidationMode(value as 'single' | 'bulk')}>
+        <TabsList className="w-full">
+          <TabsTrigger value="single" className="flex-1 font-mono text-[10px] tracking-[0.1em] uppercase">
+            <Mail /> Single Email
+          </TabsTrigger>
+          <TabsTrigger value="bulk" className="flex-1 font-mono text-[10px] tracking-[0.1em] uppercase">
+            <Upload /> Bulk Upload
+          </TabsTrigger>
+        </TabsList>
+      </Tabs>
 
       {/* Deep vs fast verification (single mode only) */}
       {validationMode === 'single' && (
-        <div className="flex items-center justify-between bg-gray-50 border border-gray-200 rounded-sm px-3 py-2 dark:bg-[#1c2024] dark:border-[#3b4a41]/40">
+        <div className="bg-muted/40 flex items-center justify-between gap-3 rounded-lg border px-3 py-2">
           <div className="flex flex-col">
-            <span className="font-mono uppercase tracking-[0.1em] text-[10px] text-gray-700 dark:text-[#bacbbf]">
+            <Label htmlFor="deep-mode" className="font-mono uppercase tracking-[0.1em] text-[10px]">
               {deepMode ? 'Deep verification' : 'Fast mode'}
-            </span>
-            <span className="font-mono text-[9px] text-gray-400 dark:text-[#bacbbf]/50">
+            </Label>
+            <span className="text-muted-foreground font-mono text-[9px]">
               {deepMode
                 ? 'Full inline SMTP check — can confirm the mailbox (~2-8s)'
                 : 'Syntax + DNS only — instant, never confirms a mailbox'}
             </span>
           </div>
-          <button
-            type="button"
-            role="switch"
-            aria-checked={deepMode}
-            onClick={() => setDeepMode((v) => !v)}
-            className={`relative w-10 h-5 rounded-full transition-colors ${
-              deepMode
-                ? 'bg-emerald-500 dark:bg-[#6effc0]/70'
-                : 'bg-gray-300 dark:bg-[#3b4a41]'
-            }`}
-          >
-            <span
-              className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white transition-transform ${
-                deepMode ? 'translate-x-5' : ''
-              }`}
-            />
-          </button>
+          <Switch id="deep-mode" checked={deepMode} onCheckedChange={setDeepMode} />
         </div>
       )}
 
