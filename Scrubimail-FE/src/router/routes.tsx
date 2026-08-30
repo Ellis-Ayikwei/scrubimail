@@ -148,8 +148,8 @@ const routes = [
     },
 
     // Protected routes for authenticated users
-    // New shadcn customer UI — its own shell (AppShell) provides the chrome, so
-    // these use the 'blank' layout (no legacy sidebar/header wrapper).
+    // All signed-in product pages share one shell: the router wraps them in
+    // AppShell, so pages must not wrap themselves.
     {
         path: '/dashboard',
         element: (
@@ -157,7 +157,7 @@ const routes = [
                 <DashboardV2 />
             </ProtectedRoute>
         ),
-        layout: 'blank',
+        layout: 'app',
     },
     {
         path: '/validate',
@@ -166,7 +166,7 @@ const routes = [
                 <ValidationV2 />
             </ProtectedRoute>
         ),
-        layout: 'blank',
+        layout: 'app',
     },
     {
         path: '/history',
@@ -175,7 +175,7 @@ const routes = [
                 <History />
             </ProtectedRoute>
         ),
-        layout: 'default',
+        layout: 'app',
     },
     {
         path: '/apikeys',
@@ -184,7 +184,7 @@ const routes = [
                 <ApiKeys />
             </ProtectedRoute>
         ),
-        layout: 'default',
+        layout: 'app',
     },
     {
         path: '/billing',
@@ -193,7 +193,7 @@ const routes = [
                 <Billing />
             </ProtectedRoute>
         ),
-        layout: 'default',
+        layout: 'app',
     },
     {
         path: '/billing/payment/:outcome',
@@ -202,7 +202,7 @@ const routes = [
                 <BillingPaymentOutcome />
             </ProtectedRoute>
         ),
-        layout: 'default',
+        layout: 'app',
     },
     {
         path: '/profile',
@@ -211,7 +211,7 @@ const routes = [
                 <Profile />
             </ProtectedRoute>
         ),
-        layout: 'default',
+        layout: 'app',
     },
     {
         path: '/security',
@@ -220,7 +220,7 @@ const routes = [
                 <TOTPSetup />
             </ProtectedRoute>
         ),
-        layout: 'default',
+        layout: 'app',
     },
     {
         path: '/api-docs',
@@ -234,7 +234,7 @@ const routes = [
                 <Analytics />
             </ProtectedRoute>
         ),
-        layout: 'default',
+        layout: 'app',
     },
     {
         path: '/bulk-upload',
@@ -243,7 +243,7 @@ const routes = [
                 <BulkUpload />
             </ProtectedRoute>
         ),
-        layout: 'default',
+        layout: 'app',
     },
     {
         path: '/notifications',
@@ -252,7 +252,7 @@ const routes = [
                 <Notifications />
             </ProtectedRoute>
         ),
-        layout: 'default',
+        layout: 'app',
     },
 
     // Error pages

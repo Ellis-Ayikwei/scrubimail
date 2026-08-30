@@ -27,7 +27,7 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 
-const NAV = [
+export const NAV = [
   { label: 'Dashboard', to: '/dashboard', icon: LayoutDashboard, exact: true },
   { label: 'Validate', to: '/validate', icon: CheckCircle2 },
   { label: 'Bulk Upload', to: '/bulk-upload', icon: FileUp },
@@ -37,13 +37,34 @@ const NAV = [
   { label: 'Billing', to: '/billing', icon: CreditCard },
 ];
 
+/** Titles for authenticated pages that aren't in the sidebar. */
+const EXTRA_TITLES: Record<string, string> = {
+  '/profile': 'Profile',
+  '/security': 'Security',
+  '/notifications': 'Notifications',
+};
+
+function resolveTitle(pathname: string): string {
+  const match = NAV.filter((item) => (item.exact ? pathname === item.to : pathname.startsWith(item.to))).sort(
+    (a, b) => b.to.length - a.to.length
+  )[0];
+  if (match) return match.label;
+
+  const extra = Object.keys(EXTRA_TITLES)
+    .filter((p) => pathname.startsWith(p))
+    .sort((a, b) => b.length - a.length)[0];
+  return extra ? EXTRA_TITLES[extra] : 'ScrubiMail';
+}
+
 interface AppShellProps {
   children: React.ReactNode;
+  /** Overrides the title derived from the current route. */
   title?: string;
 }
 
-export function AppShell({ children, title = 'Dashboard' }: AppShellProps) {
+export function AppShell({ children, title }: AppShellProps) {
   const { pathname } = useLocation();
+  const resolvedTitle = title ?? resolveTitle(pathname);
   const navigate = useNavigate();
   const signOut = useSignOut();
 
@@ -79,7 +100,11 @@ export function AppShell({ children, title = 'Dashboard' }: AppShellProps) {
       )}
     >
       <div className="flex h-14 items-center gap-2 px-5">
-        <img src="/assets/images/scrubi.png" alt="Scrubimail" className="h-7 w-7 rounded-md" />
+        <img
+          src="/assets/images/scrubimail-logo-icon.png"
+          alt="ScrubiMail"
+          className="size-7 rounded-md object-contain"
+        />
         <span className="font-semibold tracking-tight">Scrubimail</span>
       </div>
       <Separator />
@@ -141,7 +166,7 @@ export function AppShell({ children, title = 'Dashboard' }: AppShellProps) {
           >
             <MenuIcon />
           </Button>
-          <h1 className="text-sm font-semibold">{title}</h1>
+          <h1 className="text-sm font-semibold">{resolvedTitle}</h1>
 
           <div className="ml-auto flex items-center gap-1">
             <Button variant="ghost" size="icon" onClick={handleToggleTheme} aria-label="Toggle theme">

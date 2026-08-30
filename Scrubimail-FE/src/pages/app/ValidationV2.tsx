@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
   Zap,
@@ -8,17 +8,19 @@ import {
   HelpCircle,
   FileUp,
   Clock,
+  Key,
 } from 'lucide-react';
 
 import axiosInstance from '@/services/axiosInstance';
+import { apiKeyService, APIKey } from '@/services/apiKeyService';
 import { cn } from '@/lib/utils';
-import { AppShell } from '@/components/app/AppShell';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
+import ApiKeyPicker from '@/components/app/ApiKeyPicker';
 
 type Tone = 'valid' | 'invalid' | 'unknown';
 
@@ -36,6 +38,49 @@ const ValidationV2: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<any>(null);
 
+  // API key selection — the validation request is attributed to the chosen key.
+  const [apiKeys, setApiKeys] = useState<APIKey[]>([]);
+  const [selectedApiKey, setSelectedApiKey] = useState<APIKey | null>(null);
+  const [apiKeyLoading, setApiKeyLoading] = useState(false);
+  const [showApiKeyPicker, setShowApiKeyPicker] = useState(false);
+  const [copiedKey, setCopiedKey] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    const fetchApiKeys = async () => {
+      setApiKeyLoading(true);
+      try {
+        const keys = await apiKeyService.getAPIKeys();
+        if (cancelled) return;
+        setApiKeys(keys);
+        // Default to the first active key so the common case needs no action.
+        const active = keys.find((key) => key.is_active);
+        if (active) setSelectedApiKey(active);
+      } catch (err) {
+        console.error('Error fetching API keys:', err);
+      } finally {
+        if (!cancelled) setApiKeyLoading(false);
+      }
+    };
+    fetchApiKeys();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const maskApiKey = (key: string) =>
+    key.length <= 8 ? key : `${key.slice(0, 4)}${'•'.repeat(key.length - 8)}${key.slice(-4)}`;
+
+  const copyApiKey = async (key: string) => {
+    try {
+      await navigator.clipboard.writeText(key);
+      setCopiedKey(key);
+      setTimeout(() => setCopiedKey(null), 2000);
+    } catch (err) {
+      console.error('Failed to copy API key:', err);
+    }
+  };
+
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!email.trim()) return;
@@ -46,7 +91,10 @@ const ValidationV2: React.FC = () => {
       const params: Record<string, string> = {};
       if (!deep) params.mode = 'fast';
       if (details) params.details = 'true';
-      const res = await axiosInstance.post('/validate/', { email: email.trim() }, { params });
+      // JWT always goes via the interceptor; the API key is additional.
+      const headers: Record<string, string> = {};
+      if (selectedApiKey) headers['X-API-Key'] = selectedApiKey.key;
+      const res = await axiosInstance.post('/validate/', { email: email.trim() }, { headers, params });
       setResult(res.data);
     } catch (err: any) {
       setError(err?.response?.data?.detail || err?.message || 'Validation failed');
@@ -62,11 +110,26 @@ const ValidationV2: React.FC = () => {
   const requestMs = result?.request_time != null ? Math.round(result.request_time * 1000) : null;
 
   return (
-    <AppShell title="Validate">
+    <>
       <div className="mx-auto max-w-3xl space-y-6">
-        <div>
-          <h2 className="text-xl font-semibold tracking-tight">Email validation</h2>
-          <p className="text-sm text-muted-foreground">Verify a single address in real time.</p>
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h2 className="text-xl font-semibold tracking-tight">Email validation</h2>
+            <p className="text-sm text-muted-foreground">Verify a single address in real time.</p>
+          </div>
+
+          <div className="flex flex-col items-start gap-1.5 sm:items-end">
+            <div className="flex items-center gap-2 text-xs">
+              <span className="text-muted-foreground">API key</span>
+              <span className={cn('font-mono', selectedApiKey ? 'text-primary' : 'text-muted-foreground')}>
+                {selectedApiKey ? maskApiKey(selectedApiKey.key) : 'None selected'}
+              </span>
+            </div>
+            <Button variant="outline" size="sm" onClick={() => setShowApiKeyPicker(true)}>
+              <Key />
+              Select key
+            </Button>
+          </div>
         </div>
 
         {error && (
@@ -201,7 +264,19 @@ const ValidationV2: React.FC = () => {
           </CardContent>
         </Card>
       </div>
-    </AppShell>
+
+      <ApiKeyPicker
+        isOpen={showApiKeyPicker}
+        onClose={() => setShowApiKeyPicker(false)}
+        apiKeys={apiKeys}
+        selectedApiKey={selectedApiKey}
+        setSelectedApiKey={setSelectedApiKey}
+        apiKeyLoading={apiKeyLoading}
+        copiedKey={copiedKey}
+        copyApiKey={copyApiKey}
+        maskApiKey={maskApiKey}
+      />
+    </>
   );
 };
 

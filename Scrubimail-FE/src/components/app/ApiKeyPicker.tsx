@@ -2,7 +2,7 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import { Check, CheckCircle2, Copy, Key } from 'lucide-react';
 
-import { APIKey } from '../../../services/apiKeyService';
+import { APIKey } from '@/services/apiKeyService';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Spinner } from '@/components/ui/spinner';
@@ -18,7 +18,7 @@ import {
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle, EmptyContent } from '@/components/ui/empty';
 import { cn } from '@/lib/utils';
 
-interface ApiKeyModalProps {
+interface ApiKeyPickerProps {
     isOpen: boolean;
     onClose: () => void;
     apiKeys: APIKey[];
@@ -37,7 +37,7 @@ interface ApiKeyModalProps {
  * the dialog by any route — Escape, backdrop, or the close button — not just
  * via the confirm button.
  */
-const ApiKeyModal: React.FC<ApiKeyModalProps> = ({
+const ApiKeyPicker: React.FC<ApiKeyPickerProps> = ({
     isOpen,
     onClose,
     apiKeys,
@@ -159,4 +159,4 @@ const ApiKeyModal: React.FC<ApiKeyModalProps> = ({
     );
 };
 
-export default ApiKeyModal;
+export default ApiKeyPicker;

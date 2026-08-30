@@ -18,7 +18,6 @@ import { validationService, ValidationHistory } from '@/services/validationServi
 import { billingService, BillingProfile, UsageStats } from '@/services/billingService';
 import { userService } from '@/services/userService';
 
-import { AppShell } from '@/components/app/AppShell';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -100,7 +99,7 @@ const DashboardV2: React.FC = () => {
   const recent = history?.results?.slice(0, 6) ?? [];
 
   return (
-    <AppShell title="Dashboard">
+    <>
       <div className="mx-auto max-w-6xl space-y-6">
         {/* Heading */}
         <div className="flex flex-wrap items-center justify-between gap-3">
@@ -282,7 +281,7 @@ const DashboardV2: React.FC = () => {
           </div>
         </div>
       </div>
-    </AppShell>
+    </>
   );
 };
 

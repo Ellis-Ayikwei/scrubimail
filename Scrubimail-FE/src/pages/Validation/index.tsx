@@ -5,7 +5,7 @@ import { apiKeyService, APIKey } from '../../services/apiKeyService';
 import ValidationForm from './components/ValidationForm';
 import ValidationResults from './components/ValidationResults';
 import QuickStats from './components/QuickStats';
-import ApiKeyModal from './components/ApiKeyModal';
+import ApiKeyModal from '@/components/app/ApiKeyPicker';
 import HelpCard from './components/HelpCard';
 import { VAL_LABEL } from './components/validationTheme';
 import { Alert, AlertDescription } from '@/components/ui/alert';
