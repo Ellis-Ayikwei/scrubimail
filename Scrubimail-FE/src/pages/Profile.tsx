@@ -256,7 +256,7 @@ const Profile: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="max-w-3xl mx-auto space-y-4">
+      <div className="w-full space-y-4">
         <div className="bg-[#1c2024] border border-[#3b4a41]/40 rounded-sm p-6">
           <div className="flex items-center gap-4">
             <div className="w-14 h-14 bg-[#31353a] rounded-sm animate-pulse" />
@@ -271,7 +271,7 @@ const Profile: React.FC = () => {
   }
 
   return (
-    <div className="max-w-3xl mx-auto space-y-4 font-mono">
+    <div className="w-full space-y-4 font-mono">
 
       {/* Error/Success */}
       {error && (

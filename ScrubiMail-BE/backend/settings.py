@@ -301,6 +301,30 @@ else:
     }
 
 
+# Config sanity: a Railway-hosted process must reach Redis/Postgres over PRIVATE
+# networking. The public proxy (*.proxy.rlwy.net) costs ~260ms/query and ~2s per
+# new connection (see .env.example) — a silent, systemic latency tax that already
+# drifted into production once. Warn loudly if a Railway process is still pointed
+# at it. Never fires on the Hetzner egress worker (no RAILWAY_* vars, and it has
+# no private route to Railway) or in local dev.
+if os.getenv("RAILWAY_ENVIRONMENT") or os.getenv("RAILWAY_PRIVATE_DOMAIN"):
+    import logging as _logging
+
+    _cfg_log = _logging.getLogger("backend.config")
+    for _name, _url in (
+        ("REDIS_URL", REDIS_URL),
+        ("DATABASE_URL", os.getenv("DATABASE_URL", "")),
+    ):
+        if _url and "proxy.rlwy.net" in _url:
+            _cfg_log.warning(
+                "%s uses Railway's PUBLIC proxy (%s) from inside Railway — this "
+                "adds ~260ms/query and ~2s per new connection. Point it at the "
+                "private *.railway.internal endpoint instead.",
+                _name,
+                _url.rsplit("@", 1)[-1],  # host:port only — never log credentials
+            )
+
+
 AUTH_PASSWORD_VALIDATORS = [
     {
         "NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator",
@@ -401,20 +425,63 @@ SIMPLE_JWT = {
 # including in production where DEBUG is False.
 CORS_ALLOW_CREDENTIALS = True
 
-CORS_ALLOWED_ORIGINS = config(
+# CORS origins. Unlike ALLOWED_HOSTS, these must be FULL origins (scheme + host)
+# — "*" is NOT valid here and fails django-corsheaders' system check (E013),
+# blocking `migrate`/deploys. Interpret a "*" entry as "allow all origins":
+# set CORS_ALLOW_ALL_ORIGINS and drop "*" from the explicit list, so the common
+# .env shorthand works instead of crashing. With CORS_ALLOW_CREDENTIALS on,
+# corsheaders reflects the request Origin (echoes it back) rather than sending
+# "*", which is what browsers require for credentialed CORS.
+_raw_cors_origins = config(
     "CORS_ALLOWED_ORIGINS",
     default="http://localhost:3000,http://localhost:5173,http://192.168.100.12:5173",
     cast=Csv(),
 )
+if any(o.strip() == "*" for o in _raw_cors_origins):
+    CORS_ALLOW_ALL_ORIGINS = True
+    CORS_ALLOWED_ORIGINS = [
+        o.strip() for o in _raw_cors_origins if o.strip() and o.strip() != "*"
+    ]
+else:
+    CORS_ALLOWED_ORIGINS = [o.strip() for o in _raw_cors_origins if o.strip()]
 CORS_ALLOWED_ORIGIN_REGEXES = config(
     "CORS_ALLOWED_ORIGIN_REGEXES",
     default=r"^https://.*\.pages\.dev$,^https://.*\.scrubimail\.com$",
     cast=Csv(),
 )
 
-ALLOWED_HOSTS = os.getenv("ALLOWED_HOSTS", "*").split(",")
-if ALLOWED_HOSTS == ["*"]:
+# ALLOWED_HOSTS must be bare hostnames — no scheme, no port, no path. Django
+# matches request.get_host() (port already stripped) against these, so a value
+# like "http://localhost" or "127.0.0.1:5173" silently matches NOTHING and every
+# request 400s with DisallowedHost. Sanitize each entry so a URL-shaped value
+# (an easy .env mistake) still works instead of taking the whole site down.
+def _clean_allowed_host(entry):
+    entry = entry.strip()
+    if not entry or entry == "*":
+        return entry
+    if "://" in entry:  # strip scheme: http://localhost -> localhost
+        entry = entry.split("://", 1)[1]
+    entry = entry.split("/", 1)[0]  # strip any path
+    # Strip :port only when the tail is a real port and the head is not an
+    # (unbracketed) IPv6 address — never mangle "::1" or a bracketed literal.
+    head, sep, tail = entry.rpartition(":")
+    if sep and tail.isdigit() and ":" not in head:
+        entry = head
+    return entry
+
+
+_raw_allowed_hosts = os.getenv("ALLOWED_HOSTS", "*")
+if _raw_allowed_hosts.strip() == "*":
     ALLOWED_HOSTS = ["*"]
+else:
+    ALLOWED_HOSTS = [
+        h for h in (_clean_allowed_host(x) for x in _raw_allowed_hosts.split(",")) if h
+    ]
+    # Loopback is always safe to allow (not externally reachable) and keeps local
+    # dev working even with DEBUG=False.
+    for _loopback in ("localhost", "127.0.0.1"):
+        if _loopback not in ALLOWED_HOSTS:
+            ALLOWED_HOSTS.append(_loopback)
 
 
 if DEBUG:
@@ -585,6 +652,22 @@ OAUTH_ALLOWED_REDIRECT_URIS = [
 # The browser redirect carries only this opaque single-use code (never tokens);
 # the SPA exchanges it over POST within this many seconds.
 OAUTH_EXCHANGE_CODE_TTL = int(os.getenv("OAUTH_EXCHANGE_CODE_TTL", 120))
+
+# The OAuth session cookie carries authlib's state/nonce from the SPA's XHR to
+# the provider's browser callback. That cookie is SET on a cross-origin XHR and
+# SENT on a cross-site top-level navigation, so when the SPA is not same-site
+# with this API (e.g. *.pages.dev → scrubimail.com) it must be SameSite=None;
+# Secure or the browser drops it and every login fails with mismatching_state.
+# Locally both run on http://localhost (same site, different ports), where
+# Lax works and None would be rejected for lacking Secure.
+SESSION_COOKIE_SAMESITE = os.getenv("SESSION_COOKIE_SAMESITE", "Lax" if DEBUG else "None")
+SESSION_COOKIE_SECURE = (
+    os.getenv("SESSION_COOKIE_SECURE", "False" if DEBUG else "True").lower() == "true"
+)
+SESSION_COOKIE_HTTPONLY = True
+# Flow state only — the session is not an authentication mechanism here (auth is
+# JWT), so it does not need to outlive the provider round-trip by much.
+SESSION_COOKIE_AGE = int(os.getenv("SESSION_COOKIE_AGE", 3600))
 
 # Paystack return URLs — default to same origin as FRONTEND_URL (override per env in production)
 PAYMENT_SUCCESS_URL = os.getenv(

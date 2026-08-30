@@ -1,68 +1,38 @@
 import React, { useEffect, useState } from 'react';
-import { 
-  Table, 
-  Card, 
-  Row, 
-  Col, 
-  Statistic, 
-  Input, 
-  Button, 
-  Space, 
-  Tag, 
-  Avatar, 
-  Modal, 
-  Form, 
-  Select, 
+import {
+  Table,
+  Card,
+  Row,
+  Col,
+  Statistic,
+  Input,
+  Button,
+  Space,
+  Tag,
+  Modal,
+  Form,
+  Select,
   InputNumber,
   message,
   Typography,
-  Badge,
   Tooltip,
-  Popconfirm,
   Switch,
-  Divider,
   Tabs
 } from 'antd';
 import {
   DollarOutlined,
-  CreditCardOutlined,
-  UserOutlined,
-  CalendarOutlined,
   CheckCircleOutlined,
   CloseCircleOutlined,
   SearchOutlined,
-  FilterOutlined,
   DownloadOutlined,
   ReloadOutlined,
-  EyeOutlined,
   EditOutlined,
-  MoreOutlined,
   RiseOutlined,
-  BankOutlined,
-  WalletOutlined,
-  PlusOutlined
+  PlusOutlined,
+  WalletOutlined
 } from '@ant-design/icons';
 import axiosInstance from '../../services/axiosInstance';
-
-interface BillingRecord {
-  id: number;
-  user: {
-    id: number;
-    name: string;
-    email: string;
-  };
-  plan: string;
-  status: 'active' | 'cancelled' | 'expired' | 'pending';
-  amount: number;
-  currency: string;
-  billing_cycle: 'monthly' | 'yearly';
-  start_date: string;
-  end_date: string;
-  next_billing_date: string;
-  payment_method: string;
-  created_at: string;
-  updated_at: string;
-}
+import { billingService, CreditTransaction, BillingStats } from '../../services/billingService';
 
 interface Plan {
   id: number;
@@ -78,16 +48,19 @@ interface Plan {
 }
 
 const BillingManagement: React.FC = () => {
-  const [billingRecords, setBillingRecords] = useState<BillingRecord[]>([]);
+  const [transactions, setTransactions] = useState<CreditTransaction[]>([]);
   const [plans, setPlans] = useState<Plan[]>([]);
+  const [billingStats, setBillingStats] = useState<BillingStats | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
-  const [filterStatus, setFilterStatus] = useState<string>('all');
-  const [filterPlan, setFilterPlan] = useState<string>('all');
+  const [filterType, setFilterType] = useState<string>('all');
   const [showPlanModal, setShowPlanModal] = useState(false);
   const [editingPlan, setEditingPlan] = useState<Plan | null>(null);
+  const [showAdjustModal, setShowAdjustModal] = useState(false);
+  const [adjusting, setAdjusting] = useState(false);
   const [form] = Form.useForm();
+  const [adjustForm] = Form.useForm();
 
   const { Title, Text } = Typography;
 
@@ -95,16 +68,18 @@ const BillingManagement: React.FC = () => {
     setLoading(true);
     setError(null);
     try {
-      const [billingRes, plansRes] = await Promise.all([
-        axiosInstance.get('/admin/billing/'),
+      const [txns, statsData, plansRes] = await Promise.all([
+        billingService.getBillingTransactions(),
+        billingService.getBillingStats().catch(() => null),
         axiosInstance.get('/admin/plans/')
       ]);
-      setBillingRecords(Array.isArray(billingRes.data) ? billingRes.data : []);
+      setTransactions(Array.isArray(txns) ? txns : []);
+      setBillingStats(statsData);
       setPlans(Array.isArray(plansRes.data) ? plansRes.data : []);
     } catch (err: any) {
       setError('Failed to fetch billing data');
       console.error('Error fetching billing data:', err);
-      setBillingRecords([]);
+      setTransactions([]);
       setPlans([]);
     } finally {
       setLoading(false);
@@ -131,7 +106,7 @@ const BillingManagement: React.FC = () => {
     if (!editingPlan) return;
     try {
       const response = await axiosInstance.put(`/admin/plans/${editingPlan.id}/`, values);
-      setPlans(prev => prev.map(plan => 
+      setPlans(prev => prev.map(plan =>
         plan.id === editingPlan.id ? response.data : plan
       ));
       setShowPlanModal(false);
@@ -148,7 +123,7 @@ const BillingManagement: React.FC = () => {
       await axiosInstance.patch(`/admin/plans/${planId}/`, {
         is_active: !isActive
       });
-      setPlans(prev => prev.map(plan => 
+      setPlans(prev => prev.map(plan =>
         plan.id === planId ? { ...plan, is_active: !isActive } : plan
       ));
       message.success(`Plan ${!isActive ? 'activated' : 'deactivated'} successfully`);
@@ -157,77 +132,75 @@ const BillingManagement: React.FC = () => {
     }
   };
 
+  // Adjust a user's credit balance: POST /admin/billing/adjust/ {user_id, amount, reason}
+  const handleAdjustCredits = async (values: any) => {
+    setAdjusting(true);
+    try {
+      const res = await billingService.adjustCredits(
+        values.user_id,
+        Number(values.amount),
+        values.reason
+      );
+      message.success(res.detail || 'Credits adjusted successfully');
+      setShowAdjustModal(false);
+      adjustForm.resetFields();
+      fetchBillingData();
+    } catch (err: any) {
+      message.error(err.message || 'Failed to adjust credits');
+    } finally {
+      setAdjusting(false);
+    }
+  };
+
+  const transactionTypeColor = (type: string): string => {
+    const map: Record<string, string> = {
+      purchase: 'green',
+      grant: 'green',
+      deduction: 'red',
+      usage: 'orange',
+      refund: 'blue',
+      manual_reset: 'purple',
+      expiration: 'default',
+    };
+    return map[type] || 'blue';
+  };
+
   const billingColumns = [
     {
-      title: 'User',
-      key: 'user',
-      render: (record: BillingRecord) => (
-        <Space>
-          <Avatar icon={<UserOutlined />} size="small" />
-          <div>
-            <div style={{ fontWeight: 'bold' }}>{record.user?.name || 'Unknown User'}</div>
-            <Text type="secondary" style={{ fontSize: '12px' }}>{record.user?.email || 'No email'}</Text>
-          </div>
-        </Space>
+      title: 'Type',
+      dataIndex: 'transaction_type',
+      key: 'transaction_type',
+      render: (type: string) => (
+        <Tag color={transactionTypeColor(type)}>{(type || '').replace(/_/g, ' ')}</Tag>
       ),
-    },
-    {
-      title: 'Plan',
-      dataIndex: 'plan',
-      key: 'plan',
-      render: (plan: string) => <Tag color="blue">{plan}</Tag>,
-    },
-    {
-      title: 'Status',
-      dataIndex: 'status',
-      key: 'status',
-      render: (status: string) => {
-        const colors = {
-          active: 'green',
-          cancelled: 'red',
-          expired: 'orange',
-          pending: 'blue'
-        };
-        return <Tag color={colors[status as keyof typeof colors]}>{status}</Tag>;
-      },
     },
     {
       title: 'Amount',
+      dataIndex: 'amount',
       key: 'amount',
-      render: (record: BillingRecord) => (
-        <Text strong>${record.amount} {record.currency.toUpperCase()}</Text>
+      render: (amount: number) => (
+        <Text strong style={{ color: amount >= 0 ? '#52c41a' : '#ff4d4f' }}>
+          {amount >= 0 ? '+' : ''}{amount?.toLocaleString()}
+        </Text>
       ),
     },
     {
-      title: 'Billing Cycle',
-      dataIndex: 'billing_cycle',
-      key: 'billing_cycle',
-      render: (cycle: string) => <Tag>{cycle}</Tag>,
+      title: 'Description',
+      dataIndex: 'description',
+      key: 'description',
+      render: (desc: string) => <Text>{desc || '-'}</Text>,
     },
     {
-      title: 'Next Billing',
-      dataIndex: 'next_billing_date',
-      key: 'next_billing_date',
-      render: (date: string) => new Date(date).toLocaleDateString(),
+      title: 'Reference',
+      dataIndex: 'paystack_payment_reference',
+      key: 'paystack_payment_reference',
+      render: (ref: string | null) => ref ? <Text code>{ref}</Text> : <Text type="secondary">-</Text>,
     },
     {
-      title: 'Payment Method',
-      dataIndex: 'payment_method',
-      key: 'payment_method',
-    },
-    {
-      title: 'Actions',
-      key: 'actions',
-      render: (record: BillingRecord) => (
-        <Space>
-          <Tooltip title="View Details">
-            <Button type="text" icon={<EyeOutlined />} size="small" />
-          </Tooltip>
-          <Tooltip title="Edit">
-            <Button type="text" icon={<EditOutlined />} size="small" />
-          </Tooltip>
-        </Space>
-      ),
+      title: 'Date',
+      dataIndex: 'created_at',
+      key: 'created_at',
+      render: (date: string) => date ? new Date(date).toLocaleString() : '-',
     },
   ];
 
@@ -247,7 +220,7 @@ const BillingManagement: React.FC = () => {
       title: 'Price',
       key: 'price',
       render: (record: Plan) => (
-        <Text strong>${record.price} {record.currency.toUpperCase()}</Text>
+        <Text strong>${record.price} {record.currency?.toUpperCase()}</Text>
       ),
     },
     {
@@ -260,20 +233,20 @@ const BillingManagement: React.FC = () => {
       title: 'Max Validations',
       dataIndex: 'max_validations',
       key: 'max_validations',
-      render: (max: number) => max === -1 ? 'Unlimited' : max.toLocaleString(),
+      render: (max: number) => max === -1 ? 'Unlimited' : max?.toLocaleString(),
     },
     {
       title: 'Max API Calls',
       dataIndex: 'max_api_calls',
       key: 'max_api_calls',
-      render: (max: number) => max === -1 ? 'Unlimited' : max.toLocaleString(),
+      render: (max: number) => max === -1 ? 'Unlimited' : max?.toLocaleString(),
     },
     {
       title: 'Status',
       key: 'status',
       render: (record: Plan) => (
-        <Switch 
-          checked={record.is_active} 
+        <Switch
+          checked={record.is_active}
           onChange={() => handleTogglePlan(record.id, record.is_active)}
           size="small"
         />
@@ -285,9 +258,9 @@ const BillingManagement: React.FC = () => {
       render: (record: Plan) => (
         <Space>
           <Tooltip title="Edit Plan">
-            <Button 
-              type="text" 
-              icon={<EditOutlined />} 
+            <Button
+              type="text"
+              icon={<EditOutlined />}
               size="small"
               onClick={() => {
                 setEditingPlan(record);
@@ -301,40 +274,41 @@ const BillingManagement: React.FC = () => {
     },
   ];
 
-  const filteredBillingRecords = billingRecords.filter(record => {
-    const matchesSearch = (record.user?.name && record.user.name.toLowerCase().includes(searchTerm.toLowerCase())) ||
-                         (record.user?.email && record.user.email.toLowerCase().includes(searchTerm.toLowerCase())) ||
-                         (record.plan && record.plan.toLowerCase().includes(searchTerm.toLowerCase()));
-    
-    const matchesStatus = filterStatus === 'all' || record.status === filterStatus;
-    const matchesPlan = filterPlan === 'all' || record.plan === filterPlan;
-    
-    return matchesSearch && matchesStatus && matchesPlan;
+  const filteredTransactions = transactions.filter(record => {
+    const term = searchTerm.toLowerCase();
+    const matchesSearch =
+      !term ||
+      (record.description && record.description.toLowerCase().includes(term)) ||
+      (record.transaction_type && record.transaction_type.toLowerCase().includes(term)) ||
+      (record.paystack_payment_reference && record.paystack_payment_reference.toLowerCase().includes(term));
+
+    const matchesType = filterType === 'all' || record.transaction_type === filterType;
+
+    return matchesSearch && matchesType;
   });
+
+  const transactionTypes = Array.from(new Set(transactions.map(t => t.transaction_type).filter(Boolean)));
 
   const stats = [
     {
       title: 'Total Revenue',
-      value: 125430,
+      value: billingStats?.total_revenue ?? 0,
       prefix: <DollarOutlined style={{ color: '#52c41a' }} />,
-      suffix: 'USD'
     },
     {
-      title: 'Active Subscriptions',
-      value: 1247,
+      title: 'Total Transactions',
+      value: transactions.length,
+      prefix: <RiseOutlined style={{ color: '#722ed1' }} />,
+    },
+    {
+      title: 'Total Plans',
+      value: plans.length,
       prefix: <CheckCircleOutlined style={{ color: '#1890ff' }} />,
     },
     {
-      title: 'Monthly Recurring Revenue',
-      value: 45680,
-      prefix: <RiseOutlined style={{ color: '#722ed1' }} />,
-      suffix: 'USD'
-    },
-    {
-      title: 'Churn Rate',
-      value: 2.4,
-      prefix: <CloseCircleOutlined style={{ color: '#ff4d4f' }} />,
-      suffix: '%'
+      title: 'Active Plans',
+      value: plans.filter(p => p.is_active).length,
+      prefix: <CheckCircleOutlined style={{ color: '#1890ff' }} />,
     }
   ];
 
@@ -355,17 +329,23 @@ const BillingManagement: React.FC = () => {
       <div style={{ marginBottom: '24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div>
           <Title level={2} style={{ margin: 0 }}>Billing Management</Title>
-          <Text type="secondary">Manage subscriptions, plans, and billing records</Text>
+          <Text type="secondary">Manage credit transactions, plans, and billing records</Text>
         </div>
         <Space>
-          <Button 
+          <Button
             icon={<ReloadOutlined />}
             onClick={fetchBillingData}
           >
             Refresh
           </Button>
-          <Button 
-            type="primary" 
+          <Button
+            icon={<WalletOutlined />}
+            onClick={() => setShowAdjustModal(true)}
+          >
+            Adjust Credits
+          </Button>
+          <Button
+            type="primary"
             icon={<PlusOutlined />}
             onClick={() => setShowPlanModal(true)}
           >
@@ -376,10 +356,10 @@ const BillingManagement: React.FC = () => {
 
       {error && (
         <div style={{ marginBottom: '16px' }}>
-          <div style={{ 
-            background: '#fff2f0', 
-            border: '1px solid #ffccc7', 
-            borderRadius: '6px', 
+          <div style={{
+            background: '#fff2f0',
+            border: '1px solid #ffccc7',
+            borderRadius: '6px',
             padding: '12px',
             display: 'flex',
             alignItems: 'center'
@@ -399,8 +379,7 @@ const BillingManagement: React.FC = () => {
                 title={stat.title}
                 value={stat.value}
                 prefix={stat.prefix}
-                suffix={stat.suffix}
-                valueStyle={{ color: stat.title === 'Churn Rate' ? '#ff4d4f' : '#1890ff' }}
+                valueStyle={{ color: '#1890ff' }}
               />
             </Card>
           </Col>
@@ -410,40 +389,28 @@ const BillingManagement: React.FC = () => {
       <Tabs defaultActiveKey="billing" items={[
         {
           key: 'billing',
-          label: 'Billing Records',
+          label: 'Credit Transactions',
           children: (
             <Card>
               {/* Filters */}
               <div style={{ marginBottom: '16px', display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
                 <Input
-                  placeholder="Search users, plans..."
+                  placeholder="Search description, reference, type..."
                   prefix={<SearchOutlined />}
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   style={{ width: 300 }}
                 />
                 <Select
-                  value={filterStatus}
-                  onChange={setFilterStatus}
-                  style={{ width: 150 }}
-                  placeholder="Status"
+                  value={filterType}
+                  onChange={setFilterType}
+                  style={{ width: 180 }}
+                  placeholder="Transaction Type"
                 >
-                  <Select.Option value="all">All Status</Select.Option>
-                  <Select.Option value="active">Active</Select.Option>
-                  <Select.Option value="cancelled">Cancelled</Select.Option>
-                  <Select.Option value="expired">Expired</Select.Option>
-                  <Select.Option value="pending">Pending</Select.Option>
-                </Select>
-                <Select
-                  value={filterPlan}
-                  onChange={setFilterPlan}
-                  style={{ width: 150 }}
-                  placeholder="Plan"
-                >
-                  <Select.Option value="all">All Plans</Select.Option>
-                  {plans.map(plan => (
-                    <Select.Option key={plan.id} value={plan.name}>
-                      {plan.name}
+                  <Select.Option value="all">All Types</Select.Option>
+                  {transactionTypes.map(type => (
+                    <Select.Option key={type} value={type}>
+                      {type.replace(/_/g, ' ')}
                     </Select.Option>
                   ))}
                 </Select>
@@ -453,8 +420,9 @@ const BillingManagement: React.FC = () => {
               </div>
 
               <Table
+                rowKey="id"
                 columns={billingColumns}
-                dataSource={Array.isArray(filteredBillingRecords) ? filteredBillingRecords : []}
+                dataSource={Array.isArray(filteredTransactions) ? filteredTransactions : []}
                 loading={loading}
                 pagination={{
                   pageSize: 10,
@@ -473,6 +441,7 @@ const BillingManagement: React.FC = () => {
           children: (
             <Card>
               <Table
+                rowKey="id"
                 columns={planColumns}
                 dataSource={Array.isArray(plans) ? plans : []}
                 loading={loading}
@@ -488,6 +457,57 @@ const BillingManagement: React.FC = () => {
           )
         }
       ]} />
+
+      {/* Adjust Credits Modal */}
+      <Modal
+        title="Adjust User Credits"
+        open={showAdjustModal}
+        onCancel={() => {
+          setShowAdjustModal(false);
+          adjustForm.resetFields();
+        }}
+        footer={null}
+      >
+        <Form
+          form={adjustForm}
+          layout="vertical"
+          onFinish={handleAdjustCredits}
+        >
+          <Form.Item
+            name="user_id"
+            label="User ID (UUID)"
+            rules={[{ required: true, message: 'Please enter the user id' }]}
+          >
+            <Input placeholder="Enter user UUID" />
+          </Form.Item>
+          <Form.Item
+            name="amount"
+            label="Amount (use a negative value to deduct)"
+            rules={[{ required: true, message: 'Please enter an amount' }]}
+          >
+            <InputNumber style={{ width: '100%' }} placeholder="e.g. 100 or -50" />
+          </Form.Item>
+          <Form.Item
+            name="reason"
+            label="Reason"
+          >
+            <Input.TextArea rows={2} placeholder="Reason for adjustment" />
+          </Form.Item>
+          <Form.Item style={{ marginBottom: 0, textAlign: 'right' }}>
+            <Space>
+              <Button onClick={() => {
+                setShowAdjustModal(false);
+                adjustForm.resetFields();
+              }}>
+                Cancel
+              </Button>
+              <Button type="primary" htmlType="submit" loading={adjusting}>
+                Apply Adjustment
+              </Button>
+            </Space>
+          </Form.Item>
+        </Form>
+      </Modal>
 
       {/* Create/Edit Plan Modal */}
       <Modal
@@ -513,7 +533,7 @@ const BillingManagement: React.FC = () => {
           >
             <Input placeholder="Enter plan name" />
           </Form.Item>
-          
+
           <Form.Item
             name="description"
             label="Description"
@@ -521,7 +541,7 @@ const BillingManagement: React.FC = () => {
           >
             <Input.TextArea placeholder="Enter plan description" rows={3} />
           </Form.Item>
-          
+
           <Row gutter={16}>
             <Col span={12}>
               <Form.Item
@@ -529,8 +549,8 @@ const BillingManagement: React.FC = () => {
                 label="Price"
                 rules={[{ required: true, message: 'Please input the price!' }]}
               >
-                <InputNumber 
-                  min={0} 
+                <InputNumber
+                  min={0}
                   style={{ width: '100%' }}
                   placeholder="Enter price"
                 />
@@ -551,7 +571,7 @@ const BillingManagement: React.FC = () => {
               </Form.Item>
             </Col>
           </Row>
-          
+
           <Form.Item
             name="billing_cycle"
             label="Billing Cycle"
@@ -562,7 +582,7 @@ const BillingManagement: React.FC = () => {
               <Select.Option value="yearly">Yearly</Select.Option>
             </Select>
           </Form.Item>
-          
+
           <Row gutter={16}>
             <Col span={12}>
               <Form.Item
@@ -570,8 +590,8 @@ const BillingManagement: React.FC = () => {
                 label="Max Validations"
                 rules={[{ required: true, message: 'Please input max validations!' }]}
               >
-                <InputNumber 
-                  min={-1} 
+                <InputNumber
+                  min={-1}
                   style={{ width: '100%' }}
                   placeholder="-1 for unlimited"
                 />
@@ -583,15 +603,15 @@ const BillingManagement: React.FC = () => {
                 label="Max API Calls"
                 rules={[{ required: true, message: 'Please input max API calls!' }]}
               >
-                <InputNumber 
-                  min={-1} 
+                <InputNumber
+                  min={-1}
                   style={{ width: '100%' }}
                   placeholder="-1 for unlimited"
                 />
               </Form.Item>
             </Col>
           </Row>
-          
+
           <Form.Item style={{ marginBottom: 0, textAlign: 'right' }}>
             <Space>
               <Button onClick={() => {

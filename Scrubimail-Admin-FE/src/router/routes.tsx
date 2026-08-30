@@ -40,6 +40,10 @@ const GroupsPermissionsManagement = lazy(() => import('../pages/admin/GroupsPerm
 
 // Auth pages
 const Login = lazy(() => import('../pages/auth/Login'));
+const Register = lazy(() => import('../pages/auth/Register'));
+const ForgotPassword = lazy(() => import('../pages/auth/ForgotPassword'));
+const ResetPassword = lazy(() => import('../pages/auth/ResetPassword'));
+const OAuthCallback = lazy(() => import('../pages/auth/OAuthCallback'));
 
 // Error pages
 const NotFound = lazy(() => import('../pages/404'));
@@ -52,10 +56,44 @@ const routes = [
         element: <Login />,
         layout: 'blank',
     },
-    
+    {
+        path: '/register',
+        element: <Register />,
+        layout: 'blank',
+    },
+    {
+        path: '/forgot-password',
+        element: <ForgotPassword />,
+        layout: 'blank',
+    },
+    {
+        path: '/reset-password/:uidb64/:token',
+        element: <ResetPassword />,
+        layout: 'blank',
+    },
+    {
+        path: '/reset-password',
+        element: <ResetPassword />,
+        layout: 'blank',
+    },
+    {
+        path: '/oauth/callback',
+        element: <OAuthCallback />,
+        layout: 'blank',
+    },
+
     // Admin routes (protected with admin layout)
     {
         path: '/',
+        element: (
+            <ProtectedRoute>
+                <AdminDashboard />
+            </ProtectedRoute>
+        ),
+        layout: 'admin',
+    },
+    {
+        path: '/dashboard',
         element: (
             <ProtectedRoute>
                 <AdminDashboard />

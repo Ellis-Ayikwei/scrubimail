@@ -12,6 +12,33 @@ from apps.plan.models import Plan
 
 logger = logging.getLogger(__name__)
 
+# Sentinel telling "not fetched yet" apart from "fetched, and the user has no
+# profile" (None), so the request-scoped memo below caches negative lookups too.
+_UNSET = object()
+
+
+def get_billing_profile_for_request(request):
+    """Fetch the request user's BillingProfile once per request, memoized on the
+    request object. READ-ONLY: unlike ``BillingService.get_or_create_billing_profile``
+    it never creates a profile nor resets credits.
+
+    The single-validation path otherwise fetches this same profile up to three
+    times before verification even starts — ``PlanBasedRateThrottle``,
+    ``PlanFeatureThrottle`` and the view — each an identical SELECT holding the DB
+    connection that is then pinned across the multi-second egress wait. Sharing one
+    fetch removes the two redundant round trips. Returns None when no profile exists.
+    """
+    cached = getattr(request, "_billing_profile", _UNSET)
+    if cached is not _UNSET:
+        return cached
+    profile = (
+        BillingProfile.objects.select_related("current_plan")
+        .filter(user=request.user)
+        .first()
+    )
+    request._billing_profile = profile
+    return profile
+
 
 def _to_paystack_minor_units(amount):
     """Major currency units → smallest unit (kobo, pesewas, cents, etc.)."""
@@ -293,10 +320,20 @@ class BillingService:
     def __init__(self):
         self.paystack = PaystackService()
 
-    def get_or_create_billing_profile(self, user):
+    def get_or_create_billing_profile(self, user, request=None):
         """Get or create billing profile for user with Free plan assigned by default"""
         from apps.plan.models import Plan
-        
+
+        # Reuse a profile already loaded on this request (e.g. by a throttle) when
+        # it is safe: an existing profile that already has a plan is exactly what
+        # this method returns without side effects, so skip the extra queries. A
+        # planless/absent cached value falls through to the create-and-assign logic
+        # below (which resets credits) — preserving existing behavior exactly.
+        if request is not None:
+            cached = getattr(request, "_billing_profile", None)
+            if cached is not None and cached.current_plan_id:
+                return cached
+
         # Get or create Free plan (use existing if setup_plans was run, otherwise create with defaults)
         free_plan, _ = Plan.objects.get_or_create(
             name='Free',
@@ -330,7 +367,9 @@ class BillingService:
             profile.current_plan = free_plan
             profile.credits_remaining = free_plan.credits_per_month
             profile.save(update_fields=['current_plan', 'credits_remaining'])
-        
+
+        if request is not None:
+            request._billing_profile = profile
         return profile
 
     def initialize_credit_purchase(self, user, amount, credits):
@@ -530,6 +569,62 @@ class BillingService:
         out["ok"] = True
         out["message"] = "Payment confirmed with Paystack."
         return out
+
+    def sync_purchase_status(self, purchase):
+        """Re-fetch a credit-package purchase's status from Paystack and
+        reconcile the local record. Manual counterpart to the charge.success
+        webhook, for when a webhook was missed or delayed.
+
+        Idempotent and safe to call repeatedly:
+          * Paystack `success`  -> complete_purchase() (grants credits, stamps
+            completed_at). complete_purchase() is a no-op if already completed,
+            so credits are never granted twice.
+          * `failed`/`abandoned`/`reversed` -> mark the purchase failed (records
+            failed_at); never touches an already-completed purchase.
+          * anything else (pending/ongoing) -> leave untouched.
+
+        Returns a summary dict describing what the gateway said and whether the
+        local record changed. Raises on a Paystack API/transport error so the
+        caller can surface it (never silently reports "synced").
+        """
+        reference = purchase.paystack_reference
+        data = self.paystack.verify_transaction(reference)  # raises on non-200
+        gateway_status = (data.get("status") or "").lower()
+
+        result = {
+            "reference": reference,
+            "gateway_status": gateway_status,
+            "previous_status": purchase.status,
+            "changed": False,
+            "gateway_amount": data.get("amount"),
+        }
+
+        # Record the gateway transaction id whenever we learn it.
+        txn_id = data.get("id")
+        if txn_id and str(purchase.paystack_transaction_id or "") != str(txn_id):
+            purchase.paystack_transaction_id = str(txn_id)
+            purchase.save(update_fields=["paystack_transaction_id", "updated_at"])
+
+        if gateway_status == "success":
+            if purchase.status != "completed":
+                purchase.complete_purchase()  # idempotent; grants credits once
+                result["changed"] = True
+        elif gateway_status in ("failed", "abandoned", "reversed"):
+            # Never override a completed purchase on a stale/failed re-read.
+            if purchase.status not in ("failed", "completed"):
+                purchase.status = "failed"
+                purchase.metadata = {
+                    **(purchase.metadata or {}),
+                    "failed_at": timezone.now().isoformat(),
+                    "gateway_status": gateway_status,
+                }
+                purchase.save(update_fields=["status", "metadata", "updated_at"])
+                result["changed"] = True
+        # else: pending/ongoing/queued -> nothing to reconcile yet.
+
+        purchase.refresh_from_db()
+        result["current_status"] = purchase.status
+        return result
 
     def handle_subscription_webhook(self, event_data):
         """Handle subscription webhook events"""

@@ -1,6 +1,5 @@
 import { createAsyncThunk, createSlice } from '@reduxjs/toolkit';
 import authAxiosInstance from '../services/authAxiosInstance';
-import axiosInstance from '../services/axiosInstance';
 
 interface AuthState {
     isLoggedIn: boolean;
@@ -40,7 +39,9 @@ export const LoginUser = createAsyncThunk('auth/LoginUser', async ({ email, pass
         const accessToken = response?.headers['authorization'];
         const refreshToken = response?.headers['x-refresh-token'];
 
-        const user = response?.data;
+        // Backend LoginAPIView returns body `{ user: {...} }` (MinimalUserSerializer).
+        // Unwrap the nested `user` object; fall back to the raw body for safety.
+        const user = response?.data?.user ?? response?.data;
 
         if (!accessToken || !refreshToken) {
             console.error('Error: Missing tokens from server response');
@@ -101,7 +102,9 @@ export const RegisterUser = createAsyncThunk(
     async ({ userOrEmail, password, confirm_password }: { userOrEmail: { email?: string; username?: string }; password: string; confirm_password: string }) => {
         const payload = { ...userOrEmail, password, confirm_password };
         try {
-            const response = await axiosInstance.post('/register/', payload);
+            // Register lives under /auth/ on the backend, so it must use authAxiosInstance
+            // (base `.../scrubimail/api/v1/auth`), not the API-root axiosInstance.
+            const response = await authAxiosInstance.post('/register/', payload);
             return response.data;
         } catch (error: any) {
             throw new Error(error.response?.data?.message || ERROR_MESSAGES.REGISTER_FAILED);
@@ -111,19 +114,23 @@ export const RegisterUser = createAsyncThunk(
 
 export const ForgetPassword = createAsyncThunk('auth/ForgetPassword', async ({ email }: { email: string }) => {
     try {
-        const response = await authAxiosInstance.post('/forget_password/', { email });
+        // Backend: POST /auth/password-recovery/  body { email } -> { detail }
+        const response = await authAxiosInstance.post('/password-recovery/', { email });
         return response.data;
     } catch (error: any) {
-        throw new Error(error.response?.data?.message || ERROR_MESSAGES.FORGOT_PASSWORD_FAILED);
+        const serverData = error.response?.data;
+        throw new Error(serverData?.detail || serverData?.message || error.message || ERROR_MESSAGES.FORGOT_PASSWORD_FAILED);
     }
 });
 
-export const ResetPassword = createAsyncThunk('auth/ResetPassword', async ({ newPassword, confirmNewPassword, token }: { newPassword: string; confirmNewPassword: string; token: string }) => {
+export const ResetPassword = createAsyncThunk('auth/ResetPassword', async ({ password, uidb64, token }: { password: string; uidb64: string; token: string }) => {
     try {
-        const response = await axiosInstance.post('/reset_password/', { newPassword, confirmNewPassword, token });
+        // Backend: POST /auth/password-reset-confirm/<uidb64>/<token>/ body { password, uidb64, token } -> { detail }
+        const response = await authAxiosInstance.post(`/password-reset-confirm/${uidb64}/${token}/`, { password, uidb64, token });
         return response.data;
     } catch (error: any) {
-        throw new Error(error.response?.data?.message || ERROR_MESSAGES.RESET_PASSWORD_FAILED);
+        const serverData = error.response?.data;
+        throw new Error(serverData?.detail || serverData?.message || error.message || ERROR_MESSAGES.RESET_PASSWORD_FAILED);
     }
 });
 
@@ -146,9 +153,11 @@ const authSlice = createSlice({
             })
             .addCase(LoginUser.fulfilled, (state, action) => {
                 state.user = action.payload;
-                console.log('the state user', state.user);
                 state.isLoggedIn = true;
-                localStorage.setItem('userRole', state.user.role);
+                // MinimalUserSerializer has no `role`; use `user_type` (guard undefined).
+                if (state.user?.user_type) {
+                    localStorage.setItem('userRole', state.user.user_type);
+                }
                 state.loading = false;
                 state.message = 'Login successful';
             })

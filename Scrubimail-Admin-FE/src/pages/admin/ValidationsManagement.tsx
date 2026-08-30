@@ -1,96 +1,52 @@
 import React, { useEffect, useState } from 'react';
-import { 
-  Table, 
-  Card, 
-  Row, 
-  Col, 
-  Statistic, 
-  Input, 
-  Button, 
-  Space, 
-  Tag, 
-  Avatar, 
-  Modal, 
-  Form, 
-  Select, 
+import {
+  Table,
+  Card,
+  Row,
+  Col,
+  Statistic,
+  Input,
+  Button,
+  Space,
+  Tag,
+  Modal,
+  Select,
   DatePicker,
-  message,
   Typography,
-  Badge,
   Tooltip,
   Progress,
-  Tabs
+  Tabs,
+  List
 } from 'antd';
 import {
   CheckCircleOutlined,
   CloseCircleOutlined,
-  UserOutlined,
-  CalendarOutlined,
   SearchOutlined,
-  FilterOutlined,
   DownloadOutlined,
   ReloadOutlined,
   EyeOutlined,
-  MailOutlined,
   ClockCircleOutlined,
+  SyncOutlined,
   BarChartOutlined,
-  PieChartOutlined,
-  LineChartOutlined
+  PieChartOutlined
 } from '@ant-design/icons';
-import axiosInstance from '../../services/axiosInstance';
-import moment from 'moment';
-
-interface ValidationRecord {
-  id: number;
-  user?: {
-    id: number;
-    name: string;
-    email: string;
-  };
-  email: string;
-  status: 'valid' | 'invalid' | 'risky' | 'unknown';
-  result: {
-    is_valid: boolean;
-    is_deliverable: boolean;
-    is_smtp_valid: boolean;
-    is_catch_all: boolean;
-    is_role: boolean;
-    is_disposable: boolean;
-    is_free: boolean;
-    confidence_score: number;
-    risk_score: number;
-    mx_records: string[];
-    smtp_response: string;
-  };
-  created_at: string;
-  updated_at: string;
-  api_key_used: string;
-  validation_type: 'single' | 'bulk';
-  processing_time: number;
-}
-
-interface ValidationStats {
-  total_validations: number;
-  valid_emails: number;
-  invalid_emails: number;
-  risky_emails: number;
-  unknown_emails: number;
-  average_confidence: number;
-  average_processing_time: number;
-  validations_today: number;
-  validations_this_month: number;
-}
+import dayjs from 'dayjs';
+import {
+  adminValidationService,
+  AdminEmailValidation,
+  AdminValidationStats,
+  ValidationStatus
+} from '../../services/validationService';
 
 const ValidationsManagement: React.FC = () => {
-  const [validations, setValidations] = useState<ValidationRecord[]>([]);
-  const [stats, setStats] = useState<ValidationStats | null>(null);
+  const [validations, setValidations] = useState<AdminEmailValidation[]>([]);
+  const [stats, setStats] = useState<AdminValidationStats | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState<string>('all');
-  const [filterUser, setFilterUser] = useState<string>('all');
   const [dateRange, setDateRange] = useState<[string, string] | null>(null);
-  const [selectedValidation, setSelectedValidation] = useState<ValidationRecord | null>(null);
+  const [selectedValidation, setSelectedValidation] = useState<AdminEmailValidation | null>(null);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
 
   const { Title, Text } = Typography;
@@ -101,24 +57,10 @@ const ValidationsManagement: React.FC = () => {
     setError(null);
     try {
       const [validationsRes, statsRes] = await Promise.all([
-        axiosInstance.get('/admin/validations/'),
-        axiosInstance.get('/admin/validations/stats/')
+        adminValidationService.list(),
+        adminValidationService.stats()
       ]);
-      // Ensure validations data is properly structured
-      const validationsData = Array.isArray(validationsRes.data) ? validationsRes.data : [];
-      const normalizedValidations = validationsData.map(validation => ({
-        ...validation,
-        result: validation.result || {
-          confidence_score: 0,
-          risk_score: 0,
-          is_valid: false,
-          is_disposable: false,
-          is_free: false,
-          mx_records: [],
-          smtp_response: ''
-        }
-      }));
-      setValidations(normalizedValidations);
+      setValidations(Array.isArray(validationsRes.data) ? validationsRes.data : []);
       setStats(statsRes.data);
     } catch (err: any) {
       setError('Failed to fetch validations data');
@@ -134,45 +76,32 @@ const ValidationsManagement: React.FC = () => {
     fetchValidationsData();
   }, []);
 
-  const handleViewDetails = (validation: ValidationRecord) => {
+  const handleViewDetails = (validation: AdminEmailValidation) => {
     setSelectedValidation(validation);
     setShowDetailsModal(true);
   };
 
   const getStatusColor = (status: string) => {
-    const colors = {
-      valid: 'green',
-      invalid: 'red',
-      risky: 'orange',
-      unknown: 'default'
+    const colors: Record<string, string> = {
+      completed: 'green',
+      failed: 'red',
+      processing: 'blue',
+      pending: 'default'
     };
-    return colors[status as keyof typeof colors] || 'default';
+    return colors[status] || 'default';
   };
 
   const getStatusIcon = (status: string) => {
-    const icons = {
-      valid: <CheckCircleOutlined />,
-      invalid: <CloseCircleOutlined />,
-      risky: <ClockCircleOutlined />,
-      unknown: <ClockCircleOutlined />
+    const icons: Record<string, React.ReactNode> = {
+      completed: <CheckCircleOutlined />,
+      failed: <CloseCircleOutlined />,
+      processing: <SyncOutlined spin />,
+      pending: <ClockCircleOutlined />
     };
-    return icons[status as keyof typeof icons] || <ClockCircleOutlined />;
+    return icons[status] || <ClockCircleOutlined />;
   };
 
   const columns = [
-    {
-      title: 'User',
-      key: 'user',
-      render: (record: ValidationRecord) => (
-        <Space>
-          <Avatar icon={<UserOutlined />} size="small" />
-          <div>
-            <div style={{ fontWeight: 'bold' }}>{record.user?.name || 'Unknown User'}</div>
-            <Text type="secondary" style={{ fontSize: '12px' }}>{record.user?.email || 'No email'}</Text>
-          </div>
-        </Space>
-      ),
-    },
     {
       title: 'Email',
       dataIndex: 'email',
@@ -187,68 +116,55 @@ const ValidationsManagement: React.FC = () => {
       key: 'status',
       render: (status: string) => (
         <Tag color={getStatusColor(status)} icon={getStatusIcon(status)}>
-          {status.toUpperCase()}
+          {(status || 'unknown').toUpperCase()}
         </Tag>
       ),
     },
     {
-      title: 'Confidence',
-      key: 'confidence',
-      render: (record: ValidationRecord) => {
-        const confidenceScore = record.result?.confidence_score || 0;
+      title: 'Score',
+      key: 'score',
+      render: (record: AdminEmailValidation) => {
+        const score = record.score || 0;
         return (
           <div>
-            <Progress 
-              percent={Math.round(confidenceScore * 100)} 
-              size="small" 
-              status={confidenceScore > 0.8 ? 'success' : confidenceScore > 0.5 ? 'normal' : 'exception'}
+            <Progress
+              percent={score}
+              size="small"
+              status={score > 80 ? 'success' : score > 50 ? 'normal' : 'exception'}
             />
-            <Text style={{ fontSize: '12px' }}>
-              {Math.round(confidenceScore * 100)}%
-            </Text>
           </div>
         );
       },
     },
     {
-      title: 'Risk Score',
-      key: 'risk',
-      render: (record: ValidationRecord) => {
-        const riskScore = record.result?.risk_score || 0;
-        return (
-          <Tag color={riskScore > 0.7 ? 'red' : riskScore > 0.4 ? 'orange' : 'green'}>
-            {Math.round(riskScore * 100)}%
-          </Tag>
-        );
-      },
-    },
-    {
-      title: 'Processing Time',
-      dataIndex: 'processing_time',
-      key: 'processing_time',
-      render: (time: number) => `${time}ms`,
-    },
-    {
       title: 'Type',
-      dataIndex: 'validation_type',
-      key: 'validation_type',
-      render: (type: string) => <Tag>{type}</Tag>,
+      dataIndex: 'job_type',
+      key: 'job_type',
+      render: (type: string) => <Tag>{type || 'single'}</Tag>,
+    },
+    {
+      title: 'Warnings',
+      key: 'warnings',
+      render: (record: AdminEmailValidation) => {
+        const count = Array.isArray(record.warnings) ? record.warnings.length : 0;
+        return count > 0 ? <Tag color="orange">{count}</Tag> : <Text type="secondary">-</Text>;
+      },
     },
     {
       title: 'Date',
       dataIndex: 'created_at',
       key: 'created_at',
-      render: (date: string) => new Date(date).toLocaleDateString(),
+      render: (date: string) => (date ? new Date(date).toLocaleString() : '-'),
     },
     {
       title: 'Actions',
       key: 'actions',
-      render: (record: ValidationRecord) => (
+      render: (record: AdminEmailValidation) => (
         <Space>
           <Tooltip title="View Details">
-            <Button 
-              type="text" 
-              icon={<EyeOutlined />} 
+            <Button
+              type="text"
+              icon={<EyeOutlined />}
               size="small"
               onClick={() => handleViewDetails(record)}
             />
@@ -259,13 +175,9 @@ const ValidationsManagement: React.FC = () => {
   ];
 
   const filteredValidations = validations.filter(validation => {
-    const matchesSearch = validation.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         (validation.user?.name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         (validation.user?.email || '').toLowerCase().includes(searchTerm.toLowerCase());
-    
+    const matchesSearch = validation.email.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesStatus = filterStatus === 'all' || validation.status === filterStatus;
-    const matchesUser = filterUser === 'all' || validation.user?.id?.toString() === filterUser;
-    
+
     let matchesDate = true;
     if (dateRange) {
       const validationDate = new Date(validation.created_at);
@@ -273,11 +185,25 @@ const ValidationsManagement: React.FC = () => {
       const endDate = new Date(dateRange[1]);
       matchesDate = validationDate >= startDate && validationDate <= endDate;
     }
-    
-    return matchesSearch && matchesStatus && matchesUser && matchesDate;
+
+    return matchesSearch && matchesStatus && matchesDate;
   });
 
-  const statsCards = [
+  // Derived metrics from the recent_validations sample returned by the stats endpoint.
+  const recent = stats?.recent_validations ?? [];
+  const recentCompleted = recent.filter(v => v.status === 'completed').length;
+  const recentFailed = recent.filter(v => v.status === 'failed').length;
+  const avgRecentScore = recent.length
+    ? Math.round(recent.reduce((sum, v) => sum + (v.score || 0), 0) / recent.length)
+    : 0;
+
+  const statsCards: Array<{
+    title: string;
+    value: number;
+    icon: React.ReactNode;
+    color: string;
+    suffix?: string;
+  }> = [
     {
       title: 'Total Validations',
       value: stats?.total_validations || 0,
@@ -285,20 +211,20 @@ const ValidationsManagement: React.FC = () => {
       color: '#1890ff'
     },
     {
-      title: 'Valid Emails',
-      value: stats?.valid_emails || 0,
+      title: 'Recent Completed',
+      value: recentCompleted,
       icon: <CheckCircleOutlined style={{ color: '#52c41a' }} />,
       color: '#52c41a'
     },
     {
-      title: 'Invalid Emails',
-      value: stats?.invalid_emails || 0,
+      title: 'Recent Failed',
+      value: recentFailed,
       icon: <CloseCircleOutlined style={{ color: '#ff4d4f' }} />,
       color: '#ff4d4f'
     },
     {
-      title: 'Avg Confidence',
-      value: stats?.average_confidence ? Math.round(stats.average_confidence * 100) : 0,
+      title: 'Avg Score (recent)',
+      value: avgRecentScore,
       icon: <PieChartOutlined style={{ color: '#722ed1' }} />,
       color: '#722ed1',
       suffix: '%'
@@ -325,13 +251,13 @@ const ValidationsManagement: React.FC = () => {
           <Text type="secondary">Monitor and analyze email validation activities</Text>
         </div>
         <Space>
-          <Button 
+          <Button
             icon={<ReloadOutlined />}
             onClick={fetchValidationsData}
           >
             Refresh
           </Button>
-          <Button 
+          <Button
             icon={<DownloadOutlined />}
           >
             Export Data
@@ -341,10 +267,10 @@ const ValidationsManagement: React.FC = () => {
 
       {error && (
         <div style={{ marginBottom: '16px' }}>
-          <div style={{ 
-            background: '#fff2f0', 
-            border: '1px solid #ffccc7', 
-            borderRadius: '6px', 
+          <div style={{
+            background: '#fff2f0',
+            border: '1px solid #ffccc7',
+            borderRadius: '6px',
             padding: '12px',
             display: 'flex',
             alignItems: 'center'
@@ -381,7 +307,7 @@ const ValidationsManagement: React.FC = () => {
               {/* Filters */}
               <div style={{ marginBottom: '16px', display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
                 <Input
-                  placeholder="Search emails, users..."
+                  placeholder="Search emails..."
                   prefix={<SearchOutlined />}
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
@@ -394,22 +320,22 @@ const ValidationsManagement: React.FC = () => {
                   placeholder="Status"
                 >
                   <Select.Option value="all">All Status</Select.Option>
-                  <Select.Option value="valid">Valid</Select.Option>
-                  <Select.Option value="invalid">Invalid</Select.Option>
-                  <Select.Option value="risky">Risky</Select.Option>
-                  <Select.Option value="unknown">Unknown</Select.Option>
+                  <Select.Option value="pending">Pending</Select.Option>
+                  <Select.Option value="processing">Processing</Select.Option>
+                  <Select.Option value="completed">Completed</Select.Option>
+                  <Select.Option value="failed">Failed</Select.Option>
                 </Select>
                 <RangePicker
-                  value={dateRange ? [moment(dateRange[0]), moment(dateRange[1])] : null}
-                  onChange={(dates) => setDateRange(dates ? [dates[0].format('YYYY-MM-DD'), dates[1].format('YYYY-MM-DD')] : null)}
+                  value={dateRange ? [dayjs(dateRange[0]), dayjs(dateRange[1])] : null}
+                  onChange={(_, dateStrings) =>
+                    setDateRange(dateStrings[0] && dateStrings[1] ? [dateStrings[0], dateStrings[1]] : null)
+                  }
                   style={{ width: 250 }}
                 />
-                <Button icon={<FilterOutlined />}>
-                  More Filters
-                </Button>
               </div>
 
               <Table
+                rowKey="id"
                 columns={columns}
                 dataSource={Array.isArray(filteredValidations) ? filteredValidations : []}
                 loading={loading}
@@ -419,7 +345,7 @@ const ValidationsManagement: React.FC = () => {
                   showQuickJumper: true,
                   showTotal: (total, range) => `${range[0]}-${range[1]} of ${total} validations`,
                 }}
-                scroll={{ x: 1200 }}
+                scroll={{ x: 1000 }}
               />
             </Card>
           )
@@ -471,16 +397,16 @@ const ValidationsManagement: React.FC = () => {
                     <div>
                       <Text strong>Status:</Text>
                       <Tag color={getStatusColor(selectedValidation.status)} style={{ marginLeft: '8px' }}>
-                        {selectedValidation.status.toUpperCase()}
+                        {(selectedValidation.status || 'unknown').toUpperCase()}
                       </Tag>
                     </div>
                     <div>
-                      <Text strong>Validation Type:</Text>
-                      <Tag style={{ marginLeft: '8px' }}>{selectedValidation.validation_type}</Tag>
+                      <Text strong>Job Type:</Text>
+                      <Tag style={{ marginLeft: '8px' }}>{selectedValidation.job_type}</Tag>
                     </div>
                     <div>
-                      <Text strong>Processing Time:</Text>
-                      <Text style={{ marginLeft: '8px' }}>{selectedValidation.processing_time}ms</Text>
+                      <Text strong>Score:</Text>
+                      <Text style={{ marginLeft: '8px' }}>{selectedValidation.score}</Text>
                     </div>
                     <div>
                       <Text strong>Created:</Text>
@@ -490,50 +416,29 @@ const ValidationsManagement: React.FC = () => {
                 </Card>
               </Col>
               <Col span={12}>
-                <Card title="Validation Results" size="small">
-                  <Space direction="vertical" style={{ width: '100%' }}>
-                    <div>
-                      <Text strong>Is Valid:</Text>
-                      <Tag color={selectedValidation.result.is_valid ? 'green' : 'red'} style={{ marginLeft: '8px' }}>
-                        {selectedValidation.result.is_valid ? 'Yes' : 'No'}
-                      </Tag>
-                    </div>
-                    <div>
-                      <Text strong>Is Deliverable:</Text>
-                      <Tag color={selectedValidation.result.is_deliverable ? 'green' : 'red'} style={{ marginLeft: '8px' }}>
-                        {selectedValidation.result.is_deliverable ? 'Yes' : 'No'}
-                      </Tag>
-                    </div>
-                    <div>
-                      <Text strong>Is Disposable:</Text>
-                      <Tag color={selectedValidation.result.is_disposable ? 'orange' : 'green'} style={{ marginLeft: '8px' }}>
-                        {selectedValidation.result.is_disposable ? 'Yes' : 'No'}
-                      </Tag>
-                    </div>
-                    <div>
-                      <Text strong>Is Free Email:</Text>
-                      <Tag color={selectedValidation.result.is_free ? 'blue' : 'default'} style={{ marginLeft: '8px' }}>
-                        {selectedValidation.result.is_free ? 'Yes' : 'No'}
-                      </Tag>
-                    </div>
-                    <div>
-                      <Text strong>Confidence Score:</Text>
-                      <Progress 
-                        percent={Math.round(selectedValidation.result.confidence_score * 100)} 
-                        size="small" 
-                        style={{ marginLeft: '8px', width: '100px' }}
-                      />
-                    </div>
-                  </Space>
+                <Card title="Score Breakdown" size="small">
+                  <pre style={{ margin: 0, maxHeight: '200px', overflow: 'auto', fontSize: '12px' }}>
+                    {JSON.stringify(selectedValidation.breakdown || {}, null, 2)}
+                  </pre>
                 </Card>
               </Col>
             </Row>
-            
-            {selectedValidation.result.mx_records.length > 0 && (
-              <Card title="MX Records" size="small" style={{ marginTop: '16px' }}>
+
+            {Array.isArray(selectedValidation.suggestions) && selectedValidation.suggestions.length > 0 && (
+              <Card title="Suggestions" size="small" style={{ marginTop: '16px' }}>
+                <List
+                  size="small"
+                  dataSource={selectedValidation.suggestions}
+                  renderItem={(item) => <List.Item>{item}</List.Item>}
+                />
+              </Card>
+            )}
+
+            {Array.isArray(selectedValidation.warnings) && selectedValidation.warnings.length > 0 && (
+              <Card title="Warnings" size="small" style={{ marginTop: '16px' }}>
                 <Space direction="vertical" style={{ width: '100%' }}>
-                  {selectedValidation.result.mx_records.map((mx, index) => (
-                    <Text key={index} code>{mx}</Text>
+                  {selectedValidation.warnings.map((w, index) => (
+                    <Tag color="orange" key={index}>{w}</Tag>
                   ))}
                 </Space>
               </Card>

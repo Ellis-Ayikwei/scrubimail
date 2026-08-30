@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { 
   User, 
@@ -16,6 +16,7 @@ import {
 import { useDispatch, useSelector } from 'react-redux';
 import { RegisterUser } from '../../store/authSlice';
 import { RootState } from '../../store/index';
+import ssoService, { ProviderId } from '../../services/ssoService';
 
 const Register = () => {
   const [formData, setFormData] = useState({
@@ -28,12 +29,32 @@ const Register = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [success, setSuccess] = useState(false);
+  const [ssoLoading, setSsoLoading] = useState<ProviderId | null>(null);
+  const [ssoError, setSsoError] = useState<string | null>(null);
+  const [availableProviders, setAvailableProviders] = useState<ProviderId[]>([]);
   const navigate = useNavigate();
   
   const dispatch = useDispatch();
   const { loading, error: authError, message } = useSelector((state: RootState) => state.auth);
 
-  const ssoProviders = [
+  useEffect(() => {
+    let cancelled = false;
+    ssoService.getAvailableProviders().then((ids) => {
+      if (!cancelled) setAvailableProviders(ids);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const ssoProviders: {
+    id: ProviderId;
+    name: string;
+    icon: any;
+    description: string;
+    color: string;
+    textColor: string;
+  }[] = [
     {
       id: 'github',
       name: 'GitHub',
@@ -59,6 +80,9 @@ const Register = () => {
       textColor: 'text-white'
     }
   ];
+
+  // Only offer what this deployment actually has credentials for.
+  const visibleSsoProviders = ssoProviders.filter((p) => availableProviders.includes(p.id));
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -100,22 +124,16 @@ const Register = () => {
     }
   };
 
-  const handleSSO = async (providerId: string) => {
+  const handleSSO = async (providerId: ProviderId) => {
     try {
-      // Call the backend OAuth login endpoint
-      const response = await fetch(`/api/auth/oauth/${providerId}/login/?redirect_uri=${encodeURIComponent(window.location.origin + '/oauth/callback')}`, {
-        method: 'GET',
-        credentials: 'include'
-      });
-      
-      const data = await response.json();
-      
-      if (data.authorization_url) {
-        // Redirect to the OAuth provider's authorization URL
-        window.location.href = data.authorization_url;
-      }
+      setSsoError(null);
+      setSsoLoading(providerId);
+      await ssoService.startLogin(providerId);
     } catch (err: any) {
+      // Failing silently here left the button looking inert.
       console.error('OAuth login error:', err);
+      setSsoError(err?.message || 'Could not start sign-in with that provider.');
+      setSsoLoading(null);
     }
   };
 
@@ -137,7 +155,7 @@ const Register = () => {
             <h2 className="mt-6 text-3xl font-bold text-[#333333] dark:text-white">
               Account Created Successfully!
             </h2>
-            <p className="mt-2 text-sm text-[#333333]/70 dark:text-gray-400">
+            <p className="mt-2 text-sm text-[#333333]/70 dark:text-gray-300">
               Welcome to Scrubimail! Your account has been created successfully.
             </p>
           </div>
@@ -175,7 +193,7 @@ const Register = () => {
           <h2 className="mt-6 text-3xl font-bold text-[#333333] dark:text-white">
             Create your account
           </h2>
-          <p className="mt-2 text-sm text-[#333333]/70 dark:text-gray-400">
+          <p className="mt-2 text-sm text-[#333333]/70 dark:text-gray-300">
             Join thousands of developers using Scrubimail
           </p>
         </div>
@@ -183,26 +201,40 @@ const Register = () => {
         {/* Registration Form */}
         <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl border border-gray-200 dark:border-gray-700 p-8">
           {/* SSO Providers */}
-          <div className="mb-6">
-            <div className="flex justify-center space-x-3">
-              {ssoProviders.map((provider) => {
-                const IconComponent = provider.icon;
-                return (
-                  <button
-                    key={provider.id}
-                    onClick={() => handleSSO(provider.id)}
-                    disabled={loading}
-                    className={`flex-1 p-3 rounded-lg border-2 transition-all duration-200 ${provider.color} ${provider.textColor} hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed`}
-                  >
-                    <div className="flex items-center justify-center space-x-2">
-                      <IconComponent className="w-4 h-4" />
-                      <span className="text-sm font-medium">{provider.name}</span>
-                    </div>
-                  </button>
-                );
-              })}
+          {visibleSsoProviders.length > 0 && (
+            <div className="mb-6">
+              <div className="flex justify-center space-x-3">
+                {visibleSsoProviders.map((provider) => {
+                  const IconComponent = provider.icon;
+                  return (
+                    <button
+                      key={provider.id}
+                      type="button"
+                      onClick={() => handleSSO(provider.id)}
+                      disabled={loading || ssoLoading !== null}
+                      className={`flex-1 p-3 rounded-lg border-2 transition-all duration-200 ${provider.color} ${provider.textColor} hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed`}
+                    >
+                      <div className="flex items-center justify-center space-x-2">
+                        {ssoLoading === provider.id ? (
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : (
+                          <IconComponent className="w-4 h-4" />
+                        )}
+                        <span className="text-sm font-medium">{provider.name}</span>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+
+              {ssoError && (
+                <div className="mt-3 flex items-start gap-2 text-sm text-red-600 dark:text-red-400">
+                  <AlertCircle className="mt-0.5 w-4 h-4 shrink-0" />
+                  <span>{ssoError}</span>
+                </div>
+              )}
             </div>
-          </div>
+          )}
 
           {/* Divider */}
           <div className="relative mb-6">
@@ -210,7 +242,7 @@ const Register = () => {
               <div className="w-full border-t border-gray-300 dark:border-gray-600" />
             </div>
             <div className="relative flex justify-center text-sm">
-              <span className="px-2 bg-white dark:bg-gray-800 text-[#333333]/70 dark:text-gray-400">
+              <span className="px-2 bg-white dark:bg-gray-800 text-[#333333]/70 dark:text-gray-300">
                 Or continue with email
               </span>
             </div>
@@ -236,7 +268,7 @@ const Register = () => {
                 </label>
                 <div className="relative">
                   <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                    <User className="h-5 w-5 text-[#333333]/50" />
+                    <User className="h-5 w-5 text-[#333333]/70" />
                   </div>
                   <input
                     id="firstName"
@@ -259,7 +291,7 @@ const Register = () => {
                 </label>
                 <div className="relative">
                   <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                    <User className="h-5 w-5 text-[#333333]/50" />
+                    <User className="h-5 w-5 text-[#333333]/70" />
                   </div>
                   <input
                     id="lastName"
@@ -284,7 +316,7 @@ const Register = () => {
               </label>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <Mail className="h-5 w-5 text-[#333333]/50" />
+                  <Mail className="h-5 w-5 text-[#333333]/70" />
                 </div>
                 <input
                   id="email"
@@ -308,7 +340,7 @@ const Register = () => {
               </label>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <Lock className="h-5 w-5 text-[#333333]/50" />
+                  <Lock className="h-5 w-5 text-[#333333]/70" />
                 </div>
                 <input
                   id="password"
@@ -329,13 +361,13 @@ const Register = () => {
                   className="absolute inset-y-0 right-0 pr-3 flex items-center disabled:opacity-50"
                 >
                   {showPassword ? (
-                    <EyeOff className="h-5 w-5 text-[#333333]/50 hover:text-[#333333]" />
+                    <EyeOff className="h-5 w-5 text-[#333333]/70 hover:text-[#333333]" />
                   ) : (
-                    <Eye className="h-5 w-5 text-[#333333]/50 hover:text-[#333333]" />
+                    <Eye className="h-5 w-5 text-[#333333]/70 hover:text-[#333333]" />
                   )}
                 </button>
               </div>
-              <p className="mt-1 text-xs text-[#333333]/50 dark:text-gray-400">
+              <p className="mt-1 text-xs text-[#333333]/70 dark:text-gray-300">
                 Must be at least 8 characters long
               </p>
             </div>
@@ -347,7 +379,7 @@ const Register = () => {
               </label>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <Lock className="h-5 w-5 text-[#333333]/50" />
+                  <Lock className="h-5 w-5 text-[#333333]/70" />
                 </div>
                 <input
                   id="confirmPassword"
@@ -368,9 +400,9 @@ const Register = () => {
                   className="absolute inset-y-0 right-0 pr-3 flex items-center disabled:opacity-50"
                 >
                   {showConfirmPassword ? (
-                    <EyeOff className="h-5 w-5 text-[#333333]/50 hover:text-[#333333]" />
+                    <EyeOff className="h-5 w-5 text-[#333333]/70 hover:text-[#333333]" />
                   ) : (
-                    <Eye className="h-5 w-5 text-[#333333]/50 hover:text-[#333333]" />
+                    <Eye className="h-5 w-5 text-[#333333]/70 hover:text-[#333333]" />
                   )}
                 </button>
               </div>
@@ -418,7 +450,7 @@ const Register = () => {
 
             {/* Sign In Link */}
             <div className="text-center">
-              <p className="text-sm text-[#333333]/70 dark:text-gray-400">
+              <p className="text-sm text-[#333333]/70 dark:text-gray-300">
                 Already have an account?{' '}
                 <Link
                   to="/login"
@@ -433,7 +465,7 @@ const Register = () => {
 
         {/* Security Note */}
         <div className="text-center">
-          <p className="text-xs text-[#333333]/50 dark:text-gray-400">
+          <p className="text-xs text-[#333333]/70 dark:text-gray-300">
             Your data is protected with enterprise-grade security
           </p>
         </div>

@@ -1,5 +1,6 @@
 from rest_framework.throttling import SimpleRateThrottle
 from apps.billing.models import BillingProfile
+from apps.billing.services import get_billing_profile_for_request
 from apps.plan.models import Plan
 import logging
 
@@ -52,43 +53,31 @@ class PlanBasedRateThrottle(SimpleRateThrottle):
             self.rate = '10/hour'
             self.num_requests, self.duration = self.parse_rate(self.rate)
         else:
-            try:
-                profile = BillingProfile.objects.select_related('current_plan').get(user=request.user)
-                plan = profile.current_plan
-                
-                if not plan:
-                    # No plan - use Free tier limits
-                    free_plan = Plan.objects.filter(name='Free', is_active=True).first()
-                    plan = free_plan
-                
-                if plan:
-                    # Set rate from plan
-                    max_calls = plan.max_api_calls_per_hour
-                    
-                    # Check for unlimited (Enterprise)
-                    if max_calls >= 10000:
-                        return True  # Unlimited access
-                    
-                    self.rate = f'{max_calls}/hour'
-                    self.num_requests, self.duration = self.parse_rate(self.rate)
-                else:
-                    # Fallback to default
-                    self.rate = '10/hour'
-                    self.num_requests, self.duration = self.parse_rate(self.rate)
-                    
-            except BillingProfile.DoesNotExist:
-                # No billing profile - create one with Free plan
+            # One shared, read-only fetch of the profile for this request (see
+            # get_billing_profile_for_request); create only when truly absent.
+            profile = get_billing_profile_for_request(request)
+            if profile is None:
                 from apps.billing.services import BillingService
-                billing_service = BillingService()
-                profile = billing_service.get_or_create_billing_profile(request.user)
-                
-                if profile.current_plan:
-                    max_calls = profile.current_plan.max_api_calls_per_hour
-                    self.rate = f'{max_calls}/hour'
-                    self.num_requests, self.duration = self.parse_rate(self.rate)
-                else:
-                    self.rate = '10/hour'
-                    self.num_requests, self.duration = self.parse_rate(self.rate)
+                profile = BillingService().get_or_create_billing_profile(
+                    request.user, request=request
+                )
+
+            plan = profile.current_plan
+            if not plan:
+                # No plan - use Free tier limits
+                plan = Plan.objects.filter(name='Free', is_active=True).first()
+
+            if plan:
+                max_calls = plan.max_api_calls_per_hour
+                # Check for unlimited (Enterprise)
+                if max_calls >= 10000:
+                    return True  # Unlimited access
+                self.rate = f'{max_calls}/hour'
+                self.num_requests, self.duration = self.parse_rate(self.rate)
+            else:
+                # Fallback to default
+                self.rate = '10/hour'
+                self.num_requests, self.duration = self.parse_rate(self.rate)
         
         # Use parent's allow_request with our custom rate
         return super().allow_request(request, view)
@@ -194,61 +183,36 @@ class PlanFeatureThrottle(SimpleRateThrottle):
         if not request.user or not request.user.is_authenticated:
             # Allow only basic endpoints for anonymous
             return self._is_public_endpoint(view)
-        
-        try:
-            profile = BillingProfile.objects.select_related('current_plan').get(user=request.user)
-            plan = profile.current_plan
-            
-            if not plan:
-                free_plan = Plan.objects.filter(name='Free', is_active=True).first()
-                plan = free_plan
-            
-            if not plan:
-                return False
-            
-            # Check feature access
-            view_name = view.__class__.__name__
-            
-            # API access check
-            if 'API' in view_name or request.headers.get('X-API-Key'):
-                if not plan.supports_api:
-                    return False
-            
-            # Bulk validation check
-            if 'Bulk' in view_name:
-                if not plan.supports_bulk:
-                    return False
-            
-            return True
-            
-        except BillingProfile.DoesNotExist:
-            # No billing profile - create one with Free plan
+
+        # Shared read-only fetch; create only when the user has no profile yet.
+        profile = get_billing_profile_for_request(request)
+        if profile is None:
             from apps.billing.services import BillingService
-            billing_service = BillingService()
-            profile = billing_service.get_or_create_billing_profile(request.user)
-            
-            plan = profile.current_plan
-            if not plan:
-                free_plan = Plan.objects.filter(name='Free', is_active=True).first()
-                plan = free_plan
-            
-            if not plan:
+            profile = BillingService().get_or_create_billing_profile(
+                request.user, request=request
+            )
+
+        plan = profile.current_plan
+        if not plan:
+            plan = Plan.objects.filter(name='Free', is_active=True).first()
+
+        if not plan:
+            return False
+
+        # Check feature access
+        view_name = view.__class__.__name__
+
+        # API access check
+        if 'API' in view_name or request.headers.get('X-API-Key'):
+            if not plan.supports_api:
                 return False
-            
-            # Check feature access
-            view_name = view.__class__.__name__
-            
-            # API access check
-            if 'API' in view_name or request.headers.get('X-API-Key'):
-                if not plan.supports_api:
-                    return False
-            
-            # Bulk validation check
-            if 'Bulk' in view_name:
-                if not plan.supports_bulk:
-                    return False
-            
-            return True
+
+        # Bulk validation check
+        if 'Bulk' in view_name:
+            if not plan.supports_bulk:
+                return False
+
+        return True
     
     def _is_public_endpoint(self, view):
         """Check if endpoint is publicly accessible"""

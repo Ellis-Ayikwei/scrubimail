@@ -155,3 +155,35 @@ class ValidationService {
 
 export const validationService = new ValidationService();
 export default validationService;
+
+// --- Admin Validations (EmailValidationSerializer on apps/validation/serializers.py) ---
+// EmailValidation extends Basemodel → id is a UUID string. The admin list serializer
+// exposes ONLY these fields (no `user`, no nested `result`, no processing_time).
+export type ValidationStatus = 'pending' | 'processing' | 'completed' | 'failed';
+export type ValidationJobType = 'single' | 'bulk' | 'api';
+
+export interface AdminEmailValidation {
+  id: string;
+  email: string;
+  status: ValidationStatus;
+  score: number;
+  breakdown: Record<string, any>;
+  suggestions: string[];
+  warnings: string[];
+  metadata: Record<string, any>;
+  job_type: ValidationJobType;
+  created_at: string;
+  updated_at: string;
+}
+
+// GET /admin/validations/stats/ → { total_validations, recent_validations: [...] }
+export interface AdminValidationStats {
+  total_validations: number;
+  recent_validations: AdminEmailValidation[];
+}
+
+export const adminValidationService = {
+  // GET /admin/validations/ → AdminEmailValidation[] (plain array)
+  list: () => axiosInstance.get<AdminEmailValidation[]>('/admin/validations/'),
+  stats: () => axiosInstance.get<AdminValidationStats>('/admin/validations/stats/'),
+};

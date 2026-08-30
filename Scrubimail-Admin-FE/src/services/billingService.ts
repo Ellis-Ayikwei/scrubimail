@@ -6,13 +6,22 @@ export interface CreditPackage {
   id: string; // UUID
   name: string;
   credits: number;
-  price: number;
-  original_price: number;
+  price: number | string;
+  original_price: number | string | null;
   discount_percentage: number;
   expiry_days: number | null;
   is_featured: boolean;
   is_active: boolean;
   description: string;
+  // Derived / read-only fields exposed by CreditPackageSerializer
+  effective_price?: number | string;
+  price_per_credit?: number | string;
+  is_available?: boolean;
+  savings?: number;
+  sort_order?: number;
+  max_purchases_per_user?: number | null;
+  total_available?: number | null;
+  total_sold?: number;
   created_at: string;
   updated_at: string;
 }
@@ -37,23 +46,40 @@ export interface PromoCode {
   updated_at: string;
 }
 
+export interface InvoiceUserInfo {
+  id: string; // UUID
+  email: string;
+  name: string | null;
+}
+
 export interface Invoice {
   id: string; // UUID
   invoice_number: string;
   status: 'draft' | 'pending' | 'paid' | 'overdue' | 'cancelled';
   invoice_type: 'subscription' | 'credit_package' | 'credit_purchase' | 'refund';
-  subtotal: number;
-  discount_amount: number;
-  tax_amount: number;
-  total_amount: number;
+  subtotal: number | string;
+  discount_amount: number | string;
+  tax_amount: number | string;
+  total_amount: number | string;
+  amount_paid?: number | string;
   currency: string;
-  issue_date: string;
+  // Backend field is `invoice_date` (not `issue_date`).
+  invoice_date: string;
   due_date: string;
   paid_date: string | null;
+  payment_method?: string | null;
   payment_reference: string | null;
-  customer_snapshot: any;
+  customer_name?: string | null;
+  customer_email?: string | null;
+  customer_address?: string | null;
+  notes?: string | null;
+  metadata?: any;
   line_items: InvoiceLineItem[];
-  user: number;
+  user: string; // UUID
+  // Attached by the admin invoices endpoint for customer display.
+  user_info?: InvoiceUserInfo;
+  is_overdue?: boolean;
+  balance_due?: number;
   created_at: string;
   updated_at: string;
 }
@@ -62,8 +88,9 @@ export interface InvoiceLineItem {
   id: number;
   description: string;
   quantity: number;
-  unit_price: number;
-  total_price: number;
+  unit_price: number | string;
+  // Backend field is `total` (not `total_price`).
+  total: number | string;
 }
 
 export interface UsageAlert {
@@ -75,17 +102,57 @@ export interface UsageAlert {
 
 export interface CreditPackagePurchase {
   id: string; // UUID
-  package: CreditPackage;
-  user: number;
+  // Serializer exposes `package` as the FK id (UUID) and the nested object as
+  // `package_details`.
+  package: string; // UUID
+  package_details?: CreditPackage;
+  user: string; // UUID
+  // Nested user summary so tables can show a name instead of the raw UUID.
+  user_details?: {
+    id: string;
+    email: string;
+    first_name?: string;
+    last_name?: string;
+    full_name?: string;
+  } | null;
+  billing_profile?: string;
   credits_purchased: number;
-  amount_paid: number;
-  promo_code: string | null;
-  discount_amount: number;
+  amount_paid: number | string;
+  currency?: string;
+  promo_code?: string | null;
+  discount_amount?: number | string;
   payment_method: string;
-  payment_reference: string;
-  status: 'pending' | 'completed' | 'failed';
+  payment_reference: string | null;
+  payment_provider?: string;
+  status: 'pending' | 'completed' | 'failed' | 'refunded';
+  metadata?: any;
+  purchased_at?: string;
   created_at: string;
   completed_at: string | null;
+  failed_at?: string | null;
+  refunded_at?: string | null;
+}
+
+/** A CreditTransaction row as returned by GET /admin/billing/. */
+export interface CreditTransaction {
+  id: string; // UUID
+  transaction_type: string;
+  amount: number;
+  description: string;
+  created_at: string;
+  paystack_payment_reference: string | null;
+  metadata: any;
+  expiry_date: string | null;
+  is_expired: boolean;
+  expired_at: string | null;
+  is_expiring_soon: boolean;
+  days_until_expiry: number | null;
+}
+
+/** Shape of GET /admin/billing/stats/. */
+export interface BillingStats {
+  total_revenue: number;
+  recent_billing: CreditTransaction[];
 }
 
 export interface PromoCodeRedemption {
@@ -427,6 +494,84 @@ class BillingService {
     } catch (error: any) {
       console.error('Error updating invoice status:', error);
       throw new Error(error.response?.data?.detail || 'Failed to update invoice status');
+    }
+  }
+
+  // ========== Admin Billing / Credits ==========
+
+  /**
+   * Get all credit-transaction billing records (admin).
+   * GET /admin/billing/ → PLAIN ARRAY of CreditTransaction.
+   */
+  async getBillingTransactions(): Promise<CreditTransaction[]> {
+    try {
+      const response = await axiosInstance.get('/admin/billing/');
+      return Array.isArray(response.data) ? response.data : [];
+    } catch (error: any) {
+      console.error('Error fetching billing transactions:', error);
+      throw new Error(error.response?.data?.detail || 'Failed to load billing records');
+    }
+  }
+
+  /**
+   * Get billing stats (admin).
+   * GET /admin/billing/stats/ → { total_revenue, recent_billing:[] }.
+   */
+  async getBillingStats(): Promise<BillingStats> {
+    try {
+      const response = await axiosInstance.get('/admin/billing/stats/');
+      return response.data;
+    } catch (error: any) {
+      console.error('Error fetching billing stats:', error);
+      throw new Error(error.response?.data?.detail || 'Failed to load billing stats');
+    }
+  }
+
+  /**
+   * Adjust a user's credit balance (admin).
+   * POST /admin/billing/adjust/ body { user_id, amount(+/-), reason }.
+   */
+  async adjustCredits(userId: string, amount: number, reason?: string): Promise<{ detail: string; credits_remaining: number }> {
+    try {
+      const response = await axiosInstance.post('/admin/billing/adjust/', {
+        user_id: userId,
+        amount,
+        reason: reason || 'Admin adjustment',
+      });
+      return response.data;
+    } catch (error: any) {
+      console.error('Error adjusting credits:', error);
+      throw new Error(error.response?.data?.detail || 'Failed to adjust credits');
+    }
+  }
+
+  /**
+   * Reset a user's billing cycle (admin).
+   * POST /admin/users/<uuid>/reset-billing/.
+   */
+  async resetBillingCycle(userId: string): Promise<{ detail: string; credits_remaining: number }> {
+    try {
+      const response = await axiosInstance.post(`/admin/users/${userId}/reset-billing/`);
+      return response.data;
+    } catch (error: any) {
+      console.error('Error resetting billing cycle:', error);
+      throw new Error(error.response?.data?.detail || 'Failed to reset billing cycle');
+    }
+  }
+
+  /**
+   * Change a user's plan (admin).
+   * POST /admin/users/<uuid>/change_plan/ body { plan_id }.
+   */
+  async changeUserPlan(userId: string, planId: number): Promise<{ detail: string; credits_remaining: number }> {
+    try {
+      const response = await axiosInstance.post(`/admin/users/${userId}/change_plan/`, {
+        plan_id: planId,
+      });
+      return response.data;
+    } catch (error: any) {
+      console.error('Error changing plan:', error);
+      throw new Error(error.response?.data?.detail || 'Failed to change plan');
     }
   }
 

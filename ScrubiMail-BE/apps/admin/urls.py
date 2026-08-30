@@ -29,6 +29,7 @@ from .views import (
     admin_user_permissions,
     admin_payments_list,
     admin_payments_stats,
+    admin_sync_payment,
     admin_invoices_list,
     admin_invoice_update_status,
 )
@@ -88,6 +89,11 @@ urlpatterns = [
     # Payments management
     path("payments/", admin_payments_list, name="admin-payments-list"),
     path("payments/stats/", admin_payments_stats, name="admin-payments-stats"),
+    path(
+        "payments/<uuid:payment_id>/sync/",
+        admin_sync_payment,
+        name="admin-payment-sync",
+    ),
     # Invoices management
     path("invoices/", admin_invoices_list, name="admin-invoices-list"),
     path("invoices/<uuid:invoice_id>/", admin_invoice_update_status, name="admin-invoice-update-status"),

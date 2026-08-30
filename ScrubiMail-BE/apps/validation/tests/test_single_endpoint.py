@@ -1,9 +1,9 @@
-"""End-to-end contract of POST /validate/ after the latency work.
+"""End-to-end contract of POST /validate/.
 
-The endpoint must: return the verdict plus the id of a row that does not exist
-yet (it is written off-path), spend exactly one credit synchronously, and refuse
-the request when the atomic decrement loses a race — never hand out a free
-validation.
+The endpoint must: return the verdict plus the id of the validation row it wrote
+synchronously (so history reflects it immediately), spend exactly one credit
+synchronously, and refuse the request when the atomic decrement loses a race —
+never hand out a free validation.
 """
 
 from unittest import mock
@@ -61,7 +61,7 @@ class SingleValidationEndpointTests(TestCase):
         force_authenticate(request, user=self.user)
         return SingleEmailValidationView.as_view()(request)
 
-    def test_returns_verdict_without_writing_the_row_on_the_request_path(self):
+    def test_returns_verdict_and_writes_the_row_synchronously(self):
         with mock.patch.object(
             views, "verify_email_realtime", return_value=(VALID, False)
         ), mock.patch.object(
@@ -77,18 +77,15 @@ class SingleValidationEndpointTests(TestCase):
         self.assertEqual(body["mode"], "deep")
         self.assertIn("request_time", body)
 
-        # The row is NOT on the request path — it was handed to a worker...
-        enqueue.assert_called_once()
-        self.assertFalse(EmailValidation.objects.exists())
-
-        # ...and lands under exactly the id the client was already given.
-        tasks.persist_validation_record_task(**enqueue.call_args.kwargs["kwargs"])
+        # The row is written in-request (no Celery hop), under exactly the id the
+        # client was handed — so it shows in history immediately.
+        enqueue.assert_not_called()
         self.assertTrue(EmailValidation.objects.filter(id=body["id"]).exists())
 
     def test_spends_exactly_one_credit(self):
         with mock.patch.object(
             views, "verify_email_realtime", return_value=(VALID, False)
-        ), mock.patch.object(tasks.persist_validation_record_task, "apply_async"):
+        ):
             self._post()
 
         self.profile.refresh_from_db()
@@ -123,3 +120,72 @@ class SingleValidationEndpointTests(TestCase):
         self.assertEqual(response.data["mode"], "fast")
         self.assertTrue(response.data["cached"])
         self.assertTrue(verify.call_args.kwargs["fast"])
+
+
+class DeleteHistoryTests(TestCase):
+    """DELETE /status/<id>/ (one) and DELETE /history/ (all) — user-scoped, and
+    never touching the billing/usage audit trail."""
+
+    def setUp(self):
+        self.factory = APIRequestFactory()
+        self.user = get_user_model().objects.create_user(
+            email="me@example.com", password="x"
+        )
+        self.other = get_user_model().objects.create_user(
+            email="other@example.com", password="x"
+        )
+        self.mine = [
+            EmailValidation.objects.create(
+                email=f"a{i}@example.com", user=self.user, status="completed", score=90
+            )
+            for i in range(3)
+        ]
+        self.theirs = EmailValidation.objects.create(
+            email="theirs@example.com", user=self.other, status="completed", score=90
+        )
+
+    def test_delete_one_removes_only_that_row(self):
+        from apps.validation.views import ValidationStatusView
+
+        target = self.mine[0]
+        request = self.factory.delete(f"/status/{target.id}/")
+        force_authenticate(request, user=self.user)
+        response = ValidationStatusView.as_view()(request, validation_id=target.id)
+
+        self.assertEqual(response.status_code, 204)
+        self.assertFalse(EmailValidation.objects.filter(id=target.id).exists())
+        self.assertEqual(EmailValidation.objects.filter(user=self.user).count(), 2)
+
+    def test_cannot_delete_another_users_row(self):
+        from apps.validation.views import ValidationStatusView
+
+        request = self.factory.delete(f"/status/{self.theirs.id}/")
+        force_authenticate(request, user=self.user)  # not the owner
+        response = ValidationStatusView.as_view()(request, validation_id=self.theirs.id)
+
+        self.assertEqual(response.status_code, 404)
+        self.assertTrue(EmailValidation.objects.filter(id=self.theirs.id).exists())
+
+    def test_clear_all_removes_only_the_callers_rows(self):
+        from apps.billing.models import BillingProfile, EmailValidationUsage
+        from apps.validation.views import ValidationHistoryView
+
+        profile = BillingProfile.objects.create(user=self.user)
+        EmailValidationUsage.objects.create(
+            billing_profile=profile,
+            validation_request_id=str(self.mine[0].id),
+            credits_consumed=1,
+            validation_type="single",
+        )
+
+        request = self.factory.delete("/history/")
+        force_authenticate(request, user=self.user)
+        response = ValidationHistoryView.as_view()(request)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["deleted"], 3)
+        self.assertEqual(EmailValidation.objects.filter(user=self.user).count(), 0)
+        # The other user's history is untouched...
+        self.assertTrue(EmailValidation.objects.filter(id=self.theirs.id).exists())
+        # ...and the billing/usage audit trail survives a history clear.
+        self.assertEqual(EmailValidationUsage.objects.count(), 1)

@@ -1,14 +1,15 @@
-"""Latency deep-dive — the record write leaves the request path.
+"""Validation records are persisted synchronously and durably.
 
-The realtime response must not block on database I/O for data the client
-already has in its body. Credits stay synchronous (money must be exact); the
-EmailValidation + usage rows are enqueued and written by a worker.
+record_validation writes the EmailValidation + usage rows in-request, so the
+user's history reflects a validation the moment they see the verdict. (An
+earlier version enqueued this to Celery to shave latency; when the worker
+consuming that queue was down the rows were silently lost and users saw an empty
+history despite being charged — this reverts to a durable synchronous write.)
 
-These tests pin the properties that make that safe:
-  * the id in the response is the id the row is eventually written with;
-  * the write is idempotent, so an at-least-once redelivery can't double-record;
-  * a broker outage falls back to an inline write — a spent credit never ends
-    up without a record.
+These tests pin:
+  * the row is written during the call, under the id returned to the client;
+  * the write is idempotent (safe to re-run / redeliver);
+  * a persistence failure is swallowed and logged, never raised at the caller.
 """
 
 import uuid
@@ -52,19 +53,16 @@ class RecordValidationTests(TestCase):
             billing_profile_id=self.profile.id,
         )
 
-    def test_enqueues_instead_of_writing_on_the_request_path(self):
+    def test_writes_the_row_synchronously(self):
+        # No Celery hop — the row exists as soon as record_validation returns,
+        # under the id handed back to the client.
         with mock.patch.object(
             tasks.persist_validation_record_task, "apply_async"
         ) as enqueue:
             validation_id, breakdown = self._record()
 
-        # Nothing written yet — the request path did no DB work for the record.
-        enqueue.assert_called_once()
-        self.assertFalse(EmailValidation.objects.filter(id=validation_id).exists())
+        enqueue.assert_not_called()
         self.assertEqual(breakdown["risk_score"]["score"], 95)
-
-        # The worker later writes the row under the id already returned.
-        tasks.persist_validation_record_task(**enqueue.call_args.kwargs["kwargs"])
         row = EmailValidation.objects.get(id=validation_id)
         self.assertEqual(row.email, "user@example.com")
         self.assertEqual(row.status, "completed")
@@ -73,9 +71,9 @@ class RecordValidationTests(TestCase):
         self.assertEqual(row.job_type, "api")
         self.assertEqual(row.metadata["status"], "valid")
 
-    def test_write_is_idempotent_under_redelivery(self):
-        # acks_late means a task can be delivered twice; it must not double-write
-        # the record or double-record the usage (the user paid one credit).
+    def test_write_is_idempotent(self):
+        # persist_validation_record must be safe to run twice (retry / redelivery)
+        # without double-writing the record or double-recording the usage.
         kwargs = {
             "validation_id": str(uuid.uuid4()),
             "email": "user@example.com",
@@ -103,30 +101,20 @@ class RecordValidationTests(TestCase):
             1,
         )
 
-    def test_broker_down_falls_back_to_an_inline_write(self):
+    def test_persistence_failure_is_swallowed_not_raised(self):
+        # A DB hiccup must not fail the request — the verdict is already computed
+        # and the credit consumed. It is logged; the row is simply missing.
         with mock.patch.object(
-            tasks.persist_validation_record_task,
-            "apply_async",
-            side_effect=Exception("broker unreachable"),
+            services, "persist_validation_record", side_effect=Exception("db down")
         ):
-            validation_id, _ = self._record()
+            validation_id, breakdown = self._record()
 
-        # The credit was spent, so the record must exist even with no broker.
-        row = EmailValidation.objects.get(id=validation_id)
-        self.assertEqual(row.status, "completed")
-        self.assertEqual(
-            EmailValidationUsage.objects.filter(
-                validation_request_id=str(validation_id)
-            ).count(),
-            1,
-        )
+        self.assertTrue(validation_id)
+        self.assertEqual(breakdown["risk_score"]["score"], 95)
+        self.assertFalse(EmailValidation.objects.filter(id=validation_id).exists())
 
     def test_usage_row_records_the_charge(self):
-        with mock.patch.object(
-            tasks.persist_validation_record_task, "apply_async"
-        ) as enqueue:
-            validation_id, _ = self._record()
-        tasks.persist_validation_record_task(**enqueue.call_args.kwargs["kwargs"])
+        validation_id, _ = self._record()
 
         usage = EmailValidationUsage.objects.get(
             validation_request_id=str(validation_id)

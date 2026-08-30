@@ -39,37 +39,7 @@ import {
   UserOutlined,
   CalendarOutlined
 } from '@ant-design/icons';
-import axiosInstance from '../../services/axiosInstance';
-
-interface Plan {
-  id: number;
-  name: string;
-  description: string;
-  price: number;
-  yearly_price: number | null;
-  currency: string;
-  billing_cycle?: 'monthly' | 'yearly';
-  features: string[];
-  is_active: boolean;
-  is_popular: boolean;
-  max_validations: number;
-  max_api_calls: number;
-  max_users: number;
-  support_level: 'basic' | 'standard' | 'premium' | 'enterprise';
-  created_at: string;
-  updated_at: string;
-  subscription_count: number;
-  revenue: number;
-}
-
-interface PlanStats {
-  total_plans: number;
-  active_plans: number;
-  total_subscriptions: number;
-  monthly_revenue: number;
-  popular_plan: string;
-  average_plan_price: number;
-}
+import { plansService, Plan, PlanStats } from '../../services/pricingService';
 
 const PlansManagement: React.FC = () => {
   const [plans, setPlans] = useState<Plan[]>([]);
@@ -78,7 +48,6 @@ const PlansManagement: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState<string>('all');
-  const [filterCycle, setFilterCycle] = useState<string>('all');
   const [showPlanModal, setShowPlanModal] = useState(false);
   const [editingPlan, setEditingPlan] = useState<Plan | null>(null);
   const [form] = Form.useForm();
@@ -90,8 +59,8 @@ const PlansManagement: React.FC = () => {
     setError(null);
     try {
       const [plansRes, statsRes] = await Promise.all([
-        axiosInstance.get('/admin/plans/'),
-        axiosInstance.get('/admin/plans/stats/')
+        plansService.list(),
+        plansService.stats()
       ]);
       setPlans(Array.isArray(plansRes.data) ? plansRes.data : []);
       setStats(statsRes.data);
@@ -118,13 +87,13 @@ const PlansManagement: React.FC = () => {
   const handleCreatePlan = async (values: any) => {
     try {
       const payload = { ...values, features: toFeaturesArray(values.features) };
-      const response = await axiosInstance.post('/admin/plans/', payload);
+      const response = await plansService.create(payload);
       setPlans(prev => [response.data, ...prev]);
       setShowPlanModal(false);
       form.resetFields();
       message.success('Plan created successfully');
     } catch (err: any) {
-      message.error(err.message || 'Failed to create plan');
+      message.error(err.response?.data?.detail || err.message || 'Failed to create plan');
     }
   };
 
@@ -132,7 +101,7 @@ const PlansManagement: React.FC = () => {
     if (!editingPlan) return;
     try {
       const payload = { ...values, features: toFeaturesArray(values.features) };
-      const response = await axiosInstance.put(`/admin/plans/${editingPlan.id}/`, payload);
+      const response = await plansService.update(editingPlan.id, payload);
       setPlans(prev => prev.map(plan =>
         plan.id === editingPlan.id ? response.data : plan
       ));
@@ -141,27 +110,25 @@ const PlansManagement: React.FC = () => {
       form.resetFields();
       message.success('Plan updated successfully');
     } catch (err: any) {
-      message.error(err.message || 'Failed to update plan');
+      message.error(err.response?.data?.detail || err.message || 'Failed to update plan');
     }
   };
 
   const handleTogglePlan = async (planId: number, isActive: boolean) => {
     try {
-      await axiosInstance.patch(`/admin/plans/${planId}/`, {
-        is_active: !isActive
-      });
-      setPlans(prev => prev.map(plan => 
+      await plansService.patch(planId, { is_active: !isActive });
+      setPlans(prev => prev.map(plan =>
         plan.id === planId ? { ...plan, is_active: !isActive } : plan
       ));
       message.success(`Plan ${!isActive ? 'activated' : 'deactivated'} successfully`);
     } catch (err: any) {
-      message.error(err.message || 'Failed to update plan');
+      message.error(err.response?.data?.detail || err.message || 'Failed to update plan');
     }
   };
 
   const handleDeletePlan = async (planId: number) => {
     try {
-      await axiosInstance.delete(`/admin/plans/${planId}/`);
+      await plansService.remove(planId);
       setPlans(prev => prev.filter(plan => plan.id !== planId));
       message.success('Plan deleted successfully');
     } catch (err: any) {
@@ -178,7 +145,7 @@ const PlansManagement: React.FC = () => {
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               <Text strong>{record.name}</Text>
-              {record.is_popular && <Tag color="gold" icon={<StarOutlined />}>Popular</Tag>}
+              {record.priority_support && <Tag color="gold" icon={<StarOutlined />}>Priority</Tag>}
               {!record.is_active && <Tag color="red">Inactive</Tag>}
             </div>
             <Text type="secondary" style={{ fontSize: '12px' }}>{record.description}</Text>
@@ -192,10 +159,12 @@ const PlansManagement: React.FC = () => {
       render: (record: Plan) => (
         <div>
           <Text strong style={{ fontSize: '16px' }}>
-            ${record.price || 0} {(record.currency || 'USD').toUpperCase()}
+            ${record.price ?? 0} {(record.currency || 'USD').toUpperCase()}
           </Text>
           <div>
-            <Tag>{record.billing_cycle || 'monthly'}</Tag>
+            <Text type="secondary" style={{ fontSize: '12px' }}>
+              {record.yearly_price ? `$${record.yearly_price}/yr` : 'per month'}
+            </Text>
           </div>
         </div>
       ),
@@ -206,61 +175,46 @@ const PlansManagement: React.FC = () => {
       render: (record: Plan) => (
         <Space direction="vertical" size="small">
           <div>
-            <Text type="secondary">Validations:</Text>
+            <Text type="secondary">Credits/mo:</Text>
             <Text style={{ marginLeft: '4px' }}>
-              {record.max_validations === -1 || record.max_validations === null || record.max_validations === undefined 
-                ? 'Unlimited' 
-                : (record.max_validations || 0).toLocaleString()}
+              {(record.credits_per_month ?? 0).toLocaleString()}
             </Text>
           </div>
           <div>
-            <Text type="secondary">API Calls:</Text>
+            <Text type="secondary">API/hour:</Text>
             <Text style={{ marginLeft: '4px' }}>
-              {record.max_api_calls === -1 || record.max_api_calls === null || record.max_api_calls === undefined 
-                ? 'Unlimited' 
-                : (record.max_api_calls || 0).toLocaleString()}
+              {(record.max_api_calls_per_hour ?? 0).toLocaleString()}
             </Text>
           </div>
           <div>
-            <Text type="secondary">Users:</Text>
+            <Text type="secondary">Bulk max:</Text>
             <Text style={{ marginLeft: '4px' }}>
-              {record.max_users === -1 || record.max_users === null || record.max_users === undefined 
-                ? 'Unlimited' 
-                : (record.max_users || 0).toLocaleString()}
+              {(record.max_bulk_emails ?? 0).toLocaleString()}
             </Text>
           </div>
         </Space>
       ),
     },
     {
-      title: 'Support',
-      dataIndex: 'support_level',
-      key: 'support_level',
-      render: (level: string) => {
-        if (!level) return <Tag>N/A</Tag>;
-        const colors = {
-          basic: 'default',
-          standard: 'blue',
-          premium: 'purple',
-          enterprise: 'gold'
-        };
-        return <Tag color={colors[level as keyof typeof colors] || 'default'}>{level.toUpperCase()}</Tag>;
-      },
-    },
-    {
-      title: 'Subscriptions',
-      dataIndex: 'subscription_count',
-      key: 'subscription_count',
-      render: (count: number) => (
-        <Badge count={count || 0} style={{ backgroundColor: '#52c41a' }} />
+      title: 'Capabilities',
+      key: 'capabilities',
+      render: (record: Plan) => (
+        <Space direction="vertical" size={2}>
+          {record.supports_api && <Tag color="blue">API</Tag>}
+          {record.supports_bulk && <Tag color="geekblue">Bulk</Tag>}
+          {record.priority_support && <Tag color="gold">Priority</Tag>}
+          {!record.supports_api && !record.supports_bulk && !record.priority_support && (
+            <Tag>Standard</Tag>
+          )}
+        </Space>
       ),
     },
     {
-      title: 'Revenue',
-      dataIndex: 'revenue',
-      key: 'revenue',
-      render: (revenue: number) => (
-        <Text strong>${(revenue || 0).toLocaleString()}</Text>
+      title: 'Trial',
+      dataIndex: 'trial_days',
+      key: 'trial_days',
+      render: (days: number) => (
+        <Text>{days > 0 ? `${days} days` : 'None'}</Text>
       ),
     },
     {
@@ -321,17 +275,27 @@ const PlansManagement: React.FC = () => {
 
   const filteredPlans = plans.filter(plan => {
     const matchesSearch = plan.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         plan.description.toLowerCase().includes(searchTerm.toLowerCase());
-    
-    const matchesStatus = filterStatus === 'all' || 
+                         (plan.description || '').toLowerCase().includes(searchTerm.toLowerCase());
+
+    const matchesStatus = filterStatus === 'all' ||
                          (filterStatus === 'active' && plan.is_active) ||
                          (filterStatus === 'inactive' && !plan.is_active);
-    const matchesCycle = filterCycle === 'all' || plan.billing_cycle === filterCycle;
-    
-    return matchesSearch && matchesStatus && matchesCycle;
+
+    return matchesSearch && matchesStatus;
   });
 
-  const statsCards = [
+  const inactivePlans = Math.max((stats?.total_plans ?? plans.length) - (stats?.active_plans ?? 0), 0);
+  const avgMonthlyPrice = plans.length
+    ? plans.reduce((sum, p) => sum + (parseFloat(p.price) || 0), 0) / plans.length
+    : 0;
+
+  const statsCards: Array<{
+    title: string;
+    value: number;
+    icon: React.ReactNode;
+    color: string;
+    suffix?: string;
+  }> = [
     {
       title: 'Total Plans',
       value: stats?.total_plans || 0,
@@ -345,17 +309,16 @@ const PlansManagement: React.FC = () => {
       color: '#52c41a'
     },
     {
-      title: 'Total Subscriptions',
-      value: stats?.total_subscriptions || 0,
+      title: 'Inactive Plans',
+      value: inactivePlans,
       icon: <UserOutlined style={{ color: '#722ed1' }} />,
       color: '#722ed1'
     },
     {
-      title: 'Monthly Revenue',
-      value: stats?.monthly_revenue || 0,
+      title: 'Avg Monthly Price',
+      value: Number(avgMonthlyPrice.toFixed(2)),
       icon: <DollarOutlined style={{ color: '#fa8c16' }} />,
-      color: '#fa8c16',
-      suffix: 'USD'
+      color: '#fa8c16'
     }
   ];
 
@@ -449,16 +412,6 @@ const PlansManagement: React.FC = () => {
             <Select.Option value="active">Active</Select.Option>
             <Select.Option value="inactive">Inactive</Select.Option>
           </Select>
-          <Select
-            value={filterCycle}
-            onChange={setFilterCycle}
-            style={{ width: 150 }}
-            placeholder="Billing Cycle"
-          >
-            <Select.Option value="all">All Cycles</Select.Option>
-            <Select.Option value="monthly">Monthly</Select.Option>
-            <Select.Option value="yearly">Yearly</Select.Option>
-          </Select>
           <Button icon={<DownloadOutlined />}>
             Export
           </Button>
@@ -507,9 +460,10 @@ const PlansManagement: React.FC = () => {
             </Col>
             <Col span={12}>
               <Form.Item
-                name="is_popular"
-                label="Popular Plan"
+                name="priority_support"
+                label="Priority Support"
                 valuePropName="checked"
+                initialValue={false}
               >
                 <Switch />
               </Form.Item>
@@ -575,64 +529,85 @@ const PlansManagement: React.FC = () => {
           <Row gutter={16}>
             <Col span={8}>
               <Form.Item
-                name="max_validations"
-                label="Max Validations"
-                rules={[{ required: true, message: 'Please input max validations!' }]}
+                name="credits_per_month"
+                label="Credits / month"
+                rules={[{ required: true, message: 'Please input monthly credits!' }]}
+                initialValue={100}
               >
-                <InputNumber 
-                  min={-1} 
+                <InputNumber
+                  min={0}
                   style={{ width: '100%' }}
-                  placeholder="-1 for unlimited"
+                  placeholder="Monthly credits"
                 />
               </Form.Item>
             </Col>
             <Col span={8}>
               <Form.Item
-                name="max_api_calls"
-                label="Max API Calls"
-                rules={[{ required: true, message: 'Please input max API calls!' }]}
+                name="max_api_calls_per_hour"
+                label="Max API Calls / hour"
+                rules={[{ required: true, message: 'Please input max API calls per hour!' }]}
+                initialValue={100}
               >
-                <InputNumber 
-                  min={-1} 
+                <InputNumber
+                  min={0}
                   style={{ width: '100%' }}
-                  placeholder="-1 for unlimited"
+                  placeholder="API calls per hour"
                 />
               </Form.Item>
             </Col>
             <Col span={8}>
               <Form.Item
-                name="max_users"
-                label="Max Users"
-                rules={[{ required: true, message: 'Please input max users!' }]}
+                name="max_bulk_emails"
+                label="Max Bulk Emails"
+                rules={[{ required: true, message: 'Please input max bulk emails!' }]}
+                initialValue={1000}
               >
-                <InputNumber 
-                  min={-1} 
+                <InputNumber
+                  min={0}
                   style={{ width: '100%' }}
-                  placeholder="-1 for unlimited"
+                  placeholder="Bulk email limit"
                 />
               </Form.Item>
             </Col>
           </Row>
-          
-          <Form.Item
-            name="support_level"
-            label="Support Level"
-            rules={[{ required: true, message: 'Please select support level!' }]}
-          >
-            <Select>
-              <Select.Option value="basic">Basic</Select.Option>
-              <Select.Option value="standard">Standard</Select.Option>
-              <Select.Option value="premium">Premium</Select.Option>
-              <Select.Option value="enterprise">Enterprise</Select.Option>
-            </Select>
-          </Form.Item>
-          
+
+          <Row gutter={16}>
+            <Col span={6}>
+              <Form.Item
+                name="trial_days"
+                label="Trial Days"
+                initialValue={0}
+              >
+                <InputNumber min={0} style={{ width: '100%' }} />
+              </Form.Item>
+            </Col>
+            <Col span={6}>
+              <Form.Item
+                name="supports_api"
+                label="Supports API"
+                valuePropName="checked"
+                initialValue={false}
+              >
+                <Switch />
+              </Form.Item>
+            </Col>
+            <Col span={6}>
+              <Form.Item
+                name="supports_bulk"
+                label="Supports Bulk"
+                valuePropName="checked"
+                initialValue={false}
+              >
+                <Switch />
+              </Form.Item>
+            </Col>
+          </Row>
+
           <Form.Item
             name="features"
             label="Features (one per line)"
-            rules={[{ required: true, message: 'Please input features!' }]}
           >
-            <Input.TextArea 
+            <Input.TextArea
               placeholder="Enter features, one per line"
               rows={4}
             />

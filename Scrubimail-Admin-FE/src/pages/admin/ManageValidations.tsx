@@ -149,7 +149,7 @@ const ManageValidations: React.FC = () => {
       <div className="flex items-center justify-center h-64">
         <div className="text-center">
           <RefreshCw className="w-8 h-8 animate-spin text-[#2ED8A3] mx-auto mb-4" />
-          <p className="text-gray-600 dark:text-gray-400">Loading validations...</p>
+          <p className="text-gray-600 dark:text-gray-300">Loading validations...</p>
         </div>
       </div>
     );
@@ -161,7 +161,7 @@ const ManageValidations: React.FC = () => {
       <div className="flex justify-between items-center">
         <div>
           <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Validations Management</h1>
-          <p className="text-gray-500 dark:text-gray-400 mt-1">Monitor and analyze email validation activities</p>
+          <p className="text-gray-500 dark:text-gray-300 mt-1">Monitor and analyze email validation activities</p>
         </div>
         <div className="flex space-x-3">
           <button
@@ -198,7 +198,7 @@ const ManageValidations: React.FC = () => {
                 <BarChart3 className="w-6 h-6 text-blue-600 dark:text-blue-400" />
               </div>
               <div className="ml-4">
-                <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Total Validations</p>
+                <p className="text-sm font-medium text-gray-500 dark:text-gray-300">Total Validations</p>
                 <p className="text-2xl font-semibold text-gray-900 dark:text-white">
                   {stats.total_validations.toLocaleString()}
                 </p>
@@ -212,11 +212,11 @@ const ManageValidations: React.FC = () => {
                 <CheckCircle className="w-6 h-6 text-green-600 dark:text-green-400" />
               </div>
               <div className="ml-4">
-                <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Valid Emails</p>
+                <p className="text-sm font-medium text-gray-500 dark:text-gray-300">Valid Emails</p>
                 <p className="text-2xl font-semibold text-gray-900 dark:text-white">
                   {stats.valid_emails.toLocaleString()}
                 </p>
-                <p className="text-xs text-gray-500 dark:text-gray-400">
+                <p className="text-xs text-gray-500 dark:text-gray-300">
                   {((stats.valid_emails / stats.total_validations) * 100).toFixed(1)}% of total
                 </p>
               </div>
@@ -229,11 +229,11 @@ const ManageValidations: React.FC = () => {
                 <XCircle className="w-6 h-6 text-red-600 dark:text-red-400" />
               </div>
               <div className="ml-4">
-                <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Invalid Emails</p>
+                <p className="text-sm font-medium text-gray-500 dark:text-gray-300">Invalid Emails</p>
                 <p className="text-2xl font-semibold text-gray-900 dark:text-white">
                   {stats.invalid_emails.toLocaleString()}
                 </p>
-                <p className="text-xs text-gray-500 dark:text-gray-400">
+                <p className="text-xs text-gray-500 dark:text-gray-300">
                   {((stats.invalid_emails / stats.total_validations) * 100).toFixed(1)}% of total
                 </p>
               </div>
@@ -246,11 +246,11 @@ const ManageValidations: React.FC = () => {
                 <TrendingUp className="w-6 h-6 text-purple-600 dark:text-purple-400" />
               </div>
               <div className="ml-4">
-                <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Success Rate</p>
+                <p className="text-sm font-medium text-gray-500 dark:text-gray-300">Success Rate</p>
                 <p className="text-2xl font-semibold text-gray-900 dark:text-white">
                   {stats.success_rate.toFixed(1)}%
                 </p>
-                <p className="text-xs text-gray-500 dark:text-gray-400">
+                <p className="text-xs text-gray-500 dark:text-gray-300">
                   Avg score: {stats.average_score.toFixed(1)}
                 </p>
               </div>
@@ -363,7 +363,7 @@ const ManageValidations: React.FC = () => {
                           <div className="text-sm font-medium text-gray-900 dark:text-white">
                             {validation.email}
                           </div>
-                          <div className="text-xs text-gray-500 dark:text-gray-400">
+                          <div className="text-xs text-gray-500 dark:text-gray-300">
                             {validation.verdict}
                           </div>
                         </div>
@@ -398,19 +398,19 @@ const ManageValidations: React.FC = () => {
                           <div className="text-sm font-medium text-gray-900 dark:text-white">
                             {validation.user.name || 'No name'}
                           </div>
-                          <div className="text-sm text-gray-500 dark:text-gray-400">
+                          <div className="text-sm text-gray-500 dark:text-gray-300">
                             {validation.user.email}
                           </div>
                         </div>
                       </div>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-300">
                       <div className="flex items-center space-x-1">
                         <Clock className="w-3 h-3" />
                         <span>{validation.processing_time}ms</span>
                       </div>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-300">
                       <div className="flex items-center space-x-1">
                         <Calendar className="w-3 h-3" />
                         <span>{new Date(validation.created_at).toLocaleDateString()}</span>
@@ -456,25 +456,25 @@ const ManageValidations: React.FC = () => {
                 <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">Email Information</h4>
                 <div className="space-y-2">
                   <div>
-                    <span className="text-sm text-gray-500 dark:text-gray-400">Email:</span>
+                    <span className="text-sm text-gray-500 dark:text-gray-300">Email:</span>
                     <span className="ml-2 text-sm text-gray-900 dark:text-white">
                       {selectedValidation.email}
                     </span>
                   </div>
                   <div>
-                    <span className="text-sm text-gray-500 dark:text-gray-400">Status:</span>
+                    <span className="text-sm text-gray-500 dark:text-gray-300">Status:</span>
                     <span className={`ml-2 inline-flex items-center px-2 py-1 text-xs font-semibold rounded-full ${getStatusBadge(selectedValidation.status).color}`}>
                       {getStatusBadge(selectedValidation.status).text}
                     </span>
                   </div>
                   <div>
-                    <span className="text-sm text-gray-500 dark:text-gray-400">Score:</span>
+                    <span className="text-sm text-gray-500 dark:text-gray-300">Score:</span>
                     <span className={`ml-2 text-sm font-medium ${getScoreColor(selectedValidation.score)}`}>
                       {selectedValidation.score.toFixed(1)}/100
                     </span>
                   </div>
                   <div>
-                    <span className="text-sm text-gray-500 dark:text-gray-400">Verdict:</span>
+                    <span className="text-sm text-gray-500 dark:text-gray-300">Verdict:</span>
                     <span className="ml-2 text-sm text-gray-900 dark:text-white">
                       {selectedValidation.verdict}
                     </span>
@@ -486,25 +486,25 @@ const ManageValidations: React.FC = () => {
                 <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">Validation Breakdown</h4>
                 <div className="space-y-2">
                   <div className="flex justify-between">
-                    <span className="text-sm text-gray-500 dark:text-gray-400">Syntax:</span>
+                    <span className="text-sm text-gray-500 dark:text-gray-300">Syntax:</span>
                     <span className={`text-sm ${selectedValidation.breakdown.syntax.valid ? 'text-green-600' : 'text-red-600'}`}>
                       {selectedValidation.breakdown.syntax.valid ? 'Valid' : 'Invalid'}
                     </span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-sm text-gray-500 dark:text-gray-400">DNS:</span>
+                    <span className="text-sm text-gray-500 dark:text-gray-300">DNS:</span>
                     <span className={`text-sm ${selectedValidation.breakdown.dns.valid ? 'text-green-600' : 'text-red-600'}`}>
                       {selectedValidation.breakdown.dns.valid ? 'Valid' : 'Invalid'} ({selectedValidation.breakdown.dns.score}/100)
                     </span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-sm text-gray-500 dark:text-gray-400">SMTP:</span>
+                    <span className="text-sm text-gray-500 dark:text-gray-300">SMTP:</span>
                     <span className={`text-sm ${selectedValidation.breakdown.smtp.valid ? 'text-green-600' : 'text-red-600'}`}>
                       {selectedValidation.breakdown.smtp.valid ? 'Valid' : 'Invalid'}
                     </span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-sm text-gray-500 dark:text-gray-400">Reputation:</span>
+                    <span className="text-sm text-gray-500 dark:text-gray-300">Reputation:</span>
                     <span className="text-sm text-gray-900 dark:text-white">
                       {selectedValidation.breakdown.reputation.reputation_score}/100
                     </span>
@@ -518,7 +518,7 @@ const ManageValidations: React.FC = () => {
                 <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">Suggestions</h4>
                 <ul className="space-y-1">
                   {selectedValidation.suggestions.map((suggestion, index) => (
-                    <li key={index} className="text-sm text-gray-600 dark:text-gray-400 flex items-start">
+                    <li key={index} className="text-sm text-gray-600 dark:text-gray-300 flex items-start">
                       <span className="mr-2">•</span>
                       <span>{suggestion}</span>
                     </li>

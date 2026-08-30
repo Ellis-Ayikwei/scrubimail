@@ -91,10 +91,25 @@ def registration_error_response(serializer_errors):
 
 
 def normalize_register_payload(request_data):
-    """Align client payloads with RegisterSerializer (e.g. confirm_password → password2)."""
+    """Align client payloads with RegisterSerializer (e.g. confirm_password → password2).
+
+    The signup forms post a display name as a single field (the User model has
+    no `username` — USERNAME_FIELD is email), so split it into first/last rather
+    than dropping it on the floor.
+    """
     data = request_data.copy() if hasattr(request_data, "copy") else dict(request_data)
     if data.get("confirm_password") and not data.get("password2"):
         data["password2"] = data.get("confirm_password")
+
+    if not data.get("first_name") and not data.get("last_name"):
+        full_name = (
+            data.get("full_name") or data.get("name") or data.get("username") or ""
+        ).strip()
+        if full_name:
+            parts = full_name.split()
+            data["first_name"] = parts[0]
+            data["last_name"] = " ".join(parts[1:])
+    data.pop("username", None)  # not a field on this User model
     return data
 
 
@@ -109,9 +124,12 @@ class RegisterView(generics.CreateAPIView):
             return registration_error_response(serializer.errors)
         self.perform_create(serializer)
         headers = self.get_success_headers(serializer.data)
+        # NOTE: there is no email-verification step in this system (no send, no
+        # confirm endpoint), so this must not claim one — the old copy told users
+        # to check an inbox for a mail that never arrives.
         return Response(
             {
-                "message": "User created successfully. Please check your email for verification.",
+                "message": "Account created successfully. You can now sign in.",
             },
             status=status.HTTP_201_CREATED,
             headers=headers,

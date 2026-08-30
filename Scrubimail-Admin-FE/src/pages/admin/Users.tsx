@@ -92,7 +92,7 @@ const AdminUsers: React.FC = () => {
                     id: user.id || '',
                     name: displayName,
                     email: user.email || '',
-                    role: user.role || user.user_type || 'User',
+                    role: user.user_type || 'User',
                     status: user.account_status === 'active' ? 'active' as const : 
                             user.account_status === 'suspended' ? 'suspended' as const : 'inactive' as const,
                     joinDate: user.date_joined || user.created_at || new Date().toISOString(),
@@ -118,49 +118,9 @@ const AdminUsers: React.FC = () => {
             setStats({ total, active, new: newUsers, suspended });
         } catch (error) {
             console.error('Error fetching users:', error);
-            message.error('Failed to fetch users. Using mock data for demonstration.');
-            
-            // Fallback to mock data for demonstration
-            const mockUsers: User[] = [
-                {
-                    id: '1',
-                    name: 'John Doe',
-                    email: 'john.doe@example.com',
-                    role: 'Admin',
-                    status: 'active',
-                    joinDate: '2023-01-15',
-                    lastActive: '2 hours ago',
-                    plan: 'Premium',
-                },
-                {
-                    id: '2',
-                    name: 'Jane Smith',
-                    email: 'jane.smith@example.com',
-                    role: 'User',
-                    status: 'active',
-                    joinDate: '2023-02-20',
-                    lastActive: '5 minutes ago',
-                    plan: 'Basic',
-                },
-                {
-                    id: '3',
-                    name: 'Bob Johnson',
-                    email: 'bob.johnson@example.com',
-                    role: 'User',
-                    status: 'inactive',
-                    joinDate: '2023-03-10',
-                    lastActive: '3 days ago',
-                    plan: 'Pro',
-                }
-            ];
-            
-            setUsers(mockUsers);
-            setStats({ 
-                total: mockUsers.length, 
-                active: mockUsers.filter(u => u.status === 'active').length, 
-                new: 1, 
-                suspended: 0 
-            });
+            message.error('Failed to fetch users');
+            setUsers([]);
+            setStats({ total: 0, active: 0, new: 0, suspended: 0 });
         } finally {
             setLoading(false);
         }
@@ -228,7 +188,8 @@ const AdminUsers: React.FC = () => {
                 await axiosInstance.patch(`/admin/users/${editingUser.id}/`, values);
                 message.success('User updated successfully');
             } else {
-                await axiosInstance.post('/admin/users/', values);
+                // Backend create endpoint is POST /admin/users/create/ (not the list route).
+                await axiosInstance.post('/admin/users/create/', values);
                 message.success('User created successfully');
             }
             setIsModalVisible(false);

@@ -121,6 +121,11 @@ class UserSerializer(serializers.ModelSerializer):
             "user_permissions",
             "roles",
             "is_active",
+            # The admin SPA gates on these. DRF's IsAdminUser — which every
+            # admin endpoint uses — checks is_staff, so exposing user_type alone
+            # let the client's idea of "admin" drift from the server's.
+            "is_staff",
+            "is_superuser",
         )
         read_only_fields = (
             "last_active",
@@ -129,6 +134,8 @@ class UserSerializer(serializers.ModelSerializer):
             "user_permissions",
             "roles",
             "is_active",
+            "is_staff",
+            "is_superuser",
         )
 
     def get_name(self, obj):
@@ -235,6 +242,9 @@ class MinimalUserSerializer(serializers.ModelSerializer):
             "last_name",
             "user_type",
             "account_status",
+            # Needed by the admin SPA's route guard — see UserSerializer.
+            "is_staff",
+            "is_superuser",
         )
         read_only_fields = fields
 

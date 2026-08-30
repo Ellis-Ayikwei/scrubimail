@@ -202,7 +202,7 @@ const ValidationV2: React.FC = () => {
 
   return (
     <>
-      <div className="mx-auto max-w-3xl space-y-6">
+      <div className="w-full space-y-6">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <h2 className="text-xl font-semibold tracking-tight">Email validation</h2>

@@ -21,17 +21,12 @@ const ForgotPassword = () => {
     setError(null);
 
     try {
-      const response = await authAxiosInstance.post('/forgot-password/', {
-        email
-      });
-
-      if (response.data.success) {
-        setSuccess(true);
-      } else {
-        setError(response.data.message || 'Failed to send reset email');
-      }
+      // Backend: POST /auth/password-recovery/ body { email } -> { detail } on 2xx
+      await authAxiosInstance.post('/password-recovery/', { email });
+      setSuccess(true);
     } catch (err: any) {
-      setError(err.response?.data?.message || 'Failed to send reset email. Please try again.');
+      const serverData = err.response?.data;
+      setError(serverData?.detail || serverData?.message || 'Failed to send reset email. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -56,7 +51,7 @@ const ForgotPassword = () => {
             <h2 className="mt-6 text-3xl font-bold text-[#333333] dark:text-white">
               Check your email
             </h2>
-            <p className="mt-2 text-sm text-[#333333]/70 dark:text-gray-400">
+            <p className="mt-2 text-sm text-[#333333]/70 dark:text-gray-300">
               We've sent a password reset link to <strong>{email}</strong>
             </p>
           </div>
@@ -67,10 +62,10 @@ const ForgotPassword = () => {
               <p className="text-[#333333] dark:text-gray-300">
                 Click the link in the email to reset your password. The link will expire in 1 hour.
               </p>
-              <p className="text-sm text-[#333333]/70 dark:text-gray-400">
+              <p className="text-sm text-[#333333]/70 dark:text-gray-300">
                 Didn't receive the email? Check your spam folder or try again.
               </p>
-              <p className="text-xs text-[#333333]/50 dark:text-gray-400 mt-2">
+              <p className="text-xs text-[#333333]/70 dark:text-gray-300 mt-2">
                 The reset link will redirect you to: <code className="bg-gray-100 dark:bg-gray-600 px-1 rounded">/reset-password?token=...</code>
               </p>
               
@@ -109,7 +104,7 @@ const ForgotPassword = () => {
           <h2 className="mt-6 text-3xl font-bold text-[#333333] dark:text-white">
             Forgot your password?
           </h2>
-          <p className="mt-2 text-sm text-[#333333]/70 dark:text-gray-400">
+          <p className="mt-2 text-sm text-[#333333]/70 dark:text-gray-300">
             Enter your email address and we'll send you a link to reset your password
           </p>
         </div>
@@ -123,7 +118,7 @@ const ForgotPassword = () => {
               </label>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <Mail className="h-5 w-5 text-[#333333]/50" />
+                  <Mail className="h-5 w-5 text-[#333333]/70" />
                 </div>
                 <input
                   id="email"
@@ -170,7 +165,7 @@ const ForgotPassword = () => {
 
         {/* Help Text */}
         <div className="text-center">
-          <p className="text-xs text-[#333333]/50 dark:text-gray-400">
+          <p className="text-xs text-[#333333]/70 dark:text-gray-300">
             Need help? Contact our support team
           </p>
         </div>

@@ -10,6 +10,10 @@ class APIKeySerializer(serializers.ModelSerializer):
     is_valid = serializers.SerializerMethodField()
     days_until_expiry = serializers.SerializerMethodField()
     user = serializers.SerializerMethodField()
+    # Aliases the admin UI (UserApiKeysTab) reads: a non-secret prefix for
+    # display, and last_used_at for the "Last Used" column.
+    prefix = serializers.SerializerMethodField()
+    last_used_at = serializers.DateTimeField(source="last_used", read_only=True)
 
     class Meta:
         model = APIKey
@@ -17,6 +21,7 @@ class APIKeySerializer(serializers.ModelSerializer):
             "id",
             "key",
             "masked_key",
+            "prefix",
             "is_active",
             "is_expired",
             "is_valid",
@@ -24,6 +29,7 @@ class APIKeySerializer(serializers.ModelSerializer):
             "description",
             "user",
             "last_used",
+            "last_used_at",
             "usage_count",
             "expires_at",
             "days_until_expiry",
@@ -62,6 +68,10 @@ class APIKeySerializer(serializers.ModelSerializer):
 
     def get_masked_key(self, obj):
         return obj.get_masked_key()
+
+    def get_prefix(self, obj):
+        # First 8 chars — an identifier, not the secret (keys are ~43 chars).
+        return (obj.key or "")[:8]
 
     def get_is_expired(self, obj):
         return obj.is_expired()

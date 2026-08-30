@@ -60,6 +60,65 @@ export interface Payment {
     notes?: string;
 }
 
+// ==================== ADMIN PAYMENTS ====================
+// Shapes for the admin endpoints under /admin/payments/ (see integration contract).
+
+export interface AdminPaymentUser {
+    id: string; // UUID
+    email: string;
+    name?: string | null;
+}
+
+export interface AdminPayment {
+    id: string; // UUID
+    user: AdminPaymentUser;
+    amount: number;
+    currency: string;
+    status: 'pending' | 'completed' | 'failed' | 'refunded';
+    payment_method: string;
+    transaction_id?: string;
+    created_at: string;
+    updated_at: string;
+    description?: string;
+    plan?: string | null;
+    type?: string;
+}
+
+export interface PaginatedAdminPayments {
+    results: AdminPayment[];
+    count: number;
+    page: number;
+    page_size: number;
+    total_pages: number;
+}
+
+export interface AdminPaymentStats {
+    total_revenue: number;
+    monthly_revenue: number;
+    pending_payments: number;
+    failed_payments: number;
+    average_transaction: number;
+    top_plans: Array<{ plan_name: string; count: number; revenue: number }>;
+}
+
+export interface AdminPaymentSyncResult {
+    success: boolean;
+    changed: boolean;
+    gateway_status: string;
+    previous_status: string;
+    current_status: string;
+    payment: AdminPayment;
+}
+
+export interface AdminPaymentQuery {
+    search?: string;
+    status?: string;
+    date_from?: string;
+    date_to?: string;
+    page?: number | string;
+    page_size?: number | string;
+}
+
 class PaymentService {
     /**
      * Get Stripe configuration from backend
@@ -128,6 +187,55 @@ class PaymentService {
         } catch (error) {
             console.error('Error creating refund:', error);
             throw new Error('Failed to process refund');
+        }
+    }
+
+    // ==================== ADMIN PAYMENT METHODS ====================
+
+    /**
+     * List all payments for admin.
+     * GET /admin/payments/?search=&status=&date_from=&date_to=&page=&page_size=
+     * → envelope { results, count, page, page_size, total_pages }.
+     */
+    async getAdminPayments(query: AdminPaymentQuery = {}): Promise<PaginatedAdminPayments> {
+        try {
+            const params: Record<string, string> = {};
+            Object.entries(query).forEach(([k, v]) => {
+                if (v !== undefined && v !== null && v !== '') params[k] = String(v);
+            });
+            const response = await axiosInstance.get('/admin/payments/', { params });
+            return response.data;
+        } catch (error: any) {
+            console.error('Error fetching admin payments:', error);
+            throw new Error(error.response?.data?.detail || 'Failed to load payments');
+        }
+    }
+
+    /**
+     * Admin payment/revenue stats.
+     * GET /admin/payments/stats/
+     */
+    async getAdminPaymentStats(): Promise<AdminPaymentStats> {
+        try {
+            const response = await axiosInstance.get('/admin/payments/stats/');
+            return response.data;
+        } catch (error: any) {
+            console.error('Error fetching admin payment stats:', error);
+            throw new Error(error.response?.data?.detail || 'Failed to load payment stats');
+        }
+    }
+
+    /**
+     * Reconcile a payment's status live from Paystack.
+     * POST /admin/payments/<uuid>/sync/
+     */
+    async syncAdminPayment(paymentId: string): Promise<AdminPaymentSyncResult> {
+        try {
+            const response = await axiosInstance.post(`/admin/payments/${paymentId}/sync/`);
+            return response.data;
+        } catch (error: any) {
+            console.error('Error syncing payment:', error);
+            throw new Error(error.response?.data?.detail || 'Failed to sync payment with Paystack');
         }
     }
 

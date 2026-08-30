@@ -146,36 +146,43 @@ export interface UserResponse {
 
 // =================== API ENDPOINTS ===================
 
+// Paths are relative to the shared axiosInstance base (/scrubimail/api/v1/).
+// Admin group/permission/user endpoints all live under /admin/.
 const ENDPOINTS = {
-    // Groups - Updated to match Django routes
-    GROUPS: 'groups/',
-    GROUP_DETAIL: (id: number) => `groups/${id}/`,
-    GROUP_ADD_USERS: (id: number) => `groups/${id}/add_users/`,
-    GROUP_REMOVE_USERS: (id: number) => `groups/${id}/remove_users/`,
-    GROUP_UPDATE_PERMISSIONS: (id: number) => `groups/${id}/update_permissions/`,
-    GROUP_AVAILABLE_USERS: (id: number) => `groups/${id}/available_users/`,
+    // Groups — /admin/groups/
+    GROUPS: 'admin/groups/',
+    GROUP_DETAIL: (id: number) => `admin/groups/${id}/`,
+    GROUP_ADD_USERS: (id: number) => `admin/groups/${id}/add-users/`,
+    GROUP_REMOVE_USERS: (id: number) => `admin/groups/${id}/remove-users/`,
+    // PUT — replaces the group's permission set with { permission_ids }
+    GROUP_UPDATE_PERMISSIONS: (id: number) => `admin/groups/${id}/permissions/`,
+    // NOTE: no backend endpoint — kept for signature compatibility (will 404).
+    GROUP_AVAILABLE_USERS: (id: number) => `admin/groups/${id}/available_users/`,
 
-    // Permissions - Updated to match Django routes
-    PERMISSIONS: 'permissions/',
-    PERMISSIONS_BY_CONTENT_TYPE: 'permissions/by_content_type/',
+    // Permissions — /admin/permissions/
+    PERMISSIONS: 'admin/permissions/',
+    // NOTE: no backend endpoint — kept for signature compatibility (will 404).
+    PERMISSIONS_BY_CONTENT_TYPE: 'admin/permissions/by_content_type/',
 
-    // User Management - Updated to match Django routes
-    USERS: 'users/',
-    USER_DETAIL: (id: string) => `users/${id}/`,
-    CREATE_ADMIN: 'users/create_admin/',
-    USERS_WITH_GROUPS: 'user-groups/users_with_groups/',
-    BULK_ADD_TO_GROUPS: 'user-groups/bulk_add_to_groups/',
-    BULK_REMOVE_FROM_GROUPS: 'user-groups/bulk_remove_from_groups/',
-    ASSIGN_USER_TO_GROUPS: 'user-groups/assign_user_to_groups/',
+    // User Management
+    USERS: 'admin/users/',
+    USER_DETAIL: (id: string) => `admin/users/${id}/`,
+    CREATE_ADMIN: 'admin/users/create/',
+    // NOTE: the bulk user-group endpoints below are not implemented on the backend.
+    USERS_WITH_GROUPS: 'admin/users/',
+    BULK_ADD_TO_GROUPS: 'admin/user-groups/bulk_add_to_groups/',
+    BULK_REMOVE_FROM_GROUPS: 'admin/user-groups/bulk_remove_from_groups/',
+    ASSIGN_USER_TO_GROUPS: 'admin/user-groups/assign_user_to_groups/',
 
-    // User Permissions - Updated to match Django routes
-    USER_GROUPS_PERMISSIONS: (userId: string) => `users/${userId}/groups_and_permissions/`,
-    USER_UPDATE_GROUPS: (userId: string) => `users/${userId}/update_groups/`,
-    USER_ADD_TO_GROUPS: (userId: string) => `users/${userId}/add_to_groups/`,
-    USER_REMOVE_FROM_GROUPS: (userId: string) => `users/${userId}/remove_from_groups/`,
-    USER_UPDATE_PERMISSIONS: (userId: string) => `users/${userId}/update_permissions/`,
-    USER_ACTIVATE: (userId: string) => `users/${userId}/activate/`,
-    USER_DEACTIVATE: (userId: string) => `users/${userId}/deactivate/`,
+    // User Permissions — GET/PUT /admin/users/<uuid>/groups/ and /permissions/
+    USER_GROUPS_PERMISSIONS: (userId: string) => `admin/users/${userId}/permissions/`,
+    USER_UPDATE_GROUPS: (userId: string) => `admin/users/${userId}/groups/`,
+    USER_UPDATE_PERMISSIONS: (userId: string) => `admin/users/${userId}/permissions/`,
+    // NOTE: no backend endpoints — kept for signature compatibility (will 404).
+    USER_ADD_TO_GROUPS: (userId: string) => `admin/users/${userId}/add_to_groups/`,
+    USER_REMOVE_FROM_GROUPS: (userId: string) => `admin/users/${userId}/remove_from_groups/`,
+    USER_ACTIVATE: (userId: string) => `admin/users/${userId}/activate/`,
+    USER_DEACTIVATE: (userId: string) => `admin/users/${userId}/deactivate/`,
 };
 
 // =================== GROUP MANAGEMENT ===================
@@ -281,7 +288,7 @@ class GroupService {
      */
     async updateGroupPermissions(groupId: number, permissionIds: number[]): Promise<GroupOperationResponse> {
         try {
-            const response = await axiosInstance.post(ENDPOINTS.GROUP_UPDATE_PERMISSIONS(groupId), {
+            const response = await axiosInstance.put(ENDPOINTS.GROUP_UPDATE_PERMISSIONS(groupId), {
                 permission_ids: permissionIds,
             });
             return response.data;
@@ -413,7 +420,7 @@ class UserPermissionService {
      */
     async updateUserGroups(userId: string, groupIds: number[]): Promise<GroupOperationResponse> {
         try {
-            const response = await axiosInstance.post(ENDPOINTS.USER_UPDATE_GROUPS(userId), {
+            const response = await axiosInstance.put(ENDPOINTS.USER_UPDATE_GROUPS(userId), {
                 group_ids: groupIds,
             });
             return response.data;
@@ -458,7 +465,7 @@ class UserPermissionService {
      */
     async updateUserPermissions(userId: string, permissionIds: number[]): Promise<GroupOperationResponse> {
         try {
-            const response = await axiosInstance.post(ENDPOINTS.USER_UPDATE_PERMISSIONS(userId), {
+            const response = await axiosInstance.put(ENDPOINTS.USER_UPDATE_PERMISSIONS(userId), {
                 permission_ids: permissionIds,
             });
             return response.data;

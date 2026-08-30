@@ -1,3 +1,4 @@
+import * as React from "react"
 import { Button as ButtonPrimitive } from "@base-ui/react/button"
 import { cva, type VariantProps } from "class-variance-authority"
 
@@ -38,19 +39,23 @@ const buttonVariants = cva(
   }
 )
 
-function Button({
-  className,
-  variant = "default",
-  size = "default",
-  ...props
-}: ButtonPrimitive.Props & VariantProps<typeof buttonVariants>) {
+// forwardRef is REQUIRED on React 18: Base UI composition (`render={<Button/>}`,
+// e.g. DropdownMenuTrigger) hands the trigger's ref to this element, and a plain
+// function component can't receive it — so the menu had no anchor and never
+// opened. React 19 passes ref as a normal prop, but this app is on React 18.
+const Button = React.forwardRef<
+  HTMLButtonElement,
+  ButtonPrimitive.Props & VariantProps<typeof buttonVariants>
+>(({ className, variant = "default", size = "default", ...props }, ref) => {
   return (
     <ButtonPrimitive
+      ref={ref}
       data-slot="button"
       className={cn(buttonVariants({ variant, size, className }))}
       {...props}
     />
   )
-}
+})
+Button.displayName = "Button"
 
 export { Button, buttonVariants }

@@ -27,6 +27,10 @@ from django.contrib.auth.models import Group, Permission
 from django.shortcuts import get_object_or_404
 from apps.User.serializer import GroupSerializer, GroupDetailSerializer, PermissionSerializer
 
+import logging
+
+logger = logging.getLogger(__name__)
+
 User = get_user_model()
 
 
@@ -34,7 +38,7 @@ class AdminUserListView(generics.ListAPIView):
     """List all users for admin"""
 
     serializer_class = AdminUserSerializer
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.IsAdminUser]
 
     def get_queryset(self):
         return User.objects.all().order_by("-date_joined")
@@ -75,7 +79,7 @@ class AdminUserDetailView(generics.RetrieveUpdateDestroyAPIView):
     """Get, update, or delete a specific user"""
 
     serializer_class = AdminUserSerializer
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.IsAdminUser]
 
     def get_queryset(self):
         return User.objects.all()
@@ -109,11 +113,11 @@ class AdminUserCreateView(generics.CreateAPIView):
     """Create a new user"""
 
     serializer_class = UserSerializer
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.IsAdminUser]
 
 
 @api_view(["GET"])
-@permission_classes([permissions.IsAuthenticated])
+@permission_classes([permissions.IsAdminUser])
 def admin_user_stats(request):
     """Get user statistics for admin dashboard"""
     total_users = User.objects.count()
@@ -142,7 +146,7 @@ def admin_user_stats(request):
 
 
 @api_view(["GET"])
-@permission_classes([permissions.IsAuthenticated])
+@permission_classes([permissions.IsAdminUser])
 def admin_billing_stats(request):
     """Get billing statistics for admin dashboard"""
     # Calculate total revenue from credit transactions
@@ -165,7 +169,7 @@ def admin_billing_stats(request):
 
 
 @api_view(["GET"])
-@permission_classes([permissions.IsAuthenticated])
+@permission_classes([permissions.IsAdminUser])
 def admin_validations_stats(request):
     """Get validation statistics for admin dashboard"""
     total_validations = EmailValidation.objects.count()
@@ -188,7 +192,7 @@ class AdminBillingListView(generics.ListAPIView):
     """List all billing records for admin"""
 
     serializer_class = CreditTransactionSerializer
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.IsAdminUser]
 
     def get_queryset(self):
         return CreditTransaction.objects.all().order_by("-created_at")
@@ -198,7 +202,7 @@ class AdminPlansListView(generics.ListCreateAPIView):
     """List and create plans for admin"""
 
     serializer_class = PlanSerializer
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.IsAdminUser]
 
     def get_queryset(self):
         return Plan.objects.all().order_by("-created_at")
@@ -208,14 +212,14 @@ class AdminPlanDetailView(generics.RetrieveUpdateDestroyAPIView):
     """Get, update, or delete a specific plan"""
 
     serializer_class = PlanSerializer
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.IsAdminUser]
 
     def get_queryset(self):
         return Plan.objects.all()
 
 
 @api_view(["GET"])
-@permission_classes([permissions.IsAuthenticated])
+@permission_classes([permissions.IsAdminUser])
 def admin_plans_stats(request):
     """Get plans statistics for admin"""
     total_plans = Plan.objects.count()
@@ -228,17 +232,21 @@ class AdminValidationsListView(generics.ListAPIView):
     """List all validation records for admin"""
 
     serializer_class = EmailValidationSerializer
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.IsAdminUser]
 
     def get_queryset(self):
         return EmailValidation.objects.all().order_by("-created_at")
 
 
 class AdminAPIKeyListView(generics.ListCreateAPIView):
-    """List and create API keys for admin"""
+    """List a user's API keys (?user_id=) and provision new ones, as an admin.
 
-    serializer_class = APIKeySerializer
-    permission_classes = [permissions.IsAuthenticated]
+    Admin-only: with plain IsAuthenticated this exposed — and let anyone revoke —
+    EVERY user's keys. Filtered by user_id so the user-detail tab shows just that
+    user's keys; omit user_id for the global keys view.
+    """
+
+    permission_classes = [permissions.IsAdminUser]
 
     def get_serializer_class(self):
         if self.request.method == "POST":
@@ -246,54 +254,55 @@ class AdminAPIKeyListView(generics.ListCreateAPIView):
         return APIKeySerializer
 
     def get_queryset(self):
-        return APIKey.objects.all().select_related('user').order_by("-created_at")
+        qs = APIKey.objects.select_related("user").order_by("-created_at")
+        user_id = self.request.query_params.get("user_id")
+        if user_id:
+            qs = qs.filter(user_id=user_id)
+        return qs
 
-    def perform_create(self, serializer):
-        """Create API key for specified user"""
-        user_id = self.request.data.get('user_id')
-        if not user_id:
-            from rest_framework.exceptions import ValidationError
-            raise ValidationError({'user_id': 'This field is required.'})
-        
+    def create(self, request, *args, **kwargs):
+        """Provision a key for the given user and return the plaintext key ONCE.
+
+        generate_for_user rotates the user's active key (deactivating the old
+        one). The full secret is returned only here — the list endpoint shows a
+        prefix, never the whole key — so the admin can hand it over immediately.
+        """
+        from rest_framework.exceptions import ValidationError
+
+        in_ser = APIKeyCreateSerializer(data=request.data)
+        in_ser.is_valid(raise_exception=True)
+
         try:
-            user = User.objects.get(id=user_id)
+            user = User.objects.get(id=in_ser.validated_data["user_id"])
         except User.DoesNotExist:
-            from rest_framework.exceptions import ValidationError
-            raise ValidationError({'user_id': 'User not found.'})
-        
-        # Get client IP and user agent
-        ip_address = self.get_client_ip()
-        user_agent = self.request.META.get("HTTP_USER_AGENT", "")
+            raise ValidationError({"user_id": "User not found."})
 
-        # Generate new API key
         api_key = APIKey.generate_for_user(
             user=user,
-            name=serializer.validated_data.get("name"),
-            description=serializer.validated_data.get("description"),
-            expires_at=serializer.validated_data.get("expires_at"),
-            rate_limit_per_hour=serializer.validated_data.get("rate_limit_per_hour", 1000),
-            ip_address=ip_address,
-            user_agent=user_agent,
+            name=in_ser.validated_data.get("name"),
+            description=in_ser.validated_data.get("description"),
+            expires_at=in_ser.validated_data.get("expires_at"),
+            rate_limit_per_hour=in_ser.validated_data.get("rate_limit_per_hour", 1000),
+            ip_address=self.get_client_ip(),
+            user_agent=request.META.get("HTTP_USER_AGENT", ""),
         )
-
-        # Return the created API key
-        self.object = api_key
+        # APIKeySerializer includes the full `key`; this response is the only
+        # place it is ever returned.
+        return Response(APIKeySerializer(api_key).data, status=status.HTTP_201_CREATED)
 
     def get_client_ip(self):
         """Get client IP address from request"""
         x_forwarded_for = self.request.META.get("HTTP_X_FORWARDED_FOR")
         if x_forwarded_for:
-            ip = x_forwarded_for.split(",")[0]
-        else:
-            ip = self.request.META.get("REMOTE_ADDR")
-        return ip
+            return x_forwarded_for.split(",")[0]
+        return self.request.META.get("REMOTE_ADDR")
 
 
 class AdminAPIKeyDetailView(generics.RetrieveUpdateDestroyAPIView):
-    """Get, update, or delete a specific API key for admin"""
+    """Retrieve, update, or revoke (soft-delete) any user's API key, as an admin."""
 
     serializer_class = APIKeySerializer
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.IsAdminUser]
     lookup_field = "pk"
 
     def get_serializer_class(self):
@@ -302,13 +311,13 @@ class AdminAPIKeyDetailView(generics.RetrieveUpdateDestroyAPIView):
         return APIKeySerializer
 
     def get_queryset(self):
-        return APIKey.objects.all().select_related('user')
+        return APIKey.objects.select_related("user")
 
     def perform_update(self, serializer):
         serializer.save()
 
     def perform_destroy(self, instance):
-        # Soft delete by deactivating
+        # Soft delete by deactivating so historical usage rows keep their FK.
         instance.deactivate()
 
 
@@ -355,7 +364,7 @@ def admin_disable_2fa(request, user_id):
 
     try:
         totp = TOTPDevice.objects.get(user=user)
-        totp.disable()
+        totp.disable_2fa()
     except TOTPDevice.DoesNotExist:
         pass
 
@@ -1016,3 +1025,87 @@ def admin_invoice_update_status(request, invoice_id):
     invoice.save()
 
     return Response(InvoiceSerializer(invoice).data)
+
+
+def _serialize_purchase_payment(p):
+    """The same normalized payment row admin_payments_list emits, for one
+    CreditPackagePurchase (so the admin UI can drop in the synced record)."""
+    return {
+        "id": str(p.id),
+        "user": {
+            "id": str(p.user.id),
+            "email": p.user.email,
+            "name": f"{p.user.first_name} {p.user.last_name}".strip() or None,
+        },
+        "amount": float(p.amount_paid),
+        "currency": p.currency,
+        "status": p.status,
+        "payment_method": (p.metadata or {}).get("payment_method", "paystack"),
+        "transaction_id": p.paystack_reference or "",
+        "paystack_transaction_id": p.paystack_transaction_id,
+        "created_at": p.created_at.isoformat(),
+        "updated_at": p.updated_at.isoformat(),
+        "description": (
+            f"Credit package: {p.package.name}" if p.package else "Credit package purchase"
+        ),
+        "plan": None,
+        "type": "credit_package",
+    }
+
+
+@api_view(["POST"])
+@permission_classes([permissions.IsAdminUser])
+def admin_sync_payment(request, payment_id):
+    """Re-fetch a payment's status from Paystack and reconcile the local record.
+
+    Manual reconciliation for when a Paystack webhook was missed or delayed: the
+    admin clicks "Sync" on a payment and we call Paystack's verify endpoint live,
+    then complete/fail the purchase to match. Idempotent — re-syncing a completed
+    payment grants no further credits.
+
+    Only credit-package purchases carry a local record that can be reconciled;
+    `payment_id` is a CreditPackagePurchase id.
+    """
+    from apps.billing.services import BillingService
+
+    try:
+        purchase = CreditPackagePurchase.objects.select_related(
+            "user", "package", "billing_profile"
+        ).get(pk=payment_id)
+    except CreditPackagePurchase.DoesNotExist:
+        return Response(
+            {"detail": "Payment not found"}, status=status.HTTP_404_NOT_FOUND
+        )
+
+    if not purchase.paystack_reference:
+        return Response(
+            {"detail": "Payment has no Paystack reference to sync."},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    try:
+        sync = BillingService().sync_purchase_status(purchase)
+    except Exception as exc:
+        # A Paystack API/transport error is not a server bug — report it as a
+        # bad gateway with the reason so the admin knows the sync didn't run.
+        logger.exception(
+            "Admin payment sync failed for purchase %s (ref=%s)",
+            payment_id,
+            purchase.paystack_reference,
+        )
+        return Response(
+            {"detail": f"Could not verify with Paystack: {exc}"},
+            status=status.HTTP_502_BAD_GATEWAY,
+        )
+
+    purchase.refresh_from_db()
+    return Response(
+        {
+            "success": True,
+            "changed": sync["changed"],
+            "gateway_status": sync["gateway_status"],
+            "previous_status": sync["previous_status"],
+            "current_status": sync["current_status"],
+            "payment": _serialize_purchase_payment(purchase),
+        }
+    )

@@ -1,0 +1,4 @@
+# Never commit the credentials file or load-test output artifacts.
+.env.loadtest
+*.jsonl
+*.summary.json

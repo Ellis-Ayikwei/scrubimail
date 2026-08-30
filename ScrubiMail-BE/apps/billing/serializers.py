@@ -347,6 +347,8 @@ class CreditPackagePurchaseSerializer(serializers.ModelSerializer):
     """
 
     package_details = CreditPackageSerializer(source="package", read_only=True)
+    # `user` stays the raw FK id; admin tables render the name/email from here.
+    user_details = serializers.SerializerMethodField()
     # payment_reference is the model's paystack_reference under its API name.
     payment_reference = serializers.CharField(
         source="paystack_reference", read_only=True
@@ -365,6 +367,7 @@ class CreditPackagePurchaseSerializer(serializers.ModelSerializer):
         fields = [
             "id",
             "user",
+            "user_details",
             "billing_profile",
             "package",
             "package_details",
@@ -390,6 +393,20 @@ class CreditPackagePurchaseSerializer(serializers.ModelSerializer):
             "created_at",
             "updated_at",
         ]
+
+    def get_user_details(self, obj):
+        user = obj.user
+        if not user:
+            return None
+        full_name = f"{user.first_name or ''} {user.last_name or ''}".strip()
+        return {
+            "id": str(user.id),
+            "email": user.email,
+            "first_name": user.first_name,
+            "last_name": user.last_name,
+            # Users sign up with email only, so fall back to it as the label.
+            "full_name": full_name or user.email,
+        }
 
     def get_payment_method(self, obj):
         return (obj.metadata or {}).get("payment_method", "paystack")

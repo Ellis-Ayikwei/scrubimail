@@ -916,7 +916,7 @@ class CreditPackagePurchaseHistoryView(APIView):
         """Get purchase history"""
         purchases = (
             CreditPackagePurchase.objects.filter(user=request.user)
-            .select_related("package")
+            .select_related("package", "user")
             .order_by("-created_at")
         )
 

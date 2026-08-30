@@ -18,8 +18,6 @@ import {
   Box,
   Gem
 } from 'lucide-react';
-import TopBar from '../components/TopBar';
-import Footer from '../components/Footer';
 import useIsAuthenticated from 'react-auth-kit/hooks/useIsAuthenticated';
 
 const Integrations: React.FC = () => {
@@ -219,55 +217,54 @@ var result = await response.Content.ReadAsStringAsync();`,
   };
 
   return (
-    <div className="app-bg min-h-screen" style={{ fontFamily: 'Inter, sans-serif' }}>
-      <TopBar />
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-12 space-y-8">
+    <div className="min-h-screen">
+      <div className="w-full space-y-8">
         {/* Header */}
         <div>
-          <p className="font-['Space_Grotesk',sans-serif] uppercase tracking-[0.2em] text-[9px] text-[#6effc0] mb-1">SDK Reference</p>
-          <h1 className="font-['Epilogue',sans-serif] font-black text-[#e0e3e8] text-3xl tracking-tight mb-2">Integrations</h1>
-          <p className="font-['Space_Grotesk',sans-serif] uppercase tracking-[0.1em] text-[10px] text-[#bacbbf]">Native SDK examples for every major language and platform</p>
+          <p className="font-label uppercase tracking-[0.2em] text-[9px] text-primary mb-1">SDK Reference</p>
+          <h1 className="font-headline font-black text-foreground text-3xl tracking-tight mb-2">Integrations</h1>
+          <p className="font-label uppercase tracking-[0.1em] text-[10px] text-muted-foreground">Native SDK examples for every major language and platform</p>
         </div>
 
         {/* Language cards */}
         <div className="space-y-4">
           {languages.map((lang) => (
-            <div key={lang.name} className="bg-[#1c2024] border border-[#3b4a41]/40 rounded-sm overflow-hidden">
+            <div key={lang.name} className="bg-card border border-border/40 rounded-sm overflow-hidden">
               {/* Card header */}
-              <div className="flex items-center justify-between px-5 py-4 border-b border-[#3b4a41]/30">
+              <div className="flex items-center justify-between px-5 py-4 border-b border-border/30">
                 <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 bg-[#101418] border border-[#3b4a41]/40 rounded-sm flex items-center justify-center overflow-hidden">
+                  <div className="w-8 h-8 bg-muted/40 border border-border/40 rounded-sm flex items-center justify-center overflow-hidden">
                     <img src={lang.icon} alt={lang.name} className="w-5 h-5 object-contain" onError={(e) => { (e.target as HTMLImageElement).style.display='none'; }} />
                   </div>
                   <div>
-                    <p className="font-['Epilogue',sans-serif] font-bold text-[#e0e3e8] text-sm tracking-tight">{lang.name}</p>
-                    <p className="font-mono text-[10px] text-[#bacbbf]/60">{lang.description}</p>
+                    <p className="font-headline font-bold text-foreground text-sm tracking-tight">{lang.name}</p>
+                    <p className="font-mono text-[10px] text-muted-foreground/60">{lang.description}</p>
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
                   <a href={lang.docs} target="_blank" rel="noopener noreferrer"
-                    className="flex items-center gap-1.5 border border-[#3b4a41]/40 text-[#bacbbf] font-mono uppercase tracking-[0.1em] text-[9px] px-3 py-1.5 rounded-sm hover:border-[#6effc0]/40 hover:text-[#6effc0] transition-colors">
+                    className="flex items-center gap-1.5 border border-border/40 text-muted-foreground font-mono uppercase tracking-[0.1em] text-[9px] px-3 py-1.5 rounded-sm hover:border-primary/40 hover:text-primary transition-colors">
                     <ExternalLink className="w-3 h-3" /> Docs
                   </a>
                 </div>
               </div>
               {/* Code block */}
               <div className="relative">
-                <div className="flex items-center justify-between px-4 py-2 border-b border-[#3b4a41]/20" style={{ backgroundColor: '#0a0f13' }}>
+                <div className="flex items-center justify-between px-4 py-2 border-b border-border/20" style={{ backgroundColor: 'var(--color-zinc-950, #0a0f13)' }}>
                   <div className="flex gap-1.5">
-                    <div className="w-1.5 h-1.5 rounded-full bg-[#3b4a41]/40" />
-                    <div className="w-1.5 h-1.5 rounded-full bg-[#3b4a41]/40" />
-                    <div className="w-1.5 h-1.5 rounded-full bg-[#3b4a41]/40" />
+                    <div className="w-1.5 h-1.5 rounded-full bg-muted/40" />
+                    <div className="w-1.5 h-1.5 rounded-full bg-muted/40" />
+                    <div className="w-1.5 h-1.5 rounded-full bg-muted/40" />
                   </div>
-                  <span className="font-mono text-[9px] text-[#3b4a41] uppercase tracking-[0.2em]">{lang.name.toLowerCase()}.snippet</span>
+                  <span className="font-mono text-[9px] text-muted-foreground/70 uppercase tracking-[0.2em]">{lang.name.toLowerCase()}.snippet</span>
                   <button
                     onClick={() => { navigator.clipboard.writeText(lang.code); setCopiedCode(lang.name); setTimeout(() => setCopiedCode(null), 2000); }}
-                    className="flex items-center gap-1 text-[#3b4a41] hover:text-[#6effc0] transition-colors font-mono text-[9px] uppercase tracking-[0.1em]"
+                    className="flex items-center gap-1 text-muted-foreground/70 hover:text-primary transition-colors font-mono text-[9px] uppercase tracking-[0.1em]"
                   >
-                    {copiedCode === lang.name ? <><Check className="w-3 h-3 text-[#6effc0]" /> Copied</> : <><Copy className="w-3 h-3" /> Copy</>}
+                    {copiedCode === lang.name ? <><Check className="w-3 h-3 text-primary" /> Copied</> : <><Copy className="w-3 h-3" /> Copy</>}
                   </button>
                 </div>
-                <pre className="p-4 font-mono text-xs text-[#6effc0]/80 overflow-x-auto max-h-52 leading-relaxed" style={{ backgroundColor: '#0a0f13' }}>
+                <pre className="p-4 font-mono text-xs text-primary/80 overflow-x-auto max-h-52 leading-relaxed" style={{ backgroundColor: 'var(--color-zinc-950, #0a0f13)' }}>
                   <code>{lang.code}</code>
                 </pre>
               </div>
@@ -277,22 +274,21 @@ var result = await response.Content.ReadAsStringAsync();`,
 
         {/* CTA */}
         {!isAuthenticated && (
-          <div className="border border-[#6effc0]/20 rounded-sm p-8 text-center" style={{ background: 'radial-gradient(circle at 50% 50%, rgba(110,255,192,0.04) 0%, transparent 60%)' }}>
-            <p className="font-['Space_Grotesk',sans-serif] uppercase tracking-[0.2em] text-[9px] text-[#6effc0] mb-3">Get Started</p>
-            <h2 className="font-['Epilogue',sans-serif] font-black text-[#e0e3e8] text-2xl tracking-tight mb-3">Ready to integrate?</h2>
-            <p className="font-mono text-xs text-[#bacbbf]/60 mb-6">Create a free account and get your API key to start validating emails in minutes.</p>
+          <div className="border border-primary/20 rounded-sm p-8 text-center" style={{ background: 'radial-gradient(circle at 50% 50%, rgba(110,255,192,0.04) 0%, transparent 60%)' }}>
+            <p className="font-label uppercase tracking-[0.2em] text-[9px] text-primary mb-3">Get Started</p>
+            <h2 className="font-headline font-black text-foreground text-2xl tracking-tight mb-3">Ready to integrate?</h2>
+            <p className="font-mono text-xs text-muted-foreground/60 mb-6">Create a free account and get your API key to start validating emails in minutes.</p>
             <div className="flex items-center justify-center gap-3">
-              <Link to="/register" className="bg-[#6effc0] text-[#003824] font-mono uppercase tracking-[0.1em] text-[10px] font-bold px-6 py-3 rounded-sm hover:brightness-105 transition-all">
+              <Link to="/register" className="bg-primary text-primary-foreground font-mono uppercase tracking-[0.1em] text-[10px] font-bold px-6 py-3 rounded-sm hover:brightness-105 transition-all">
                 Get API Key
               </Link>
-              <Link to="/api-docs" className="border border-[#3b4a41]/40 text-[#bacbbf] font-mono uppercase tracking-[0.1em] text-[10px] px-6 py-3 rounded-sm hover:border-[#6effc0]/40 hover:text-[#6effc0] transition-all">
+              <Link to="/api-docs" className="border border-border/40 text-muted-foreground font-mono uppercase tracking-[0.1em] text-[10px] px-6 py-3 rounded-sm hover:border-primary/40 hover:text-primary transition-all">
                 View Docs
               </Link>
             </div>
           </div>
         )}
       </div>
-      <Footer />
     </div>
   );
 };

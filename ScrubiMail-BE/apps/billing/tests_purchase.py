@@ -18,7 +18,9 @@ from rest_framework.test import APIRequestFactory, force_authenticate
 
 from apps.billing.models import BillingProfile, CreditPackage, CreditPackagePurchase
 from apps.billing.serializers import CreditPackagePurchaseSerializer
+from apps.billing.services import BillingService
 from apps.billing.views import PurchaseCreditPackageView
+from apps.admin.views import admin_sync_payment
 
 
 class CreditPackagePurchaseFlowTests(TestCase):
@@ -43,9 +45,10 @@ class CreditPackagePurchaseFlowTests(TestCase):
     def test_purchase_creates_row_and_initializes_payment(self):
         # The reported crash: create() used to be handed fields the model lacks.
         fake_paystack = mock.Mock()
-        fake_paystack.initialize_payment.return_value = {
+        # Real Paystack echoes back the reference we send; mirror that.
+        fake_paystack.initialize_payment.side_effect = lambda **kw: {
             "authorization_url": "https://paystack/checkout/abc",
-            "reference": "pkg_generated_ref_123",
+            "reference": kw["reference"],
             "access_code": "ac_1",
         }
         with mock.patch("apps.billing.views.PaystackService", return_value=fake_paystack):
@@ -62,6 +65,7 @@ class CreditPackagePurchaseFlowTests(TestCase):
         # ...and it is the SAME reference handed to the gateway.
         passed_ref = fake_paystack.initialize_payment.call_args.kwargs["reference"]
         self.assertEqual(purchase.paystack_reference, passed_ref)
+        self.assertEqual(response.data["reference"], passed_ref)
         # payment_method has no column; it is preserved in metadata.
         self.assertEqual(purchase.metadata.get("payment_method"), "paystack")
 
@@ -129,3 +133,100 @@ class CreditPackagePurchaseFlowTests(TestCase):
         self.assertEqual(data["payment_reference"], "pkg_serialize_1")
         self.assertEqual(data["payment_method"], "card")
         self.assertIsNone(data["completed_at"])  # not completed yet
+
+
+class SyncPaymentStatusTests(TestCase):
+    """Admin re-fetches a payment status from Paystack and reconciles locally."""
+
+    def setUp(self):
+        self.factory = APIRequestFactory()
+        self.admin = get_user_model().objects.create_user(
+            email="admin@example.com", password="x", is_staff=True
+        )
+        self.buyer = get_user_model().objects.create_user(
+            email="buyer2@example.com", password="x"
+        )
+        self.profile = BillingProfile.objects.create(
+            user=self.buyer, credits_remaining=0
+        )
+        self.package = CreditPackage.objects.create(
+            name="Pro", credits=500, price=Decimal("20.00"), currency="USD",
+            is_active=True,
+        )
+        self.purchase = CreditPackagePurchase.objects.create(
+            user=self.buyer,
+            billing_profile=self.profile,
+            package=self.package,
+            credits_purchased=500,
+            amount_paid=Decimal("20.00"),
+            currency="USD",
+            paystack_reference="pkg_sync_1",
+            status="pending",
+        )
+
+    def _sync(self):
+        request = self.factory.post(f"/payments/{self.purchase.id}/sync/")
+        force_authenticate(request, user=self.admin)
+        return admin_sync_payment(request, payment_id=self.purchase.id)
+
+    def _verify_returns(self, status_str, txn_id=42):
+        return mock.patch(
+            "apps.billing.services.PaystackService.verify_transaction",
+            return_value={"status": status_str, "id": txn_id, "amount": 2000},
+        )
+
+    def test_sync_success_completes_and_grants_credits(self):
+        with self._verify_returns("success"):
+            response = self._sync()
+
+        self.assertEqual(response.status_code, 200, response.data)
+        self.assertTrue(response.data["changed"])
+        self.assertEqual(response.data["current_status"], "completed")
+        self.profile.refresh_from_db()
+        self.assertEqual(self.profile.credits_remaining, 500)
+        self.purchase.refresh_from_db()
+        self.assertEqual(self.purchase.paystack_transaction_id, "42")
+
+    def test_re_sync_is_idempotent_and_grants_no_extra_credits(self):
+        with self._verify_returns("success"):
+            self._sync()
+            second = self._sync()
+
+        self.assertFalse(second.data["changed"])  # already completed
+        self.profile.refresh_from_db()
+        self.assertEqual(self.profile.credits_remaining, 500)  # not 1000
+
+    def test_sync_failed_marks_purchase_failed(self):
+        with self._verify_returns("failed"):
+            response = self._sync()
+
+        self.assertEqual(response.data["current_status"], "failed")
+        self.purchase.refresh_from_db()
+        self.assertEqual(self.purchase.status, "failed")
+        self.assertIn("failed_at", self.purchase.metadata)
+        self.profile.refresh_from_db()
+        self.assertEqual(self.profile.credits_remaining, 0)
+
+    def test_sync_pending_leaves_untouched(self):
+        with self._verify_returns("ongoing"):
+            response = self._sync()
+
+        self.assertFalse(response.data["changed"])
+        self.assertEqual(response.data["current_status"], "pending")
+
+    def test_paystack_error_returns_502(self):
+        with mock.patch(
+            "apps.billing.services.PaystackService.verify_transaction",
+            side_effect=Exception("Failed to verify transaction: 503"),
+        ):
+            response = self._sync()
+
+        self.assertEqual(response.status_code, 502)
+        self.purchase.refresh_from_db()
+        self.assertEqual(self.purchase.status, "pending")  # unchanged
+
+    def test_non_admin_is_forbidden(self):
+        request = self.factory.post(f"/payments/{self.purchase.id}/sync/")
+        force_authenticate(request, user=self.buyer)  # not staff
+        response = admin_sync_payment(request, payment_id=self.purchase.id)
+        self.assertEqual(response.status_code, 403)

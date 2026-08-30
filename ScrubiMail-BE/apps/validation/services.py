@@ -231,18 +231,16 @@ def record_validation(
     validation_type: str = "single",
     credits_consumed: int = 1,
 ) -> Tuple[str, Dict[str, Any]]:
-    """Record a completed validation OFF the request path.
+    """Record a completed validation and return (validation_id, breakdown).
 
-    Returns (validation_id, breakdown) immediately — the id is generated here, so
-    the response can carry it before the row exists. The rows are written by a
-    worker a few hundred ms later; nothing user-facing depends on them existing
-    yet, because the client already has the verdict in the response body.
-
-    If the enqueue fails (broker down), the write happens inline rather than
-    being lost: a credit was already spent, so the record must survive.
+    Writes the row SYNCHRONOUSLY, so it exists before the response returns and
+    the user's history/analytics reflect the validation the moment they see the
+    verdict. An earlier version enqueued this to Celery to shave a few hundred ms
+    off the response, but when the worker consuming that queue was down the rows
+    were silently lost — users were charged yet saw an empty history. A couple of
+    indexed writes is cheap; correctness wins. (Move DATABASE_URL to the internal
+    Railway hostname to make these writes single-digit-ms again.)
     """
-    from .tasks import persist_validation_record_task
-
     validation_id = str(uuid.uuid4())
     record = {
         "score": result.score,
@@ -265,13 +263,15 @@ def record_validation(
     }
 
     try:
-        persist_validation_record_task.apply_async(kwargs=kwargs)
-    except Exception:
-        logger.exception(
-            "Could not enqueue the validation record for %s — writing inline so "
-            "the charged credit still has a record",
-            email,
-        )
         persist_validation_record(**kwargs)
+    except Exception:
+        # The verdict is already computed and the credit consumed; don't fail the
+        # request over a persistence hiccup, but log loudly — this row will be
+        # missing from history.
+        logger.exception(
+            "Failed to persist validation record for %s (id=%s)",
+            email,
+            validation_id,
+        )
 
     return validation_id, record["breakdown"]

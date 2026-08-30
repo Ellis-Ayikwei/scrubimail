@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Table,
   Card,
@@ -56,6 +57,7 @@ function formatUsd(value: unknown): string {
 }
 
 const CreditPackagesManagement: React.FC = () => {
+  const navigate = useNavigate();
   const [packages, setPackages] = useState<CreditPackage[]>([]);
   const [purchases, setPurchases] = useState<CreditPackagePurchase[]>([]);
   const [loading, setLoading] = useState(false);
@@ -106,13 +108,15 @@ const CreditPackagesManagement: React.FC = () => {
 
   const calculateStats = (pkgList: CreditPackage[]) => {
     const active = pkgList.filter(p => p.is_active).length;
+    // `package` is the FK id (UUID string); fall back to nested details if present.
     const purchaseCounts = purchases.reduce((acc, p) => {
-      acc[p.package.id] = (acc[p.package.id] || 0) + 1;
+      const pkgId = p.package || p.package_details?.id || '';
+      if (pkgId) acc[pkgId] = (acc[pkgId] || 0) + 1;
       return acc;
-    }, {} as Record<number, number>);
-    
-    const mostPopularId = Object.keys(purchaseCounts).reduce((a, b) => 
-      purchaseCounts[Number(a)] > purchaseCounts[Number(b)] ? a : b, '0'
+    }, {} as Record<string, number>);
+
+    const mostPopularId = Object.keys(purchaseCounts).reduce((a, b) =>
+      purchaseCounts[a] > purchaseCounts[b] ? a : b, ''
     );
     const mostPopular = pkgList.find(p => p.id === mostPopularId) || null;
 
@@ -278,12 +282,30 @@ const CreditPackagesManagement: React.FC = () => {
     {
       title: 'Package',
       key: 'package',
-      render: (_, record) => record.package.name,
+      render: (_, record) => record.package_details?.name || '—',
     },
     {
       title: 'User',
-      dataIndex: 'user',
       key: 'user',
+      render: (_, record) => {
+        const userId = record.user_details?.id || record.user;
+        const label =
+          record.user_details?.full_name ||
+          record.user_details?.email ||
+          (userId ? `${userId.slice(0, 8)}…` : '—');
+
+        if (!userId) return <Text type="secondary">—</Text>;
+
+        return (
+          <Button
+            type="link"
+            className="px-0"
+            onClick={() => navigate(`/admin/users/${userId}`)}
+          >
+            {label}
+          </Button>
+        );
+      },
     },
     {
       title: 'Credits',

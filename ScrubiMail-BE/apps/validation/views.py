@@ -65,9 +65,11 @@ class SingleEmailValidationView(APIView):
         deep_q = request.query_params.get("deep", "").lower()
         fast = mode == "fast" or deep_q in ("false", "0", "no")
 
-        # Check if user has enough credits
+        # Check if user has enough credits. Reuses the profile the throttles
+        # already loaded for this request (see get_billing_profile_for_request)
+        # instead of issuing another identical SELECT.
         billing_service = BillingService()
-        profile = billing_service.get_or_create_billing_profile(user)
+        profile = billing_service.get_or_create_billing_profile(user, request=request)
 
         if not profile.can_use_credits(1):
             raise InsufficientCredits(
@@ -88,6 +90,12 @@ class SingleEmailValidationView(APIView):
             raise InsufficientCredits(
                 "Insufficient credits. Please purchase more credits."
             )
+        # consume_ms = the credit decrement (DB write). enqueue_ms = handing the
+        # record write to the broker. They are timed separately because they fail
+        # slow for DIFFERENT reasons — consume under row-lock contention (same
+        # account), enqueue when the broker is remote/flaky — and persist_ms alone
+        # can't tell them apart.
+        consume_ms = round((time.monotonic() - persist_started) * 1000)
 
         # Records go OFF the request path (~1ms to enqueue instead of ~4 blocking
         # writes). The client already has the verdict in this response, so
@@ -96,6 +104,7 @@ class SingleEmailValidationView(APIView):
         # id is generated up front so the response can carry it immediately.
         # If the broker is down the write falls back to inline — a spent credit
         # must never end up without a record.
+        record_started = time.monotonic()
         validation_id, breakdown = record_validation(
             email=email,
             result=result,
@@ -104,7 +113,8 @@ class SingleEmailValidationView(APIView):
             job_type="api",
             validation_type="single",
         )
-        persist_ms = round((time.monotonic() - persist_started) * 1000)
+        enqueue_ms = round((time.monotonic() - record_started) * 1000)
+        persist_ms = consume_ms + enqueue_ms
 
         details = request.query_params.get("details", "false").lower() == "true"
         response_data = {
@@ -134,7 +144,15 @@ class SingleEmailValidationView(APIView):
             # request_time (or between request_time and what the client
             # measures) points at billing pre-checks, auth/throttling, or the
             # network — not the validation pipeline.
-            "timing": {"verify_ms": verify_ms, "persist_ms": persist_ms},
+            # persist_ms = consume_ms + enqueue_ms, split out so a slow persist
+            # can be attributed to the credit-decrement DB write vs the broker
+            # publish without guessing.
+            "timing": {
+                "verify_ms": verify_ms,
+                "persist_ms": persist_ms,
+                "consume_ms": consume_ms,
+                "enqueue_ms": enqueue_ms,
+            },
         }
         if details:
             response_data["breakdown"] = breakdown
@@ -176,6 +194,7 @@ class BulkEmailValidationView(APIView):
         profile = billing_service.get_or_create_billing_profile(user)
 
         required_credits = len(emails)
+        # (profile reused from the throttles' request-scoped fetch)
         if not profile.can_use_credits(required_credits):
             raise InsufficientCredits(
                 f"Insufficient credits. You need {required_credits} credits but "
@@ -281,6 +300,19 @@ class ValidationStatusView(APIView):
             response_data["metadata"] = validation.metadata
         return Response(response_data)
 
+    def delete(self, request, validation_id):
+        """Delete a single validation from the user's history.
+
+        Scoped to request.user, so a user can only delete their own. The billing
+        usage/credit records (EmailValidationUsage) are intentionally left
+        untouched — clearing history must not erase the financial audit trail.
+        """
+        validation = get_object_or_404(
+            EmailValidation, id=validation_id, user=request.user
+        )
+        validation.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
 
 class ValidationHistoryView(generics.ListAPIView):
     serializer_class = EmailValidationSerializer
@@ -313,6 +345,18 @@ class ValidationHistoryView(generics.ListAPIView):
             queryset = queryset.filter(score__lte=max_score)
 
         return queryset.order_by("-created_at")
+
+    def delete(self, request, *args, **kwargs):
+        """Clear the user's validation history.
+
+        Deletes the SAME set the list endpoint would return, so it honours any
+        active filters (status / date / score) — "clear all" with no filters
+        deletes everything for the user. Billing usage records are left intact
+        (they are a separate model, not FK-linked), so the financial audit trail
+        survives a history clear.
+        """
+        deleted, _ = self.get_queryset().delete()
+        return Response({"deleted": deleted}, status=status.HTTP_200_OK)
 
     def get(self, request, *args, **kwargs):
         """Enhanced history view with summary statistics"""

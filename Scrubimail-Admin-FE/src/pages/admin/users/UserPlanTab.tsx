@@ -29,7 +29,7 @@ const UserPlanTab: React.FC<Props> = ({ userId, user, onRefresh }) => {
 
   useEffect(() => {
     axiosInstance
-      .get('/plans/')
+      .get('/admin/plans/')
       .then((res) => setPlans(Array.isArray(res.data) ? res.data : res.data?.results ?? []))
       .catch(() => setPlans([]))
       .finally(() => setLoading(false));

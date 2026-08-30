@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Link, useSearchParams, useNavigate } from 'react-router-dom';
+import { Link, useSearchParams, useNavigate, useParams } from 'react-router-dom';
 import { 
   Lock, 
   Eye, 
@@ -22,28 +22,21 @@ const ResetPassword = () => {
   const [success, setSuccess] = useState(false);
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
-  
-  const token = searchParams.get('token');
+  const params = useParams();
+
+  // Backend emails a link shaped `/reset-password/<uidb64>/<token>`; also accept
+  // a query-string fallback (`?uidb64=&token=`).
+  const uidb64 = params.uidb64 ?? searchParams.get('uidb64') ?? '';
+  const token = params.token ?? searchParams.get('token') ?? '';
 
   useEffect(() => {
-    const validateToken = async () => {
-      if (!token) {
-        setError('Reset token is missing');
-        setValidating(false);
-        return;
-      }
-
-      try {
-        await authAxiosInstance.post('/validate-reset-token/', { token });
-        setValidating(false);
-      } catch (err: any) {
-        setError('Invalid or expired reset token');
-        setValidating(false);
-      }
-    };
-
-    validateToken();
-  }, [token]);
+    // No server-side token pre-validation endpoint exists; the token is verified
+    // on submit by the password-reset-confirm endpoint. Just check presence here.
+    if (!uidb64 || !token) {
+      setError('Reset link is invalid or incomplete');
+    }
+    setValidating(false);
+  }, [uidb64, token]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -58,25 +51,30 @@ const ResetPassword = () => {
       return;
     }
 
+    if (!uidb64 || !token) {
+      setError('Reset link is invalid or incomplete');
+      return;
+    }
+
     setLoading(true);
     setError(null);
 
     try {
-      const response = await authAxiosInstance.post('/reset-password/', {
+      // Backend: POST /auth/password-reset-confirm/<uidb64>/<token>/
+      // body { password, uidb64, token } -> { detail } on 2xx
+      await authAxiosInstance.post(`/password-reset-confirm/${uidb64}/${token}/`, {
+        password,
+        uidb64,
         token,
-        password
       });
 
-      if (response.data.success) {
-        setSuccess(true);
-        setTimeout(() => {
-          navigate('/login');
-        }, 2000);
-      } else {
-        setError(response.data.message || 'Password reset failed');
-      }
+      setSuccess(true);
+      setTimeout(() => {
+        navigate('/login');
+      }, 2000);
     } catch (err: any) {
-      setError(err.response?.data?.message || 'Password reset failed. Please try again.');
+      const serverData = err.response?.data;
+      setError(serverData?.detail || serverData?.message || 'Password reset failed. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -110,7 +108,7 @@ const ResetPassword = () => {
             <h2 className="mt-6 text-3xl font-bold text-[#333333] dark:text-white">
               Validating Reset Link
             </h2>
-            <p className="mt-2 text-sm text-[#333333]/70 dark:text-gray-400">
+            <p className="mt-2 text-sm text-[#333333]/70 dark:text-gray-300">
               Please wait while we verify your password reset link.
             </p>
           </div>
@@ -137,7 +135,7 @@ const ResetPassword = () => {
             <h2 className="mt-6 text-3xl font-bold text-[#333333] dark:text-white">
               Password Reset Successfully
             </h2>
-            <p className="mt-2 text-sm text-[#333333]/70 dark:text-gray-400">
+            <p className="mt-2 text-sm text-[#333333]/70 dark:text-gray-300">
               Your password has been updated. You can now sign in with your new password.
             </p>
           </div>
@@ -174,7 +172,7 @@ const ResetPassword = () => {
           <h2 className="mt-6 text-3xl font-bold text-[#333333] dark:text-white">
             Reset your password
           </h2>
-          <p className="mt-2 text-sm text-[#333333]/70 dark:text-gray-400">
+          <p className="mt-2 text-sm text-[#333333]/70 dark:text-gray-300">
             Enter your new password below
           </p>
         </div>
@@ -200,7 +198,7 @@ const ResetPassword = () => {
               </label>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <Lock className="h-5 w-5 text-[#333333]/50" />
+                  <Lock className="h-5 w-5 text-[#333333]/70" />
                 </div>
                 <input
                   id="password"
@@ -219,13 +217,13 @@ const ResetPassword = () => {
                   className="absolute inset-y-0 right-0 pr-3 flex items-center"
                 >
                   {showPassword ? (
-                    <EyeOff className="h-5 w-5 text-[#333333]/50 hover:text-[#333333]" />
+                    <EyeOff className="h-5 w-5 text-[#333333]/70 hover:text-[#333333]" />
                   ) : (
-                    <Eye className="h-5 w-5 text-[#333333]/50 hover:text-[#333333]" />
+                    <Eye className="h-5 w-5 text-[#333333]/70 hover:text-[#333333]" />
                   )}
                 </button>
               </div>
-              <p className="mt-1 text-xs text-[#333333]/50 dark:text-gray-400">
+              <p className="mt-1 text-xs text-[#333333]/70 dark:text-gray-300">
                 Must be at least 8 characters long
               </p>
             </div>
@@ -237,7 +235,7 @@ const ResetPassword = () => {
               </label>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <Lock className="h-5 w-5 text-[#333333]/50" />
+                  <Lock className="h-5 w-5 text-[#333333]/70" />
                 </div>
                 <input
                   id="confirmPassword"
@@ -256,9 +254,9 @@ const ResetPassword = () => {
                   className="absolute inset-y-0 right-0 pr-3 flex items-center"
                 >
                   {showConfirmPassword ? (
-                    <EyeOff className="h-5 w-5 text-[#333333]/50 hover:text-[#333333]" />
+                    <EyeOff className="h-5 w-5 text-[#333333]/70 hover:text-[#333333]" />
                   ) : (
-                    <Eye className="h-5 w-5 text-[#333333]/50 hover:text-[#333333]" />
+                    <Eye className="h-5 w-5 text-[#333333]/70 hover:text-[#333333]" />
                   )}
                 </button>
               </div>
@@ -294,7 +292,7 @@ const ResetPassword = () => {
 
         {/* Security Note */}
         <div className="text-center">
-          <p className="text-xs text-[#333333]/50 dark:text-gray-400">
+          <p className="text-xs text-[#333333]/70 dark:text-gray-300">
             This link will expire in 1 hour for security
           </p>
         </div>

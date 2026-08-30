@@ -41,30 +41,18 @@ import {
   MoreOutlined
 } from '@ant-design/icons';
 import axiosInstance from '../../services/axiosInstance';
-
-interface APIKey {
-  id: string; // UUID
-  key: string;
-  masked_key?: string;
-  name?: string;
-  is_active: boolean;
-  created_at: string;
-  last_used?: string;
-  user?: {
-    id: number;
-    email: string;
-    name?: string;
-  };
-  usage_count?: number;
-  rate_limit_per_hour?: number;
-}
+import { adminApiKeyService, AdminAPIKey as APIKey } from '../../services/apiKeyService';
 
 interface User {
-  id: number;
+  id: string; // UUID (AdminUserSerializer)
   email: string;
-  name?: string;
+  first_name?: string;
+  last_name?: string;
   is_active: boolean;
 }
+
+const userLabel = (user: User) =>
+  [user.first_name, user.last_name].filter(Boolean).join(' ').trim() || user.email;
 
 const ManageAPIKeys: React.FC = () => {
   const [apiKeys, setApiKeys] = useState<APIKey[]>([]);
@@ -87,7 +75,7 @@ const ManageAPIKeys: React.FC = () => {
     setLoading(true);
     setError(null);
     try {
-      const response = await axiosInstance.get('/admin/api-keys/');
+      const response = await adminApiKeyService.list();
       // Ensure response.data is an array
       const data = Array.isArray(response.data) ? response.data : [];
       setApiKeys(data);
@@ -121,17 +109,18 @@ const ManageAPIKeys: React.FC = () => {
 
   const handleCreateKey = async (values: any) => {
     try {
-      const response = await axiosInstance.post('/admin/api-keys/', {
+      // user_id is a UUID string — do NOT parseInt it.
+      await adminApiKeyService.create({
         name: values.name,
-        user_id: parseInt(values.user_id),
-        rate_limit_per_hour: values.rate_limit || 1000
+        user_id: values.user_id,
+        description: values.description || undefined,
+        rate_limit_per_hour: values.rate_limit || 1000,
       });
-      
-      setApiKeys(prev => [response.data, ...prev]);
+
       setShowCreateModal(false);
       form.resetFields();
       message.success('API key created successfully');
-      fetchAPIKeys(); // Refresh to get updated list
+      fetchAPIKeys(); // Refresh to get the full serialized key (create returns partial data)
     } catch (err: any) {
       setError(err.response?.data?.detail || 'Failed to create API key');
       message.error(err.response?.data?.detail || 'Failed to create API key');
@@ -140,10 +129,8 @@ const ManageAPIKeys: React.FC = () => {
 
   const handleToggleKey = async (keyId: string, isActive: boolean) => {
     try {
-      await axiosInstance.patch(`/admin/api-keys/${keyId}/`, {
-        is_active: !isActive
-      });
-      setApiKeys(prev => prev.map(key => 
+      await adminApiKeyService.update(keyId, { is_active: !isActive });
+      setApiKeys(prev => prev.map(key =>
         key.id === keyId ? { ...key, is_active: !isActive } : key
       ));
       message.success(`API key ${!isActive ? 'activated' : 'deactivated'} successfully`);
@@ -155,7 +142,7 @@ const ManageAPIKeys: React.FC = () => {
 
   const handleDeleteKey = async (keyId: string) => {
     try {
-      await axiosInstance.delete(`/admin/api-keys/${keyId}/`);
+      await adminApiKeyService.remove(keyId);
       setApiKeys(prev => prev.filter(key => key.id !== keyId));
       message.success('API key deleted successfully');
     } catch (err: any) {
@@ -382,7 +369,7 @@ const ManageAPIKeys: React.FC = () => {
                 <Select.Option value="all">All Users</Select.Option>
                 {(Array.isArray(users) ? users : []).map(user => (
                   <Select.Option key={user.id} value={user.id.toString()}>
-                  {user.name || user.email}
+                  {userLabel(user)}
                   </Select.Option>
               ))}
               </Select>
@@ -450,10 +437,10 @@ const ManageAPIKeys: React.FC = () => {
             label="User"
             rules={[{ required: true, message: 'Please select a user!' }]}
           >
-            <Select placeholder="Select user">
+            <Select placeholder="Select user" showSearch optionFilterProp="children">
               {(Array.isArray(users) ? users : []).map(user => (
                 <Select.Option key={user.id} value={user.id.toString()}>
-                  {user.name || user.email}
+                  {userLabel(user)}
                 </Select.Option>
               ))}
             </Select>

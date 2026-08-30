@@ -7,6 +7,8 @@ from .views import (
     LogoutAPIView,
     LoginAPIView,
     PasswordChangeAPIView,
+    PasswordRecoveryAPIView,
+    PasswordResetConfirmAPIView,
     NotificationPreferencesView,
     DeleteAccountView,
     TOTPSetupView,
@@ -27,6 +29,7 @@ from .oauth_views import (
     OAuthCallbackView,
     OAuthProvidersView,
     OAuthTokenExchangeView,
+    SocialAccountsView,
 )
 
 urlpatterns = [
@@ -36,6 +39,17 @@ urlpatterns = [
     path("user/", UserProfileView.as_view(), name="user-profile"),
     path("my-profile/", MyProfileView.as_view(), name="my-profile"),
     path("change-password/", PasswordChangeAPIView.as_view(), name="change-password"),
+    # Password recovery (forgot / reset) — email a reset link, then confirm with a new password
+    path(
+        "password-recovery/",
+        PasswordRecoveryAPIView.as_view(),
+        name="password-recovery",
+    ),
+    path(
+        "password-reset-confirm/<str:uidb64>/<str:token>/",
+        PasswordResetConfirmAPIView.as_view(),
+        name="password_reset_confirm",
+    ),
     path("refresh_token/", TokenRefreshView.as_view(), name="refresh-token"),
     path(
         "notification-preferences/",
@@ -65,6 +79,18 @@ urlpatterns = [
     ),
     # OAuth routes
     path("oauth/providers/", OAuthProvidersView.as_view(), name="oauth-providers"),
+    # Linked-provider management for the signed-in user (the "link it from your
+    # account settings" destination referenced by the link_required error).
+    path(
+        "oauth/accounts/",
+        SocialAccountsView.as_view(),
+        name="oauth-social-accounts",
+    ),
+    path(
+        "oauth/accounts/<str:provider>/",
+        SocialAccountsView.as_view(),
+        name="oauth-social-account-detail",
+    ),
     path("oauth/<str:provider>/login/", OAuthLoginView.as_view(), name="oauth-login"),
     path(
         "oauth/<str:provider>/callback/",

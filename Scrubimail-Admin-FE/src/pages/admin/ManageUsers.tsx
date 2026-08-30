@@ -22,35 +22,62 @@ import {
 } from 'lucide-react';
 import axiosInstance from '../../services/axiosInstance';
 
-interface User {
+interface UserGroup {
   id: number;
+  name: string;
+  user_count?: number;
+}
+
+interface UserPermission {
+  id: number;
+  name: string;
+  codename: string;
+  content_type?: unknown;
+}
+
+interface UserBilling {
+  credits_remaining: number;
+  credits_used_this_month: number;
+  current_plan: { id: number; name: string; price: string; credits_per_month: number } | null;
+}
+
+// Aligned with the backend AdminUserSerializer shape (snake_case).
+interface User {
+  id: string; // UUID string, not a number
   email: string;
-  name?: string;
+  first_name?: string;
+  last_name?: string;
+  phone_number?: string;
+  profile_picture?: string | null;
+  user_type?: string;
+  account_status?: string;
+  last_active?: string | null;
+  date_joined: string;
   is_active: boolean;
   is_staff: boolean;
   is_superuser: boolean;
-  date_joined: string;
-  last_login?: string;
-  profile?: {
-    phone?: string;
-    company?: string;
-    location?: string;
-  };
-  billing?: {
-    plan: string;
-    credits_remaining: number;
-    total_credits: number;
-  };
-  stats?: {
-    total_validations: number;
-    api_keys_count: number;
-    last_activity: string;
-  };
+  groups?: UserGroup[];
+  roles?: string[];
+  user_permissions?: UserPermission[];
+  billing?: UserBilling | null;
 }
+
+interface UserStats {
+  total: number;
+  active: number;
+  new: number;
+  suspended: number;
+}
+
+const getDisplayName = (user: User): string => {
+  const full = [user.first_name, user.last_name].filter(Boolean).join(' ').trim();
+  return full || user.email;
+};
 
 const ManageUsers: React.FC = () => {
   const navigate = useNavigate();
   const [users, setUsers] = useState<User[]>([]);
+  const [stats, setStats] = useState<UserStats | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
@@ -61,8 +88,9 @@ const ManageUsers: React.FC = () => {
     setLoading(true);
     setError(null);
     try {
+      // GET /admin/users/ returns a PLAIN ARRAY (no { results }).
       const response = await axiosInstance.get('/admin/users/');
-      setUsers(response.data);
+      setUsers(Array.isArray(response.data) ? response.data : []);
     } catch (err: any) {
       setError('Failed to fetch users');
       console.error('Error fetching users:', err);
@@ -71,11 +99,28 @@ const ManageUsers: React.FC = () => {
     }
   };
 
+  const fetchStats = async () => {
+    try {
+      const response = await axiosInstance.get('/admin/users/stats/');
+      const { total, active, new: newUsers, suspended } = response.data ?? {};
+      setStats({
+        total: total ?? 0,
+        active: active ?? 0,
+        new: newUsers ?? 0,
+        suspended: suspended ?? 0,
+      });
+    } catch (err: any) {
+      // Stats are non-critical; cards fall back to values derived from the list.
+      console.error('Error fetching user stats:', err);
+    }
+  };
+
   useEffect(() => {
     fetchUsers();
+    fetchStats();
   }, []);
 
-  const handleToggleUserStatus = async (userId: number, isActive: boolean) => {
+  const handleToggleUserStatus = async (userId: string, isActive: boolean) => {
     try {
       await axiosInstance.patch(`/admin/users/${userId}/`, {
         is_active: !isActive
@@ -88,7 +133,7 @@ const ManageUsers: React.FC = () => {
     }
   };
 
-  const handleToggleStaffStatus = async (userId: number, isStaff: boolean) => {
+  const handleToggleStaffStatus = async (userId: string, isStaff: boolean) => {
     try {
       await axiosInstance.patch(`/admin/users/${userId}/`, {
         is_staff: !isStaff
@@ -101,7 +146,7 @@ const ManageUsers: React.FC = () => {
     }
   };
 
-  const handleDeleteUser = async (userId: number) => {
+  const handleDeleteUser = async (userId: string) => {
     if (!confirm('Are you sure you want to delete this user? This action cannot be undone.')) {
       return;
     }
@@ -115,10 +160,11 @@ const ManageUsers: React.FC = () => {
   };
 
   const filteredUsers = users.filter(user => {
-    const matchesSearch = user.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         user.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         user.profile?.company?.toLowerCase().includes(searchTerm.toLowerCase());
-    
+    const term = searchTerm.toLowerCase();
+    const matchesSearch = user.email.toLowerCase().includes(term) ||
+                         getDisplayName(user).toLowerCase().includes(term) ||
+                         (user.user_type ?? '').toLowerCase().includes(term);
+
     const matchesStatus = filterStatus === 'all' || 
                          (filterStatus === 'active' && user.is_active) ||
                          (filterStatus === 'inactive' && !user.is_active);
@@ -145,7 +191,7 @@ const ManageUsers: React.FC = () => {
       <div className="flex items-center justify-center h-64">
         <div className="text-center">
           <RefreshCw className="w-8 h-8 animate-spin text-[#2ED8A3] mx-auto mb-4" />
-          <p className="text-gray-600 dark:text-gray-400">Loading users...</p>
+          <p className="text-gray-600 dark:text-gray-300">Loading users...</p>
         </div>
       </div>
     );
@@ -157,7 +203,7 @@ const ManageUsers: React.FC = () => {
       <div className="flex justify-between items-center">
         <div>
           <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Users Management</h1>
-          <p className="text-gray-500 dark:text-gray-400 mt-1">Manage all users and their permissions</p>
+          <p className="text-gray-500 dark:text-gray-300 mt-1">Manage all users and their permissions</p>
         </div>
         <div className="flex space-x-3">
           <button
@@ -193,8 +239,8 @@ const ManageUsers: React.FC = () => {
               <Users className="w-6 h-6 text-blue-600 dark:text-blue-400" />
             </div>
             <div className="ml-4">
-              <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Total Users</p>
-              <p className="text-2xl font-semibold text-gray-900 dark:text-white">{users.length}</p>
+              <p className="text-sm font-medium text-gray-500 dark:text-gray-300">Total Users</p>
+              <p className="text-2xl font-semibold text-gray-900 dark:text-white">{stats?.total ?? users.length}</p>
             </div>
           </div>
         </div>
@@ -205,9 +251,9 @@ const ManageUsers: React.FC = () => {
               <UserCheck className="w-6 h-6 text-green-600 dark:text-green-400" />
             </div>
             <div className="ml-4">
-              <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Active Users</p>
+              <p className="text-sm font-medium text-gray-500 dark:text-gray-300">Active Users</p>
               <p className="text-2xl font-semibold text-gray-900 dark:text-white">
-                {users.filter(u => u.is_active).length}
+                {stats?.active ?? users.filter(u => u.is_active).length}
               </p>
             </div>
           </div>
@@ -219,7 +265,7 @@ const ManageUsers: React.FC = () => {
               <Shield className="w-6 h-6 text-purple-600 dark:text-purple-400" />
             </div>
             <div className="ml-4">
-              <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Admins</p>
+              <p className="text-sm font-medium text-gray-500 dark:text-gray-300">Admins</p>
               <p className="text-2xl font-semibold text-gray-900 dark:text-white">
                 {users.filter(u => u.is_staff).length}
               </p>
@@ -233,9 +279,9 @@ const ManageUsers: React.FC = () => {
               <Activity className="w-6 h-6 text-orange-600 dark:text-orange-400" />
             </div>
             <div className="ml-4">
-              <p className="text-sm font-medium text-gray-500 dark:text-gray-400">New This Month</p>
+              <p className="text-sm font-medium text-gray-500 dark:text-gray-300">New This Month</p>
               <p className="text-2xl font-semibold text-gray-900 dark:text-white">
-                {users.filter(u => {
+                {stats?.new ?? users.filter(u => {
                   const joinDate = new Date(u.date_joined);
                   const now = new Date();
                   const monthAgo = new Date(now.getFullYear(), now.getMonth() - 1, now.getDate());
@@ -333,19 +379,19 @@ const ManageUsers: React.FC = () => {
                       <div className="flex items-center space-x-3">
                         <div className="w-10 h-10 bg-gray-200 dark:bg-gray-600 rounded-full flex items-center justify-center">
                           <span className="text-sm font-medium text-gray-600 dark:text-gray-300">
-                            {user.name ? user.name.charAt(0).toUpperCase() : user.email.charAt(0).toUpperCase()}
+                            {getDisplayName(user).charAt(0).toUpperCase()}
                           </span>
                         </div>
                         <div>
                           <div className="text-sm font-medium text-gray-900 dark:text-white">
-                            {user.name || 'No name'}
+                            {getDisplayName(user)}
                           </div>
-                          <div className="text-sm text-gray-500 dark:text-gray-400">
+                          <div className="text-sm text-gray-500 dark:text-gray-300">
                             {user.email}
                           </div>
-                          {user.profile?.company && (
-                            <div className="text-xs text-gray-400 dark:text-gray-500">
-                              {user.profile.company}
+                          {user.user_type && (
+                            <div className="text-xs text-gray-400 dark:text-gray-400 capitalize">
+                              {user.user_type}
                             </div>
                           )}
                         </div>
@@ -365,18 +411,18 @@ const ManageUsers: React.FC = () => {
                         {user.is_active ? 'Active' : 'Inactive'}
                       </span>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-300">
                       <div className="flex items-center space-x-1">
                         <Activity className="w-3 h-3" />
-                        <span>{user.stats?.total_validations || 0} validations</span>
+                        <span>{user.groups?.length || 0} group{(user.groups?.length || 0) === 1 ? '' : 's'}</span>
                       </div>
-                      {user.last_login && (
-                        <div className="text-xs text-gray-400 dark:text-gray-500">
-                          Last login: {new Date(user.last_login).toLocaleDateString()}
+                      {user.last_active && (
+                        <div className="text-xs text-gray-400 dark:text-gray-400">
+                          Last active: {new Date(user.last_active).toLocaleDateString()}
                         </div>
                       )}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-300">
                       <div className="flex items-center space-x-1">
                         <Calendar className="w-3 h-3" />
                         <span>{new Date(user.date_joined).toLocaleDateString()}</span>

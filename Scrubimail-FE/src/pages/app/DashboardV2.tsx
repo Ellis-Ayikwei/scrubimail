@@ -112,7 +112,7 @@ const DashboardV2: React.FC = () => {
               <RefreshCw className={loading ? 'animate-spin' : ''} />
               Refresh
             </Button>
-            <Button size="sm" onClick={() => (window.location.href = '/validate')}>
+            <Button size="sm" render={<Link to="/validate" />}>
               <Zap />
               New validation
             </Button>
@@ -194,7 +194,7 @@ const DashboardV2: React.FC = () => {
                   <div className="flex flex-col items-center gap-2 p-10 text-center">
                     <Mail className="size-6 text-muted-foreground" />
                     <p className="text-sm text-muted-foreground">No validations yet</p>
-                    <Button size="sm" className="mt-1" onClick={() => (window.location.href = '/validate')}>
+                    <Button size="sm" className="mt-1" render={<Link to="/validate" />}>
                       Run your first check
                     </Button>
                   </div>
@@ -261,7 +261,7 @@ const DashboardV2: React.FC = () => {
                   <span className="text-sm font-medium">${billing?.current_plan?.price ?? '0'}</span>
                 </div>
 
-                <Button className="w-full" onClick={() => (window.location.href = '/billing')}>
+                <Button className="w-full" render={<Link to="/billing" />}>
                   Refill credits
                 </Button>
               </CardContent>

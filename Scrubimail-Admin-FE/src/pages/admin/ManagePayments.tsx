@@ -18,41 +18,11 @@ import {
   ChevronLeft,
   ChevronRight
 } from 'lucide-react';
-import axiosInstance from '../../services/axiosInstance';
+import { paymentService, AdminPayment, AdminPaymentStats } from '../../services/paymentService';
 
-interface PaymentUser {
-  id: string;
-  email: string;
-  name?: string | null;
-}
-
-interface Payment {
-  id: string;
-  user: PaymentUser;
-  amount: number;
-  currency: string;
-  status: 'pending' | 'completed' | 'failed' | 'refunded';
-  payment_method: string;
-  transaction_id?: string;
-  created_at: string;
-  updated_at: string;
-  description?: string;
-  plan?: string | null;
-  type?: string;
-}
-
-interface PaymentStats {
-  total_revenue: number;
-  monthly_revenue: number;
-  pending_payments: number;
-  failed_payments: number;
-  average_transaction: number;
-  top_plans: Array<{
-    plan_name: string;
-    count: number;
-    revenue: number;
-  }>;
-}
+// Contract shapes live in paymentService; alias for readability in this file.
+type Payment = AdminPayment;
+type PaymentStats = AdminPaymentStats;
 
 const ManagePayments: React.FC = () => {
   const [payments, setPayments] = useState<Payment[]>([]);
@@ -67,12 +37,21 @@ const ManagePayments: React.FC = () => {
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [totalCount, setTotalCount] = useState(0);
+  // Per-row "sync from Paystack" state + a transient success banner.
+  const [syncingId, setSyncingId] = useState<string | null>(null);
+  const [syncMessage, setSyncMessage] = useState<string | null>(null);
 
   const fetchPayments = async () => {
     setLoading(true);
     setError(null);
     try {
-      const params: Record<string, string> = { page: String(page), page_size: '50' };
+      const params: {
+        page: number;
+        page_size: number;
+        search?: string;
+        status?: string;
+        date_from?: string;
+      } = { page, page_size: 50 };
       if (searchTerm) params.search = searchTerm;
       if (filterStatus !== 'all') params.status = filterStatus;
 
@@ -90,14 +69,14 @@ const ManagePayments: React.FC = () => {
       }
 
       const [paymentsRes, statsRes] = await Promise.all([
-        axiosInstance.get('/admin/payments/', { params }),
-        axiosInstance.get('/admin/payments/stats/')
+        paymentService.getAdminPayments(params),
+        paymentService.getAdminPaymentStats()
       ]);
 
-      setPayments(paymentsRes.data.results || []);
-      setTotalPages(paymentsRes.data.total_pages || 1);
-      setTotalCount(paymentsRes.data.count || 0);
-      setStats(statsRes.data);
+      setPayments(paymentsRes.results || []);
+      setTotalPages(paymentsRes.total_pages || 1);
+      setTotalCount(paymentsRes.count || 0);
+      setStats(statsRes);
     } catch (err: any) {
       setError(err?.message || 'Failed to fetch payments data');
       console.error('Error fetching payments:', err);
@@ -113,6 +92,34 @@ const ManagePayments: React.FC = () => {
   const handleSearch = () => {
     setPage(1);
     fetchPayments();
+  };
+
+  // Re-fetch a payment's status live from Paystack and reconcile it server-side
+  // (completes/fails the purchase). Use when a webhook was missed and a payment
+  // is stuck "pending" despite the customer having paid. Only credit-package
+  // payments have a reconcilable local record.
+  const handleSync = async (payment: Payment) => {
+    setSyncingId(payment.id);
+    setError(null);
+    setSyncMessage(null);
+    try {
+      const res = await paymentService.syncAdminPayment(payment.id);
+      const { changed, gateway_status, current_status } = res;
+      setSyncMessage(
+        changed
+          ? `Payment ${payment.transaction_id || payment.id} synced: now ${current_status} (Paystack: ${gateway_status}).`
+          : `No change — Paystack reports "${gateway_status}", payment is ${current_status}.`
+      );
+      await fetchPayments();
+    } catch (err: any) {
+      setError(
+        err?.response?.data?.detail ||
+          err?.message ||
+          'Failed to sync payment with Paystack'
+      );
+    } finally {
+      setSyncingId(null);
+    }
   };
 
   const getStatusBadge = (status: string) => {
@@ -135,7 +142,7 @@ const ManagePayments: React.FC = () => {
       <div className="flex items-center justify-center h-64">
         <div className="text-center">
           <RefreshCw className="w-8 h-8 animate-spin text-[#2ED8A3] mx-auto mb-4" />
-          <p className="text-gray-600 dark:text-gray-400">Loading payments...</p>
+          <p className="text-gray-600 dark:text-gray-300">Loading payments...</p>
         </div>
       </div>
     );
@@ -147,7 +154,7 @@ const ManagePayments: React.FC = () => {
       <div className="flex justify-between items-center">
         <div>
           <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Payments Management</h1>
-          <p className="text-gray-500 dark:text-gray-400 mt-1">
+          <p className="text-gray-500 dark:text-gray-300 mt-1">
             Monitor and manage all payment transactions ({totalCount} total)
           </p>
         </div>
@@ -174,6 +181,24 @@ const ManagePayments: React.FC = () => {
         </div>
       )}
 
+      {syncMessage && (
+        <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-4">
+          <div className="flex items-start justify-between">
+            <div className="flex">
+              <CheckCircle className="w-5 h-5 text-green-600 dark:text-green-400 mt-0.5" />
+              <p className="ml-3 text-sm text-green-700 dark:text-green-300">{syncMessage}</p>
+            </div>
+            <button
+              onClick={() => setSyncMessage(null)}
+              className="text-green-600 hover:text-green-800 dark:text-green-400"
+              title="Dismiss"
+            >
+              <XCircle className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Stats Cards */}
       {stats && (
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
@@ -183,7 +208,7 @@ const ManagePayments: React.FC = () => {
                 <DollarSign className="w-6 h-6 text-green-600 dark:text-green-400" />
               </div>
               <div className="ml-4">
-                <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Total Revenue</p>
+                <p className="text-sm font-medium text-gray-500 dark:text-gray-300">Total Revenue</p>
                 <p className="text-2xl font-semibold text-gray-900 dark:text-white">
                   {formatCurrency(stats.total_revenue)}
                 </p>
@@ -197,7 +222,7 @@ const ManagePayments: React.FC = () => {
                 <TrendingUp className="w-6 h-6 text-blue-600 dark:text-blue-400" />
               </div>
               <div className="ml-4">
-                <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Monthly Revenue</p>
+                <p className="text-sm font-medium text-gray-500 dark:text-gray-300">Monthly Revenue</p>
                 <p className="text-2xl font-semibold text-gray-900 dark:text-white">
                   {formatCurrency(stats.monthly_revenue)}
                 </p>
@@ -211,7 +236,7 @@ const ManagePayments: React.FC = () => {
                 <Clock className="w-6 h-6 text-yellow-600 dark:text-yellow-400" />
               </div>
               <div className="ml-4">
-                <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Pending</p>
+                <p className="text-sm font-medium text-gray-500 dark:text-gray-300">Pending</p>
                 <p className="text-2xl font-semibold text-gray-900 dark:text-white">
                   {stats.pending_payments}
                 </p>
@@ -225,7 +250,7 @@ const ManagePayments: React.FC = () => {
                 <XCircle className="w-6 h-6 text-red-600 dark:text-red-400" />
               </div>
               <div className="ml-4">
-                <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Failed</p>
+                <p className="text-sm font-medium text-gray-500 dark:text-gray-300">Failed</p>
                 <p className="text-2xl font-semibold text-gray-900 dark:text-white">
                   {stats.failed_payments}
                 </p>
@@ -332,7 +357,7 @@ const ManagePayments: React.FC = () => {
             <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
               {payments.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="px-6 py-12 text-center text-gray-500 dark:text-gray-400">
+                  <td colSpan={7} className="px-6 py-12 text-center text-gray-500 dark:text-gray-300">
                     No payments found.
                   </td>
                 </tr>
@@ -349,7 +374,7 @@ const ManagePayments: React.FC = () => {
                             {payment.transaction_id || payment.id}
                           </div>
                           {payment.description && (
-                            <div className="text-xs text-gray-400 dark:text-gray-500 truncate max-w-[180px]">
+                            <div className="text-xs text-gray-400 dark:text-gray-400 truncate max-w-[180px]">
                               {payment.description}
                             </div>
                           )}
@@ -362,7 +387,7 @@ const ManagePayments: React.FC = () => {
                             <div className="text-sm font-medium text-gray-900 dark:text-white">
                               {payment.user.name || 'No name'}
                             </div>
-                            <div className="text-sm text-gray-500 dark:text-gray-400">
+                            <div className="text-sm text-gray-500 dark:text-gray-300">
                               {payment.user.email}
                             </div>
                           </div>
@@ -372,7 +397,7 @@ const ManagePayments: React.FC = () => {
                         <div className="text-sm font-medium text-gray-900 dark:text-white">
                           {formatCurrency(payment.amount, payment.currency)}
                         </div>
-                        <div className="text-xs text-gray-500 dark:text-gray-400">
+                        <div className="text-xs text-gray-500 dark:text-gray-300">
                           {payment.currency}
                         </div>
                       </td>
@@ -385,7 +410,7 @@ const ManagePayments: React.FC = () => {
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600 dark:text-gray-300">
                         {payment.type?.replace(/_/g, ' ') || payment.payment_method}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-300">
                         <div className="flex items-center space-x-1">
                           <Calendar className="w-3 h-3" />
                           <span>{new Date(payment.created_at).toLocaleDateString()}</span>
@@ -395,16 +420,32 @@ const ManagePayments: React.FC = () => {
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                        <button
-                          onClick={() => {
-                            setSelectedPayment(payment);
-                            setShowPaymentModal(true);
-                          }}
-                          className="text-blue-600 hover:text-blue-700"
-                          title="View details"
-                        >
-                          <Eye className="w-4 h-4" />
-                        </button>
+                        <div className="flex items-center space-x-3">
+                          <button
+                            onClick={() => {
+                              setSelectedPayment(payment);
+                              setShowPaymentModal(true);
+                            }}
+                            className="text-blue-600 hover:text-blue-700"
+                            title="View details"
+                          >
+                            <Eye className="w-4 h-4" />
+                          </button>
+                          {/* Sync only applies to credit-package purchases —
+                              the only payments with a reconcilable local record. */}
+                          {payment.type === 'credit_package' && (
+                            <button
+                              onClick={() => handleSync(payment)}
+                              disabled={syncingId === payment.id}
+                              className="text-gray-500 hover:text-gray-700 disabled:opacity-50"
+                              title="Sync status from Paystack"
+                            >
+                              <RefreshCw
+                                className={`w-4 h-4 ${syncingId === payment.id ? 'animate-spin' : ''}`}
+                              />
+                            </button>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   );
@@ -417,7 +458,7 @@ const ManagePayments: React.FC = () => {
         {/* Pagination */}
         {totalPages > 1 && (
           <div className="flex items-center justify-between px-6 py-3 border-t border-gray-200 dark:border-gray-700">
-            <p className="text-sm text-gray-500 dark:text-gray-400">
+            <p className="text-sm text-gray-500 dark:text-gray-300">
               Page {page} of {totalPages} ({totalCount} results)
             </p>
             <div className="flex space-x-2">
@@ -461,31 +502,31 @@ const ManagePayments: React.FC = () => {
                 <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">Transaction Information</h4>
                 <div className="space-y-2">
                   <div>
-                    <span className="text-sm text-gray-500 dark:text-gray-400">Reference:</span>
+                    <span className="text-sm text-gray-500 dark:text-gray-300">Reference:</span>
                     <span className="ml-2 text-sm text-gray-900 dark:text-white break-all">
                       {selectedPayment.transaction_id || 'N/A'}
                     </span>
                   </div>
                   <div>
-                    <span className="text-sm text-gray-500 dark:text-gray-400">Amount:</span>
+                    <span className="text-sm text-gray-500 dark:text-gray-300">Amount:</span>
                     <span className="ml-2 text-sm text-gray-900 dark:text-white">
                       {formatCurrency(selectedPayment.amount, selectedPayment.currency)}
                     </span>
                   </div>
                   <div>
-                    <span className="text-sm text-gray-500 dark:text-gray-400">Status:</span>
+                    <span className="text-sm text-gray-500 dark:text-gray-300">Status:</span>
                     <span className={`ml-2 inline-flex items-center px-2 py-1 text-xs font-semibold rounded-full ${getStatusBadge(selectedPayment.status).color}`}>
                       {getStatusBadge(selectedPayment.status).text}
                     </span>
                   </div>
                   <div>
-                    <span className="text-sm text-gray-500 dark:text-gray-400">Type:</span>
+                    <span className="text-sm text-gray-500 dark:text-gray-300">Type:</span>
                     <span className="ml-2 text-sm text-gray-900 dark:text-white">
                       {selectedPayment.type?.replace(/_/g, ' ') || 'N/A'}
                     </span>
                   </div>
                   <div>
-                    <span className="text-sm text-gray-500 dark:text-gray-400">Payment Method:</span>
+                    <span className="text-sm text-gray-500 dark:text-gray-300">Payment Method:</span>
                     <span className="ml-2 text-sm text-gray-900 dark:text-white">
                       {selectedPayment.payment_method}
                     </span>
@@ -497,20 +538,20 @@ const ManagePayments: React.FC = () => {
                 <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">User Information</h4>
                 <div className="space-y-2">
                   <div>
-                    <span className="text-sm text-gray-500 dark:text-gray-400">Name:</span>
+                    <span className="text-sm text-gray-500 dark:text-gray-300">Name:</span>
                     <span className="ml-2 text-sm text-gray-900 dark:text-white">
                       {selectedPayment.user.name || 'Not provided'}
                     </span>
                   </div>
                   <div>
-                    <span className="text-sm text-gray-500 dark:text-gray-400">Email:</span>
+                    <span className="text-sm text-gray-500 dark:text-gray-300">Email:</span>
                     <span className="ml-2 text-sm text-gray-900 dark:text-white">
                       {selectedPayment.user.email}
                     </span>
                   </div>
                   {selectedPayment.plan && (
                     <div>
-                      <span className="text-sm text-gray-500 dark:text-gray-400">Plan:</span>
+                      <span className="text-sm text-gray-500 dark:text-gray-300">Plan:</span>
                       <span className="ml-2 text-sm text-gray-900 dark:text-white">
                         {selectedPayment.plan}
                       </span>
@@ -525,7 +566,7 @@ const ManagePayments: React.FC = () => {
               <div className="space-y-2">
                 <div className="flex items-center space-x-2">
                   <Calendar className="w-4 h-4 text-gray-400" />
-                  <span className="text-sm text-gray-500 dark:text-gray-400">Created:</span>
+                  <span className="text-sm text-gray-500 dark:text-gray-300">Created:</span>
                   <span className="text-sm text-gray-900 dark:text-white">
                     {new Date(selectedPayment.created_at).toLocaleString()}
                   </span>
@@ -533,7 +574,7 @@ const ManagePayments: React.FC = () => {
                 {selectedPayment.updated_at && selectedPayment.updated_at !== selectedPayment.created_at && (
                   <div className="flex items-center space-x-2">
                     <CreditCard className="w-4 h-4 text-gray-400" />
-                    <span className="text-sm text-gray-500 dark:text-gray-400">Updated:</span>
+                    <span className="text-sm text-gray-500 dark:text-gray-300">Updated:</span>
                     <span className="text-sm text-gray-900 dark:text-white">
                       {new Date(selectedPayment.updated_at).toLocaleString()}
                     </span>

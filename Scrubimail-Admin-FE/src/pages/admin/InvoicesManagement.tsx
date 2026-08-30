@@ -40,6 +40,9 @@ import dayjs from 'dayjs';
 const { Title, Text } = Typography;
 const { RangePicker } = DatePicker;
 
+// Money amounts arrive as DecimalField strings or numbers — coerce safely.
+const money = (v: unknown): number => (typeof v === 'number' ? v : parseFloat(String(v ?? '')) || 0);
+
 const InvoicesManagement: React.FC = () => {
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [loading, setLoading] = useState(false);
@@ -61,10 +64,13 @@ const InvoicesManagement: React.FC = () => {
     setLoading(true);
     try {
       const data = await billingService.getInvoices(filters);
-      // Handle both array and wrapped response format
-      const invoiceList = Array.isArray(data) ? data : ((data as any).invoices || []);
+      // Admin endpoint returns an envelope: { results, count, stats, ... }.
+      // Tolerate a plain array too (defensive).
+      const invoiceList: Invoice[] = Array.isArray(data)
+        ? data
+        : (data?.results || []);
       setInvoices(invoiceList);
-      calculateStats(invoiceList);
+      calculateStats(invoiceList, data?.stats);
     } catch (error: any) {
       message.error(error.message || 'Failed to load invoices');
     } finally {
@@ -72,7 +78,9 @@ const InvoicesManagement: React.FC = () => {
     }
   };
 
-  const calculateStats = (invoiceList: Invoice[]) => {
+  // Prefer the backend's global stats envelope; fall back to page-level counts.
+  const calculateStats = (invoiceList: Invoice[], envelopeStats?: any) => {
+    const num = (v: any) => (typeof v === 'number' ? v : parseFloat(v) || 0);
     const paid = invoiceList.filter(i => i.status === 'paid');
     const pending = invoiceList.filter(i => i.status === 'pending');
     const overdue = invoiceList.filter(i => i.status === 'overdue');
@@ -80,19 +88,19 @@ const InvoicesManagement: React.FC = () => {
     setStats({
       totalPaid: paid.length,
       totalPending: pending.length,
-      totalOverdue: overdue.length,
-      totalRevenue: paid.reduce((sum, i) => sum + (i.total_amount || 0), 0)
+      totalOverdue: envelopeStats?.overdue_count ?? overdue.length,
+      totalRevenue: envelopeStats
+        ? num(envelopeStats.paid_total)
+        : paid.reduce((sum, i) => sum + num(i.total_amount), 0)
     });
   };
 
-  const handleViewDetails = async (id: string) => {
-    try {
-      const invoice = await billingService.getInvoiceDetails(id);
-      setSelectedInvoice(invoice);
-      setDetailModalVisible(true);
-    } catch (error: any) {
-      message.error(error.message || 'Failed to load invoice details');
-    }
+  // The admin list rows already carry full invoice data (line_items included),
+  // and the per-invoice detail endpoint is user-scoped, so open the modal from
+  // the row rather than re-fetching.
+  const handleViewDetails = (invoice: Invoice) => {
+    setSelectedInvoice(invoice);
+    setDetailModalVisible(true);
   };
 
   const handleDownloadPDF = async (id: string) => {
@@ -161,6 +169,18 @@ const InvoicesManagement: React.FC = () => {
       ),
     },
     {
+      title: 'Customer',
+      key: 'customer',
+      render: (_, record) => (
+        <div>
+          <Text strong>{record.user_info?.name || record.customer_name || '—'}</Text>
+          <div className="text-xs text-gray-500">
+            {record.user_info?.email || record.customer_email || ''}
+          </div>
+        </div>
+      ),
+    },
+    {
       title: 'Type',
       dataIndex: 'invoice_type',
       key: 'invoice_type',
@@ -173,10 +193,10 @@ const InvoicesManagement: React.FC = () => {
       key: 'amount',
       render: (_, record) => (
         <Text strong className="text-lg">
-          ${(record.total_amount || 0).toFixed(2)}
+          ${money(record.total_amount).toFixed(2)}
         </Text>
       ),
-      sorter: (a, b) => (a.total_amount || 0) - (b.total_amount || 0),
+      sorter: (a, b) => money(a.total_amount) - money(b.total_amount),
     },
     {
       title: 'Status',
@@ -198,12 +218,12 @@ const InvoicesManagement: React.FC = () => {
     },
     {
       title: 'Issue Date',
-      dataIndex: 'issue_date',
-      key: 'issue_date',
+      dataIndex: 'invoice_date',
+      key: 'invoice_date',
       render: (date) => date ? dayjs(date).format('MMM DD, YYYY') : '-',
       sorter: (a, b) => {
-        if (!a.issue_date || !b.issue_date) return 0;
-        return dayjs(a.issue_date).unix() - dayjs(b.issue_date).unix();
+        if (!a.invoice_date || !b.invoice_date) return 0;
+        return dayjs(a.invoice_date).unix() - dayjs(b.invoice_date).unix();
       },
     },
     {
@@ -221,7 +241,7 @@ const InvoicesManagement: React.FC = () => {
             <Button
               type="text"
               icon={<Eye className="w-4 h-4" />}
-              onClick={() => handleViewDetails(record.id)}
+              onClick={() => handleViewDetails(record)}
             />
           </Tooltip>
           <Tooltip title="Download PDF">
@@ -318,7 +338,7 @@ const InvoicesManagement: React.FC = () => {
             placeholder="Type"
             style={{ width: 150 }}
             allowClear
-            onChange={(value) => setFilters({ ...filters, invoice_type: value || undefined })}
+            onChange={(value) => setFilters({ ...filters, type: value || undefined })}
           >
             <Select.Option value="subscription">Subscription</Select.Option>
             <Select.Option value="credit_package">Credit Package</Select.Option>
@@ -406,8 +426,16 @@ const InvoicesManagement: React.FC = () => {
               <Descriptions.Item label="Type">
                 {selectedInvoice.invoice_type.replace('_', ' ').toUpperCase()}
               </Descriptions.Item>
+              <Descriptions.Item label="Customer">
+                {selectedInvoice.user_info?.name || selectedInvoice.customer_name || '—'}
+                {(selectedInvoice.user_info?.email || selectedInvoice.customer_email) && (
+                  <div className="text-xs text-gray-500">
+                    {selectedInvoice.user_info?.email || selectedInvoice.customer_email}
+                  </div>
+                )}
+              </Descriptions.Item>
               <Descriptions.Item label="Issue Date">
-                {selectedInvoice.issue_date ? dayjs(selectedInvoice.issue_date).format('MMM DD, YYYY') : '-'}
+                {selectedInvoice.invoice_date ? dayjs(selectedInvoice.invoice_date).format('MMM DD, YYYY') : '-'}
               </Descriptions.Item>
               <Descriptions.Item label="Due Date">
                 {selectedInvoice.due_date ? dayjs(selectedInvoice.due_date).format('MMM DD, YYYY') : '-'}
@@ -428,8 +456,8 @@ const InvoicesManagement: React.FC = () => {
               columns={[
                 { title: 'Description', dataIndex: 'description', key: 'description' },
                 { title: 'Quantity', dataIndex: 'quantity', key: 'quantity' },
-                { title: 'Unit Price', dataIndex: 'unit_price', key: 'unit_price', render: (price) => `$${(price || 0).toFixed(2)}` },
-                { title: 'Total', dataIndex: 'total_price', key: 'total_price', render: (total) => `$${(total || 0).toFixed(2)}` },
+                { title: 'Unit Price', dataIndex: 'unit_price', key: 'unit_price', render: (price) => `$${money(price).toFixed(2)}` },
+                { title: 'Total', dataIndex: 'total', key: 'total', render: (total) => `$${money(total).toFixed(2)}` },
               ]}
             />
 
@@ -438,24 +466,24 @@ const InvoicesManagement: React.FC = () => {
             <div className="text-right space-y-2">
               <div className="flex justify-end">
                 <Text>Subtotal: </Text>
-                <Text strong className="ml-4">${(selectedInvoice.subtotal || 0).toFixed(2)}</Text>
+                <Text strong className="ml-4">${money(selectedInvoice.subtotal).toFixed(2)}</Text>
               </div>
-              {(selectedInvoice.discount_amount || 0) > 0 && (
+              {money(selectedInvoice.discount_amount) > 0 && (
                 <div className="flex justify-end">
                   <Text>Discount: </Text>
-                  <Text strong className="ml-4 text-red-500">-${(selectedInvoice.discount_amount || 0).toFixed(2)}</Text>
+                  <Text strong className="ml-4 text-red-500">-${money(selectedInvoice.discount_amount).toFixed(2)}</Text>
                 </div>
               )}
-              {(selectedInvoice.tax_amount || 0) > 0 && (
+              {money(selectedInvoice.tax_amount) > 0 && (
                 <div className="flex justify-end">
                   <Text>Tax: </Text>
-                  <Text strong className="ml-4">${(selectedInvoice.tax_amount || 0).toFixed(2)}</Text>
+                  <Text strong className="ml-4">${money(selectedInvoice.tax_amount).toFixed(2)}</Text>
                 </div>
               )}
               <Divider style={{ margin: '8px 0' }} />
               <div className="flex justify-end">
                 <Text strong className="text-lg">Total: </Text>
-                <Text strong className="ml-4 text-lg text-blue-600">${(selectedInvoice.total_amount || 0).toFixed(2)}</Text>
+                <Text strong className="ml-4 text-lg text-blue-600">${money(selectedInvoice.total_amount).toFixed(2)}</Text>
               </div>
             </div>
           </div>

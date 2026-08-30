@@ -5,7 +5,11 @@ import path from 'path';
 // https://vitejs.dev/config/
 export default defineConfig({
     server: {
-        // port: 3000,
+        // Pinned and distinct from the customer app (3000): both send their own
+        // origin as the OAuth redirect_uri, and each must be listed in the
+        // backend's OAUTH_ALLOWED_REDIRECT_URIS or the login dead-ends.
+        port: 3001,
+        strictPort: true,
         host: true,
     },
     plugins: [react()],
