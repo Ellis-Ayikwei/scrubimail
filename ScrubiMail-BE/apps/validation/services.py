@@ -14,6 +14,7 @@ credit decrement is synchronous and atomic in the view.
 """
 
 import logging
+import threading
 import time
 import uuid
 from typing import Any, Dict, Optional, Tuple
@@ -29,7 +30,25 @@ logger = logging.getLogger(__name__)
 
 # One validator per process (mirrors tasks.py). Its result cache and circuit
 # breaker live in the shared Redis cache, not on the instance.
-_validator = AdvancedEmailValidator()
+#
+# Instantiated lazily (on first use) rather than at import time: construction
+# calls load_disposable_domains(), which reads files from disk. Doing that
+# during Django app startup means a hang/failure there kills every gunicorn
+# worker before it can serve a single request, with no traceback in the logs.
+# Deferring it to first request lets any failure be caught and logged there.
+_validator_instance: Optional[AdvancedEmailValidator] = None
+_validator_lock = threading.Lock()
+
+
+def _get_validator() -> AdvancedEmailValidator:
+    """Return the process-wide validator, creating it on first use."""
+    global _validator_instance
+    if _validator_instance is None:
+        with _validator_lock:
+            if _validator_instance is None:
+                _validator_instance = AdvancedEmailValidator()
+    return _validator_instance
+
 
 # When a wait for the egress worker times out while the probe is still PENDING
 # (nobody consumed it), this flag makes subsequent requests skip the wait for a
@@ -97,15 +116,17 @@ def verify_email_realtime(
     """
     from .tasks import verify_email_deep_task
 
-    if fast:
-        return _validator.validate_email_realtime(email, fast=True)
+    validator = _get_validator()
 
-    budget = budget or _validator.realtime_budget
+    if fast:
+        return validator.validate_email_realtime(email, fast=True)
+
+    budget = budget or validator.realtime_budget
     deadline = time.monotonic() + budget
 
     # Result cache first — verdicts from earlier realtime probes (including
     # ones whose caller timed out) and bulk jobs make repeat lookups instant.
-    cached = _validator.get_cached_result(email)
+    cached = validator.get_cached_result(email)
     if cached is not None:
         return cached, True
 
@@ -114,10 +135,10 @@ def verify_email_realtime(
     # syntax, non-existent domain, null MX, disposable, role-based. Settle
     # those here and skip the queue round trip; only mailbox existence needs
     # the egress worker. Terminal verdicts are cached like any deep result.
-    local = _validator.validate_email(email, deep=False)
+    local = validator.validate_email(email, deep=False)
     if local.metadata.get("status") in ("invalid", "do_not_mail"):
         local.metadata["verified_at"] = _now_iso()
-        _validator.store_result(email, local)
+        validator.store_result(email, local)
         return local, False
 
     skip_wait = _egress_unresponsive()
@@ -152,7 +173,7 @@ def verify_email_realtime(
     # Honest degradation: return the local pre-flight result relabelled
     # smtp_unavailable — a transient sub_status, so it is never cached and the
     # next request attempts deep verification again.
-    _validator._mark_smtp_unavailable(local)
+    validator._mark_smtp_unavailable(local)
     local.metadata["verified_at"] = _now_iso()
     return local, False
 
