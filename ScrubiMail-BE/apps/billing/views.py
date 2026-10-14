@@ -4,7 +4,7 @@ from django.utils.decorators import method_decorator
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
-from rest_framework.permissions import IsAuthenticated, AllowAny
+from rest_framework.permissions import IsAuthenticated, AllowAny, IsAdminUser
 from backend.middle_ware import AllowJWTOrAPIKey
 from rest_framework.decorators import (
     api_view,
@@ -57,8 +57,11 @@ from .serializers import (
     InvoiceSerializer,
     InvoiceLineItemSerializer,
     CreateInvoiceSerializer,
+    CreditPricingConfigSerializer,
 )
-from .services import BillingService, PaystackService
+from .credit_pricing import CreditPricingError, CreditPricer, get_pricer
+from .models import CreditPricingConfig
+from .services import BillingService, PaystackService, resolve_paystack_charge
 from apps.plan.models import Plan
 
 
@@ -112,20 +115,121 @@ class CreditPurchaseView(APIView):
 
     def post(self, request):
         serializer = CreditPurchaseSerializer(data=request.data)
-        if serializer.is_valid():
-            billing_service = BillingService()
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        try:
+            result = BillingService().initialize_credit_purchase(
+                user=request.user,
+                credits=serializer.validated_data.get("credits"),
+                amount=serializer.validated_data.get("amount"),
+            )
+        except CreditPricingError as e:
+            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+        except Exception as e:
+            logger.exception("Credit purchase initialize failed user_id=%s", request.user.pk)
+            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+        return Response(result, status=status.HTTP_200_OK)
 
-            try:
-                result = billing_service.initialize_credit_purchase(
-                    user=request.user,
-                    amount=serializer.validated_data["amount"],
-                    credits=serializer.validated_data["credits"],
-                )
-                return Response(result, status=status.HTTP_200_OK)
-            except Exception as e:
-                return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+class CreditPricingView(APIView):
+    """Public pay-as-you-go pricing rules (drives the pricing calculator)."""
+
+    permission_classes = [AllowAny]
+
+    def get(self, request):
+        try:
+            rules = get_pricer().public_rules()
+        except CreditPricingError as e:
+            logger.error("Credit pricing config invalid: %s", e)
+            return Response(
+                {"is_enabled": False, "error": "Pricing is temporarily unavailable."}
+            )
+        # Lets the calculator show what the card will be charged without a
+        # request per keystroke (anonymous traffic is throttled to 100/day).
+        try:
+            charge_amount, charge_currency = resolve_paystack_charge(
+                rules["min_total"], rules["currency"], label="rules"
+            )
+            rules["charge_currency"] = charge_currency
+            rules["charge_rate"] = str(
+                (charge_amount / Decimal(rules["min_total"])).quantize(Decimal("0.0001"))
+            )
+        except (ValueError, ArithmeticError):
+            rules["charge_currency"] = None
+            rules["charge_rate"] = None
+        return Response(rules)
+
+
+class CreditPricingQuoteView(APIView):
+    """Authoritative quote: ?credits=N or ?amount=X -> credits, total, tier, nudge."""
+
+    permission_classes = [AllowAny]
+
+    def get(self, request):
+        serializer = CreditPurchaseSerializer(data=request.query_params)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        try:
+            quote = get_pricer().quote(
+                credits=serializer.validated_data.get("credits"),
+                amount=serializer.validated_data.get("amount"),
+            )
+        except CreditPricingError as e:
+            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+        # Paystack bills in its own currency; show what the card will actually see.
+        try:
+            charge_amount, charge_currency = resolve_paystack_charge(
+                quote["total"], quote["currency"], label="quote"
+            )
+            quote["charge_estimate"] = {
+                "amount": str(charge_amount),
+                "currency": charge_currency,
+            }
+        except ValueError:
+            quote["charge_estimate"] = None
+        return Response(quote)
+
+
+class AdminCreditPricingView(APIView):
+    """Admin: read/update the pay-as-you-go pricing rules."""
+
+    permission_classes = [IsAdminUser]
+
+    def _payload(self, config):
+        data = CreditPricingConfigSerializer(config).data
+        try:
+            pricer = CreditPricer(config)
+            samples = sorted(
+                {pricer.min_credits, 10000, 100000, *(t.start for t in pricer.tiers)}
+            )
+            data["preview"] = [
+                pricer.quote_for_credits(c)
+                for c in samples
+                if pricer.min_credits <= c <= pricer.max_credits and c % pricer.step == 0
+            ]
+        except CreditPricingError as e:
+            data["preview"] = []
+            data["config_error"] = str(e)
+        return data
+
+    def get(self, request):
+        return Response(self._payload(CreditPricingConfig.get_solo()))
+
+    def put(self, request):
+        config = CreditPricingConfig.get_solo()
+        serializer = CreditPricingConfigSerializer(config, data=request.data, partial=True)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        config = serializer.save(updated_by=request.user)
+        logger.info(
+            "Credit pricing updated by %s: mode=%s tiers=%s",
+            request.user.pk,
+            config.tiers_mode,
+            config.tiers,
+        )
+        return Response(self._payload(config))
+
+    patch = put
 
 
 class PlanUpgradeView(APIView):
@@ -667,6 +771,11 @@ class ListCreditPackagesView(APIView):
 
     permission_classes = [AllowJWTOrAPIKey]
 
+    def get_permissions(self):
+        if self.request.method == "POST":
+            return [IsAdminUser()]
+        return super().get_permissions()
+
     def get(self, request):
         """Get all active credit packages"""
         packages = CreditPackage.objects.filter(is_active=True).order_by(
@@ -699,9 +808,36 @@ class ListCreditPackagesView(APIView):
 
 
 class CreditPackageDetailView(APIView):
-    """Get details of a specific credit package"""
+    """Get details of a specific credit package (admins may update/delete)"""
 
     permission_classes = [AllowJWTOrAPIKey]
+
+    def get_permissions(self):
+        if self.request.method in ("PUT", "PATCH", "DELETE"):
+            return [IsAdminUser()]
+        return super().get_permissions()
+
+    def put(self, request, package_id):
+        package = get_object_or_404(CreditPackage, id=package_id)
+        serializer = CreditPackageSerializer(
+            package, data=request.data, partial=True, context={"request": request}
+        )
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    patch = put
+
+    def delete(self, request, package_id):
+        package = get_object_or_404(CreditPackage, id=package_id)
+        if CreditPackagePurchase.objects.filter(package=package).exists():
+            # Keep purchase history intact: retire instead of deleting.
+            package.is_active = False
+            package.save(update_fields=["is_active", "updated_at"])
+        else:
+            package.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
     def get(self, request, package_id):
         """Get package details"""
@@ -798,7 +934,7 @@ class PurchaseCreditPackageView(APIView):
             package=package,
             credits_purchased=package.credits,
             amount_paid=final_amount,  # Use discounted amount
-            currency="NGN",
+            currency=package.currency or "USD",
             paystack_reference=reference,
             status="pending",
             metadata={
@@ -844,9 +980,13 @@ class PurchaseCreditPackageView(APIView):
         if not payment_reference and payment_method == "paystack":
             try:
                 paystack_service = PaystackService()
+                charge_amount, charge_currency = resolve_paystack_charge(
+                    final_amount, package.currency, label=f"package={package.name}"
+                )
                 payment_data = paystack_service.initialize_payment(
                     email=request.user.email,
-                    amount=final_amount,  # Use discounted amount
+                    amount=charge_amount,  # discounted amount, in Paystack's currency
+                    currency=charge_currency,
                     reference=reference,  # reuse the row's reference at the gateway
                     metadata={
                         "purchase_id": str(purchase.id),

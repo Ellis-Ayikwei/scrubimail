@@ -186,6 +186,7 @@ class AdminUserSerializer(serializers.ModelSerializer):
             "user_type",
             "account_status",
             "last_active",
+            "last_login",
             "date_joined",
             "is_active",
             "is_staff",
@@ -196,6 +197,7 @@ class AdminUserSerializer(serializers.ModelSerializer):
         )
         read_only_fields = (
             "last_active",
+            "last_login",
             "date_joined",
             "groups",
             "user_permissions",

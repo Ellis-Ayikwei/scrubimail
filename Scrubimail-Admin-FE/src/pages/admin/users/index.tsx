@@ -1,176 +1,293 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import React, { useCallback, useEffect, useState } from 'react';
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import {
-  ArrowLeft, RefreshCw, User, CreditCard, BarChart3,
-  Key, AlertTriangle, Zap, Shield, UserCog,
+    ArrowLeft,
+    Ban,
+    CircleCheck,
+    CreditCard,
+    KeyRound,
+    MailCheck,
+    MoreHorizontal,
+    Package,
+    RefreshCw,
+    Send,
+    ShieldCheck,
+    TriangleAlert,
+    User,
+    UserCog,
 } from 'lucide-react';
-import axiosInstance from '../../../services/axiosInstance';
+import { toast } from 'sonner';
+
+import axiosInstance from '@/services/axiosInstance';
+import { ErrorState, StatusBadge, useConfirm } from '@/components/admin';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuSeparator,
+    DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { Skeleton } from '@/components/ui/skeleton';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { apiError } from '@/lib/api';
+import { displayName, initialsOf } from '@/lib/format';
 import UserOverviewTab from './UserOverviewTab';
 import UserCreditsTab from './UserCreditsTab';
 import UserPlanTab from './UserPlanTab';
 import UserValidationsTab from './UserValidationsTab';
 import UserApiKeysTab from './UserApiKeysTab';
-import UserActionsTab from './UserActionsTab';
 import UserSecurityTab from './UserSecurityTab';
 import UserPermissionsTab from './UserPermissionsTab';
-import { UCARD } from './userTheme';
+import UserActionsTab from './UserActionsTab';
+import { useCurrentAdminId, type AdminUser, type AdminUserSummary } from './types';
 
-export interface AdminUser {
-  id: string;
-  email: string;
-  username?: string;
-  first_name?: string;
-  last_name?: string;
-  is_active: boolean;
-  is_staff: boolean;
-  is_superuser: boolean;
-  date_joined: string;
-  last_login?: string;
-  user_type?: string;
-  billing?: {
-    current_plan?: { id: number; name: string; price: string; credits_per_month: number };
-    credits_remaining?: number;
-    credits_used_this_month?: number;
-    credits_reset_date?: string;
-    plan_start_date?: string;
-  };
-}
+export type { AdminUser } from './types';
 
 const TABS = [
-  { id: 'overview',    label: 'Overview',    Icon: User },
-  { id: 'credits',     label: 'Credits',     Icon: CreditCard },
-  { id: 'plan',        label: 'Plan',        Icon: Zap },
-  { id: 'validations', label: 'Validations', Icon: BarChart3 },
-  { id: 'apikeys',     label: 'API Keys',    Icon: Key },
-  { id: 'security',    label: 'Security',    Icon: Shield },
-  { id: 'permissions', label: 'Permissions', Icon: UserCog },
-  { id: 'actions',     label: 'Actions',     Icon: AlertTriangle },
-];
+    { id: 'overview', label: 'Overview', Icon: User },
+    { id: 'credits', label: 'Credits', Icon: CreditCard },
+    { id: 'plan', label: 'Plan', Icon: Package },
+    { id: 'validations', label: 'Validations', Icon: MailCheck },
+    { id: 'api-keys', label: 'API keys', Icon: KeyRound },
+    { id: 'security', label: 'Security', Icon: ShieldCheck },
+    { id: 'permissions', label: 'Permissions', Icon: UserCog },
+    { id: 'account', label: 'Account', Icon: TriangleAlert },
+] as const;
 
-const LABEL =
-  "font-['Space_Grotesk',sans-serif] uppercase tracking-[0.15em] text-[9px] text-emerald-600 dark:text-[#6effc0]";
+type TabId = (typeof TABS)[number]['id'];
 
 const UserDetailPage: React.FC = () => {
-  const { id } = useParams<{ id: string }>();
-  const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState('overview');
-  const [user, setUser] = useState<AdminUser | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+    const { id } = useParams<{ id: string }>();
+    const navigate = useNavigate();
+    const [searchParams, setSearchParams] = useSearchParams();
+    const confirm = useConfirm();
+    const currentAdminId = useCurrentAdminId();
 
-  const fetchUser = useCallback(async () => {
-    if (!id) return;
-    setLoading(true);
-    setError(null);
-    try {
-      const res = await axiosInstance.get(`/admin/users/${id}/`);
-      setUser(res.data);
-      console.log("res.data", res.data);
-    } catch (e: any) {
-      setError(e?.response?.data?.detail ?? 'Failed to load user');
-    } finally {
-      setLoading(false);
+    const [user, setUser] = useState<AdminUser | null>(null);
+    const [summary, setSummary] = useState<AdminUserSummary | null>(null);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
+
+    const tabParam = searchParams.get('tab') as TabId | null;
+    const activeTab: TabId = TABS.some((t) => t.id === tabParam) ? (tabParam as TabId) : 'overview';
+    const setTab = (tab: string) =>
+        setSearchParams((prev) => {
+            const next = new URLSearchParams(prev);
+            if (tab === 'overview') next.delete('tab');
+            else next.set('tab', tab);
+            return next;
+        }, { replace: true });
+
+    const fetchUser = useCallback(async () => {
+        if (!id) return;
+        setLoading(true);
+        setError(null);
+        const [userRes, summaryRes] = await Promise.allSettled([
+            axiosInstance.get<AdminUser>(`/admin/users/${id}/`),
+            axiosInstance.get<AdminUserSummary>(`/admin/users/${id}/summary/`),
+        ]);
+        if (userRes.status === 'fulfilled') setUser(userRes.value.data);
+        else setError(apiError(userRes.reason, 'Failed to load user'));
+        setSummary(summaryRes.status === 'fulfilled' ? summaryRes.value.data : null);
+        setLoading(false);
+    }, [id]);
+
+    useEffect(() => {
+        void fetchUser();
+    }, [fetchUser]);
+
+    if (error && !user) {
+        return (
+            <div className="space-y-4">
+                <Button variant="ghost" size="sm" render={<Link to="/admin/manage/users" />}>
+                    <ArrowLeft />
+                    All users
+                </Button>
+                <ErrorState title="Couldn't load this user" description={error} onRetry={() => void fetchUser()} />
+            </div>
+        );
     }
-  }, [id]);
 
-  useEffect(() => { fetchUser(); }, [fetchUser]);
+    const isSelf = Boolean(user && currentAdminId && user.id === currentAdminId);
+    const name = user ? displayName(user) : '';
 
-  const displayName = user
-    ? (user.first_name || user.last_name)
-      ? `${user.first_name ?? ''} ${user.last_name ?? ''}`.trim()
-      : user.username ?? user.email
-    : '—';
+    const toggleActive = () => {
+        if (!user) return;
+        const suspending = user.is_active;
+        confirm.ask({
+            title: suspending ? `Suspend ${name}?` : `Reactivate ${name}?`,
+            description: suspending
+                ? 'They are signed out of the app and their API keys stop working immediately. Nothing is deleted.'
+                : 'They can sign in and use their API keys again.',
+            confirmLabel: suspending ? 'Suspend' : 'Reactivate',
+            destructive: suspending,
+            onConfirm: async () => {
+                try {
+                    await axiosInstance.patch(`/admin/users/${user.id}/`, { is_active: !user.is_active });
+                    toast.success(suspending ? 'User suspended' : 'User reactivated');
+                    void fetchUser();
+                } catch (e) {
+                    toast.error(apiError(e, 'Could not update the account'));
+                    throw e;
+                }
+            },
+        });
+    };
 
-  return (
-    <div className="space-y-5" style={{ fontFamily: 'Inter, sans-serif' }}>
+    const sendReset = async () => {
+        if (!user) return;
+        try {
+            const res = await axiosInstance.post(`/admin/users/${user.id}/reset-password/`);
+            if (res.data?.email_sent) toast.success(`Reset link emailed to ${user.email}`);
+            else toast.warning('Email failed to send — copy the link from the Security tab instead.');
+        } catch (e) {
+            toast.error(apiError(e, 'Could not send the reset link'));
+        }
+    };
 
-      {/* Header */}
-      <div className="flex items-start justify-between flex-wrap gap-3">
-        <div className="flex items-center gap-3">
-          <button
-            onClick={() => navigate('/admin/users')}
-            type="button"
-            className="p-1.5 border border-gray-300 dark:border-[#3b4a41]/40 rounded-sm text-gray-600 dark:text-[#bacbbf] hover:text-emerald-600 dark:hover:text-[#6effc0] hover:border-emerald-500/40 dark:hover:border-[#6effc0]/30 transition-colors"
-          >
-            <ArrowLeft className="w-3.5 h-3.5" />
-          </button>
-          <div>
-            <p className={`${LABEL} mb-0.5`}>User Management</p>
-            <h1 className="font-['Epilogue',sans-serif] font-black text-gray-900 dark:text-[#e0e3e8] text-xl tracking-tight">
-              {loading ? '—' : displayName}
-            </h1>
-            {user && (
-              <p className="font-mono text-[10px] text-gray-500 dark:text-[#bacbbf]/50 mt-0.5">{user.email}</p>
-            )}
-          </div>
+    return (
+        <div className="space-y-6">
+            <Button variant="ghost" size="sm" className="-ml-2" onClick={() => navigate('/admin/manage/users')}>
+                <ArrowLeft />
+                All users
+            </Button>
+
+            <div className="flex flex-wrap items-start justify-between gap-4">
+                <div className="flex min-w-0 items-center gap-4">
+                    {user ? (
+                        <Avatar className="size-14">
+                            {user.profile_picture && <AvatarImage src={user.profile_picture} alt="" />}
+                            <AvatarFallback className="text-base">{initialsOf(name)}</AvatarFallback>
+                        </Avatar>
+                    ) : (
+                        <Skeleton className="size-14 rounded-full" />
+                    )}
+                    <div className="min-w-0 space-y-1">
+                        {user ? (
+                            <>
+                                <h1 className="truncate text-2xl font-semibold tracking-tight">
+                                    {name}
+                                    {isSelf && <span className="text-muted-foreground ml-2 text-base font-normal">(you)</span>}
+                                </h1>
+                                <p className="text-muted-foreground truncate text-sm">{user.email}</p>
+                                <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
+                                    <StatusBadge status={user.is_active ? 'active' : 'suspended'} />
+                                    {user.is_superuser && <Badge variant="destructive">Superuser</Badge>}
+                                    {user.is_staff && !user.is_superuser && <Badge variant="secondary">Staff</Badge>}
+                                    {user.billing?.current_plan && (
+                                        <Badge variant="outline">{user.billing.current_plan.name}</Badge>
+                                    )}
+                                    {summary?.security.two_factor_enabled && <Badge variant="outline">2FA</Badge>}
+                                </div>
+                            </>
+                        ) : (
+                            <>
+                                <Skeleton className="h-7 w-48" />
+                                <Skeleton className="h-4 w-56" />
+                            </>
+                        )}
+                    </div>
+                </div>
+
+                <div className="flex items-center gap-2">
+                    <Button variant="outline" size="icon" onClick={() => void fetchUser()} disabled={loading} aria-label="Refresh">
+                        <RefreshCw className={loading ? 'animate-spin' : undefined} />
+                    </Button>
+                    {user && (
+                        <>
+                            <Button variant={user.is_active ? 'outline' : 'default'} onClick={toggleActive} disabled={isSelf}>
+                                {user.is_active ? <Ban /> : <CircleCheck />}
+                                {user.is_active ? 'Suspend' : 'Reactivate'}
+                            </Button>
+                            <DropdownMenu>
+                                <DropdownMenuTrigger render={<Button variant="outline" size="icon" aria-label="More actions" />}>
+                                    <MoreHorizontal />
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end" className="w-52">
+                                    <DropdownMenuItem onClick={() => void sendReset()}>
+                                        <Send />
+                                        Email password reset
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem onClick={() => setTab('credits')}>
+                                        <CreditCard />
+                                        Adjust credits
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem onClick={() => setTab('plan')}>
+                                        <Package />
+                                        Change plan
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem onClick={() => setTab('api-keys')}>
+                                        <KeyRound />
+                                        Manage API keys
+                                    </DropdownMenuItem>
+                                    <DropdownMenuSeparator />
+                                    <DropdownMenuItem
+                                        variant="destructive"
+                                        onClick={() => setTab('account')}
+                                    >
+                                        <TriangleAlert />
+                                        Delete account…
+                                    </DropdownMenuItem>
+                                </DropdownMenuContent>
+                            </DropdownMenu>
+                        </>
+                    )}
+                </div>
+            </div>
+
+            <Tabs value={activeTab} onValueChange={(v) => setTab(String(v))}>
+                <div className="-mx-1 overflow-x-auto px-1 pb-1">
+                    <TabsList>
+                        {TABS.map(({ id: tid, label, Icon }) => (
+                            <TabsTrigger key={tid} value={tid}>
+                                <Icon />
+                                {label}
+                            </TabsTrigger>
+                        ))}
+                    </TabsList>
+                </div>
+
+                {!user ? (
+                    <div className="grid gap-4 pt-2 lg:grid-cols-3">
+                        <Skeleton className="h-64 lg:col-span-2" />
+                        <Skeleton className="h-64" />
+                    </div>
+                ) : (
+                    <div className="pt-2">
+                        <TabsContent value="overview">
+                            <UserOverviewTab user={user} summary={summary} onChanged={fetchUser} />
+                        </TabsContent>
+                        <TabsContent value="credits">
+                            <UserCreditsTab user={user} onChanged={fetchUser} />
+                        </TabsContent>
+                        <TabsContent value="plan">
+                            <UserPlanTab user={user} onChanged={fetchUser} />
+                        </TabsContent>
+                        <TabsContent value="validations">
+                            <UserValidationsTab user={user} onChanged={fetchUser} />
+                        </TabsContent>
+                        <TabsContent value="api-keys">
+                            <UserApiKeysTab user={user} onChanged={fetchUser} />
+                        </TabsContent>
+                        <TabsContent value="security">
+                            <UserSecurityTab user={user} onChanged={fetchUser} />
+                        </TabsContent>
+                        <TabsContent value="permissions">
+                            <UserPermissionsTab user={user} onChanged={fetchUser} />
+                        </TabsContent>
+                        <TabsContent value="account">
+                            <UserActionsTab user={user} onChanged={fetchUser} />
+                        </TabsContent>
+                    </div>
+                )}
+            </Tabs>
+
+            {confirm.dialog}
         </div>
-
-        <div className="flex items-center gap-2">
-          {user && (
-            <span className={`px-2 py-0.5 font-mono text-[9px] uppercase tracking-[0.1em] rounded-sm border ${
-              user.is_active
-                ? 'bg-[#6effc0]/10 text-[#6effc0] border-[#6effc0]/20'
-                : 'bg-[#ff4c4c]/10 text-[#ff4c4c] border-[#ff4c4c]/20'
-            }`}>
-              {user.is_active ? 'Active' : 'Suspended'}
-            </span>
-          )}
-          <button
-            type="button"
-            onClick={fetchUser}
-            disabled={loading}
-            className="p-1.5 border border-gray-300 dark:border-[#3b4a41]/40 rounded-sm text-gray-600 dark:text-[#bacbbf] hover:text-emerald-600 dark:hover:text-[#6effc0] hover:border-emerald-500/40 dark:hover:border-[#6effc0]/30 transition-colors disabled:opacity-40"
-          >
-            <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
-          </button>
-        </div>
-      </div>
-
-      {error && (
-        <div className="bg-red-50 border border-red-200 dark:bg-[#ff4c4c]/10 dark:border-[#ff4c4c]/30 rounded-sm p-3 font-mono text-xs text-red-700 dark:text-[#ff4c4c]">
-          {error}
-        </div>
-      )}
-
-      {/* Tab bar */}
-      <div className="flex items-center gap-px bg-gray-100 dark:bg-[#101418] border border-gray-200 dark:border-[#3b4a41]/40 rounded-sm p-0.5 flex-wrap">
-        {TABS.map(({ id: tid, label, Icon }) => (
-          <button
-            key={tid}
-            type="button"
-            onClick={() => setActiveTab(tid)}
-            className={`flex items-center gap-1.5 px-3 py-2 rounded-sm font-mono uppercase tracking-[0.1em] text-[10px] transition-all ${
-              activeTab === tid
-                ? 'bg-emerald-100 text-emerald-800 border border-emerald-200 dark:bg-[#6effc0]/15 dark:text-[#6effc0] dark:border-[#6effc0]/20'
-                : 'text-gray-500 hover:text-gray-800 dark:text-[#bacbbf]/50 dark:hover:text-[#bacbbf]'
-            }`}
-          >
-            <Icon className="w-3 h-3" />
-            {label}
-          </button>
-        ))}
-      </div>
-
-      {/* Tab content */}
-      {loading && !user ? (
-        <div className={`${UCARD} p-8 text-center`}>
-          <RefreshCw className="w-5 h-5 text-emerald-600 dark:text-[#6effc0] animate-spin mx-auto mb-2" />
-          <p className="font-mono text-xs text-gray-500 dark:text-[#bacbbf]/40">Loading user…</p>
-        </div>
-      ) : user ? (
-        <>
-          {activeTab === 'overview'    && <UserOverviewTab    user={user} onRefresh={fetchUser} />}
-          {activeTab === 'credits'     && <UserCreditsTab     userId={id!} user={user} onRefresh={fetchUser} />}
-          {activeTab === 'plan'        && <UserPlanTab        userId={id!} user={user} onRefresh={fetchUser} />}
-          {activeTab === 'validations' && <UserValidationsTab userId={id!} />}
-          {activeTab === 'apikeys'     && <UserApiKeysTab     userId={id!} />}
-          {activeTab === 'security'    && <UserSecurityTab    userId={id!} />}
-          {activeTab === 'permissions' && <UserPermissionsTab userId={id!} />}
-          {activeTab === 'actions'     && <UserActionsTab     user={user} onRefresh={fetchUser} />}
-        </>
-      ) : null}
-    </div>
-  );
+    );
 };
 
 export default UserDetailPage;

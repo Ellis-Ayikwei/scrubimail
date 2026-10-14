@@ -46,56 +46,57 @@ def _to_paystack_minor_units(amount):
     return int((d * 100).to_integral_value(rounding=ROUND_HALF_UP))
 
 
-def resolve_paystack_plan_charge(plan):
+def resolve_paystack_charge(amount, currency, label=""):
     """
-    Map catalog Plan (e.g. USD in DB) to (amount_major, currency) for Paystack.
+    Map a catalog price (e.g. USD in DB) to (amount_major, currency) for Paystack.
 
-    - If PAYSTACK_CHARGE_CURRENCY matches plan.currency: no conversion.
-    - If plan is USD and charge currency is GHS: amount = price * live rate (CurrencyFreaks,
-      cached) with PAYSTACK_FX_BUFFER, else PAYSTACK_FX_USD_TO_GHS fallback.
+    - If PAYSTACK_CHARGE_CURRENCY matches ``currency``: no conversion.
+    - If the price is USD and charge currency is GHS: amount = price * live rate
+      (CurrencyFreaks, cached) with PAYSTACK_FX_BUFFER, else PAYSTACK_FX_USD_TO_GHS fallback.
 
-    When Paystack enables USD: set PAYSTACK_CHARGE_CURRENCY=USD and keep Plan.currency=USD.
+    When Paystack enables USD: set PAYSTACK_CHARGE_CURRENCY=USD and keep catalog prices in USD.
     """
+    catalog_ccy = (currency or "USD").strip().upper()
     charge_ccy = (getattr(settings, "PAYSTACK_CHARGE_CURRENCY", None) or "").strip().upper()
     if not charge_ccy:
-        charge_ccy = (plan.currency or "USD").upper()
+        charge_ccy = catalog_ccy
 
-    plan_ccy = (plan.currency or "USD").strip().upper()
-    price = Decimal(str(plan.price))
+    price = Decimal(str(amount))
 
-    if charge_ccy == plan_ccy:
-        amount = price
-    elif plan_ccy == "USD" and charge_ccy == "GHS":
+    if charge_ccy == catalog_ccy:
+        charge = price
+    elif catalog_ccy == "USD" and charge_ccy == "GHS":
         rate = get_usd_to_ghs_rate()
         if rate is None or rate <= 0:
             raise ValueError(
                 "Could not resolve USD→GHS rate: set CURRENCYFREAKS_API_KEY or a positive "
                 "PAYSTACK_FX_USD_TO_GHS fallback."
             )
-        amount = (price * rate).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+        charge = (price * rate).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
         logger.info(
-            "Paystack plan pricing: USD %s → GHS %s (rate=%s, plan=%s)",
-            price,
-            amount,
-            rate,
-            plan.name,
+            "Paystack pricing: USD %s → GHS %s (rate=%s, %s)", price, charge, rate, label
         )
     else:
         raise ValueError(
-            f"No Paystack FX rule from catalog currency {plan_ccy} to "
-            f"PAYSTACK_CHARGE_CURRENCY={charge_ccy}. Align Plan.currency with "
-            "PAYSTACK_CHARGE_CURRENCY or extend resolve_paystack_plan_charge()."
+            f"No Paystack FX rule from catalog currency {catalog_ccy} to "
+            f"PAYSTACK_CHARGE_CURRENCY={charge_ccy}. Align the catalog currency with "
+            "PAYSTACK_CHARGE_CURRENCY or extend resolve_paystack_charge()."
         )
 
     if charge_ccy == "GHS":
         min_ghs = Decimal(str(getattr(settings, "PAYSTACK_MIN_GHS_MAJOR", "2.00")))
-        if amount < min_ghs:
+        if charge < min_ghs:
             raise ValueError(
-                f"Converted charge {amount} GHS is below Paystack minimum {min_ghs} GHS "
-                f"(plan={plan.name}). Raise the USD price, FX buffer/rate, or fallback."
+                f"Converted charge {charge} GHS is below Paystack minimum {min_ghs} GHS "
+                f"({label}). Raise the price, FX buffer/rate, or fallback."
             )
 
-    return amount, charge_ccy
+    return charge, charge_ccy
+
+
+def resolve_paystack_plan_charge(plan):
+    """Plan price → (amount_major, currency) for Paystack. See resolve_paystack_charge."""
+    return resolve_paystack_charge(plan.price, plan.currency, label=f"plan={plan.name}")
 
 
 class PaystackService:
@@ -141,17 +142,19 @@ class PaystackService:
         raise Exception(f"Failed to create customer: {response.text}")
 
     def initialize_transaction(
-        self, email, amount, reference, callback_url=None, metadata=None
+        self, email, amount, reference, callback_url=None, metadata=None, currency=None
     ):
-        """Initialize a payment transaction"""
+        """Initialize a payment transaction (``amount`` in major units)."""
         url = f"{self.base_url}/transaction/initialize"
         data = {
             "email": email,
-            "amount": int(amount * 100),  # Convert to kobo
+            "amount": _to_paystack_minor_units(amount),
             "reference": reference,
             "callback_url": callback_url,
             "metadata": metadata or {},
         }
+        if currency:
+            data["currency"] = currency
 
         response = requests.post(url, headers=self.headers, json=data)
         if response.status_code == 200:
@@ -210,15 +213,20 @@ class PaystackService:
         amount,
         metadata=None,
         reference=None,
+        currency=None,
     ):
         """One-off Paystack checkout (e.g. credit packages)."""
         ref = reference or f"pkg_{uuid.uuid4().hex[:20]}"
         callback_url = getattr(settings, "PAYMENT_SUCCESS_URL", None) or (
             f"{getattr(settings, 'FRONTEND_URL', '')}/billing/payment/success"
         )
-        amt = float(amount) if isinstance(amount, Decimal) else amount
         data = self.initialize_transaction(
-            email, amt, ref, callback_url=callback_url, metadata=metadata or {}
+            email,
+            amount,
+            ref,
+            callback_url=callback_url,
+            metadata=metadata or {},
+            currency=currency,
         )
         return {
             "authorization_url": data.get("authorization_url"),
@@ -372,26 +380,44 @@ class BillingService:
             request._billing_profile = profile
         return profile
 
-    def initialize_credit_purchase(self, user, amount, credits):
-        """Initialize credit purchase"""
-        profile = self.get_or_create_billing_profile(user)
+    def initialize_credit_purchase(self, user, credits=None, amount=None):
+        """Start a pay-as-you-go credit purchase.
 
-        # Generate unique reference
-        reference = f"credits_{user.id}_{timezone.now().timestamp()}"
+        The caller names *either* how many credits it wants or how much it wants
+        to spend; the price/credit count always comes from the admin pricing
+        rules (``credit_pricing``), never from the client.
+        """
+        from .credit_pricing import CreditPricingError, get_pricer
 
-        # Initialize Paystack transaction
+        pricer = get_pricer()
+        if not pricer.config.is_enabled:
+            raise CreditPricingError("Custom credit purchases are currently unavailable.")
+        quote = pricer.quote(credits=credits, amount=amount)
+
+        charge_amount, charge_currency = resolve_paystack_charge(
+            quote["total"], quote["currency"], label=f"credits={quote['credits']}"
+        )
+        reference = f"credits_{user.id}_{uuid.uuid4().hex[:16]}"
         success_cb = getattr(settings, "PAYMENT_SUCCESS_URL", None) or (
             f"{settings.FRONTEND_URL}/billing/payment/success"
         )
         transaction_data = self.paystack.initialize_transaction(
             email=user.email,
-            amount=amount,
+            amount=charge_amount,
             reference=reference,
             callback_url=success_cb,
+            currency=charge_currency,
             metadata={
                 "user_id": str(user.id),
-                "credits": credits,
                 "type": "credit_purchase",
+                "credits": quote["credits"],
+                "quote_total": quote["total"],
+                "quote_currency": quote["currency"],
+                "unit_price": quote["effective_unit_price"],
+                "tiers_mode": quote["tiers_mode"],
+                "charge_amount": str(charge_amount),
+                "charge_currency": charge_currency,
+                "expiry_days": quote["expiry_days"],
             },
         )
 
@@ -399,7 +425,58 @@ class BillingService:
             "authorization_url": transaction_data["authorization_url"],
             "access_code": transaction_data["access_code"],
             "reference": reference,
+            "quote": quote,
+            "charge_amount": str(charge_amount),
+            "charge_currency": charge_currency,
         }
+
+    def fulfill_credit_purchase(self, profile, reference, metadata, paid_minor=None):
+        """Grant a pay-as-you-go purchase exactly once.
+
+        Shared by the verify endpoint and the charge.success webhook, which can
+        race: the profile row lock + reference check makes the second caller a
+        no-op. Returns True if credits were granted by this call.
+        """
+        from django.db import transaction as db_transaction
+
+        try:
+            credits = int(metadata.get("credits") or 0)
+        except (TypeError, ValueError):
+            credits = 0
+        if credits <= 0:
+            raise ValueError("Invalid or missing credit amount in transaction")
+
+        expected = metadata.get("charge_amount")
+        if expected is not None and paid_minor is not None:
+            if int(paid_minor) < _to_paystack_minor_units(expected):
+                raise ValueError(
+                    f"Paid amount {paid_minor} is below the quoted charge {expected}"
+                )
+
+        try:
+            expiry_days = int(metadata.get("expiry_days") or 0) or None
+        except (TypeError, ValueError):
+            expiry_days = None
+
+        with db_transaction.atomic():
+            locked = BillingProfile.objects.select_for_update().get(pk=profile.pk)
+            if CreditTransaction.objects.filter(
+                billing_profile=locked, paystack_payment_reference=reference
+            ).exists():
+                return False
+            locked.add_credits(
+                amount=credits,
+                description=f"Credit purchase - {credits:,} credits",
+                payment_reference=reference,
+                expiry_days=expiry_days,
+            )
+            try:
+                spent = Decimal(str(metadata.get("quote_total") or 0))
+            except Exception:
+                spent = Decimal("0")
+            locked.total_amount_spent += spent
+            locked.save(update_fields=["total_amount_spent"])
+        return True
 
     def initialize_plan_upgrade(self, user, plan):
         """
@@ -534,35 +611,21 @@ class BillingService:
 
         if trans_type == "credit_purchase":
             out["payment_type"] = "credit_purchase"
-            try:
-                credits = int(metadata.get("credits") or 0)
-            except (TypeError, ValueError):
-                credits = 0
-            if credits <= 0:
-                out["message"] = "Invalid or missing credit amount in transaction"
-                return out
             profile = self.get_or_create_billing_profile(user)
-            if CreditTransaction.objects.filter(
-                billing_profile=profile, paystack_payment_reference=reference
-            ).exists():
-                out["ok"] = True
-                out["message"] = "Payment was already applied to your account."
-                return out
-            profile.add_credits(
-                amount=credits,
-                description=f"Credit purchase - {credits} credits",
-                payment_reference=reference,
-            )
             try:
-                amt_major = Decimal(str(transaction_data.get("amount", 0))) / Decimal(
-                    "100"
+                granted = self.fulfill_credit_purchase(
+                    profile, reference, metadata, transaction_data.get("amount")
                 )
-            except Exception:
-                amt_major = Decimal("0")
-            profile.total_amount_spent += amt_major
-            profile.save(update_fields=["total_amount_spent"])
+            except ValueError as e:
+                logger.error("credit_purchase verify %s rejected: %s", reference, e)
+                out["message"] = str(e)
+                return out
             out["ok"] = True
-            out["message"] = "Payment verified. Credits have been added to your account."
+            out["message"] = (
+                "Payment verified. Credits have been added to your account."
+                if granted
+                else "Payment was already applied to your account."
+            )
             return out
 
         out["payment_type"] = trans_type
@@ -755,31 +818,26 @@ class BillingService:
                 logger.info("Credit package purchase %s completed", purchase_id)
 
         elif charge_type == "credit_purchase":
-            # Credits come from what was recorded at checkout
-            # (initialize_credit_purchase stores metadata['credits'] and
-            # metadata['user_id']) — not from an amount-to-credit cast.
-            credits = metadata.get("credits")
-            if credits is None:
-                logger.error(
-                    "credit_purchase charge %s missing 'credits' metadata; "
-                    "refusing to derive credits from the raw amount",
-                    reference,
-                )
-                return
+            # Credits come from what initialize_credit_purchase recorded at
+            # checkout (server-side quote) — never from the raw paid amount.
             profile = self._resolve_profile_for_charge(data, metadata)
             if profile is None:
                 logger.error(
                     "credit_purchase charge %s: no billing profile found", reference
                 )
                 return
-            profile.add_credits(
-                int(credits), f"Credit purchase via Paystack (Ref: {reference})"
-            )
+            try:
+                granted = self.fulfill_credit_purchase(
+                    profile, reference, metadata, data.get("amount")
+                )
+            except ValueError as e:
+                logger.error("credit_purchase charge %s rejected: %s", reference, e)
+                return
             logger.info(
-                "Added %s credits to profile %s (ref %s)",
-                credits,
-                profile.id,
+                "credit_purchase %s for profile %s (granted=%s)",
                 reference,
+                profile.id,
+                granted,
             )
         else:
             logger.info(

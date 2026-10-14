@@ -32,6 +32,9 @@ from .views import (
     GenerateInvoiceView,
     DownloadInvoicePDFView,
     UsageAlertsStatusView,
+    CreditPricingView,
+    CreditPricingQuoteView,
+    AdminCreditPricingView,
 )
 
 urlpatterns = [
@@ -50,6 +53,10 @@ urlpatterns = [
     ),
     # Credit purchases
     path("purchase-credits/", CreditPurchaseView.as_view(), name="purchase-credits"),
+    # Pay-as-you-go pricing rules + live quotes (public), admin editor
+    path("credit-pricing/", CreditPricingView.as_view(), name="credit-pricing"),
+    path("credit-pricing/quote/", CreditPricingQuoteView.as_view(), name="credit-pricing-quote"),
+    path("admin/credit-pricing/", AdminCreditPricingView.as_view(), name="admin-credit-pricing"),
     # Credit packages
     path("credit-packages/", ListCreditPackagesView.as_view(), name="list-credit-packages"),
     path("credit-packages/<uuid:package_id>/", CreditPackageDetailView.as_view(), name="credit-package-detail"),

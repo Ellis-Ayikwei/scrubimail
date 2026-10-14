@@ -1,380 +1,337 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { Plus, Minus, RefreshCw, TrendingUp, TrendingDown, RotateCcw } from 'lucide-react';
-import axiosInstance from '../../../services/axiosInstance';
-import type { AdminUser } from './index';
-import {
-  UCARD,
-  ULABEL,
-  UINPUT,
-  UHEADER,
-  UBORDER_B,
-  UPANEL,
-  UDIVIDE,
-  UROW_HOVER,
-  USKELETON,
-  UICON_BTN,
-  UBTN_GHOST,
-  UMINT,
-  UERR,
-  UOK,
-} from './userTheme';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { Minus, Plus, RotateCcw } from 'lucide-react';
+import { toast } from 'sonner';
+
+import axiosInstance from '@/services/axiosInstance';
+import { DataTable, type DataTableColumn, StatCard, StatCardGrid, StatusBadge, useConfirm } from '@/components/admin';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Field, FieldDescription, FieldGroup, FieldLabel } from '@/components/ui/field';
+import { Input } from '@/components/ui/input';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { apiError, asList } from '@/lib/api';
+import { formatDate, formatDateTime, formatNumber } from '@/lib/format';
+import { cn } from '@/lib/utils';
+import type { UserTabProps } from './types';
 
 interface Transaction {
-  id: string;
-  amount: number;
-  transaction_type: string;
-  description?: string;
-  created_at: string;
-  balance_after?: number;
+    id: string;
+    amount: number;
+    transaction_type: string;
+    description?: string;
+    created_at: string;
+    paystack_payment_reference?: string | null;
 }
 
-interface Props {
-  userId: string;
-  user: AdminUser;
-  onRefresh: () => void;
-}
+const TX_LABEL: Record<string, string> = {
+    purchase: 'Purchase',
+    usage: 'Usage',
+    refund: 'Refund',
+    bonus: 'Bonus',
+    expired: 'Expired',
+    plan_credits: 'Plan credits',
+    grant: 'Admin grant',
+    deduction: 'Admin deduction',
+    auto_reset: 'Monthly reset',
+    manual_reset: 'Manual reset',
+};
 
-const txColor = (t: Transaction) =>
-  ['auto_reset', 'manual_reset'].includes(t.transaction_type)
-    ? 'text-amber-600 dark:text-[#f59e0b]'
-    : t.amount > 0
-      ? UMINT
-      : t.transaction_type === 'usage'
-        ? 'text-gray-500 dark:text-[#bacbbf]/50'
-        : 'text-red-600 dark:text-[#ff4c4c]';
+const TX_TONE: Record<string, 'success' | 'danger' | 'info' | 'warning' | 'neutral'> = {
+    purchase: 'success',
+    grant: 'success',
+    bonus: 'success',
+    plan_credits: 'success',
+    refund: 'info',
+    usage: 'neutral',
+    deduction: 'danger',
+    expired: 'danger',
+    auto_reset: 'warning',
+    manual_reset: 'warning',
+};
 
-const UserCreditsTab: React.FC<Props> = ({ userId, user, onRefresh }) => {
-  const [transactions, setTransactions] = useState<Transaction[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [submitting, setSubmitting] = useState(false);
-  const [resetting, setResetting] = useState(false);
-  const [confirmReset, setConfirmReset] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState<string | null>(null);
-  const [mode, setMode] = useState<'add' | 'deduct'>('add');
-  const [amount, setAmount] = useState('');
-  const [reason, setReason] = useState('');
+const UserCreditsTab: React.FC<UserTabProps> = ({ user, onChanged }) => {
+    const confirm = useConfirm();
+    const [transactions, setTransactions] = useState<Transaction[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
+    const [mode, setMode] = useState<'add' | 'deduct'>('add');
+    const [amount, setAmount] = useState('');
+    const [reason, setReason] = useState('');
+    const [submitting, setSubmitting] = useState(false);
 
-  const fetchTransactions = useCallback(async () => {
-    setLoading(true);
-    try {
-      const res = await axiosInstance.get('/admin/billing/', { params: { user_id: userId } });
-      const all: Transaction[] = Array.isArray(res.data) ? res.data : res.data?.results ?? [];
-      setTransactions(all.filter((t: any) => String(t.user_id ?? t.billing_profile?.user ?? '') === String(userId)));
-    } catch {
-      setTransactions([]);
-    } finally {
-      setLoading(false);
+    const fetchTransactions = useCallback(async () => {
+        setLoading(true);
+        setError(null);
+        try {
+            const res = await axiosInstance.get('/admin/billing/', { params: { user_id: user.id, limit: 1000 } });
+            setTransactions(asList<Transaction>(res.data));
+        } catch (e) {
+            setTransactions([]);
+            setError(apiError(e, 'Could not load the credit history'));
+        } finally {
+            setLoading(false);
+        }
+    }, [user.id]);
+
+    useEffect(() => {
+        void fetchTransactions();
+    }, [fetchTransactions]);
+
+    const credits = user.billing?.credits_remaining ?? 0;
+    const n = Number.parseInt(amount, 10);
+    const validAmount = Number.isFinite(n) && n > 0;
+    const overdraw = mode === 'deduct' && validAmount && n > credits;
+
+    const submit = (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!validAmount || overdraw) return;
+        const signed = mode === 'add' ? n : -n;
+        confirm.ask({
+            title: `${mode === 'add' ? 'Add' : 'Deduct'} ${formatNumber(n)} credits?`,
+            description: `Balance goes from ${formatNumber(credits)} to ${formatNumber(credits + signed)}. This is recorded in the user's credit history.`,
+            confirmLabel: mode === 'add' ? 'Add credits' : 'Deduct credits',
+            destructive: mode === 'deduct',
+            onConfirm: async () => {
+                setSubmitting(true);
+                try {
+                    const res = await axiosInstance.post('/admin/billing/adjust/', {
+                        user_id: user.id,
+                        amount: signed,
+                        reason: reason.trim() || (mode === 'add' ? 'Admin credit grant' : 'Admin credit deduction'),
+                    });
+                    toast.success(res.data?.detail ?? 'Credits updated');
+                    setAmount('');
+                    setReason('');
+                    void fetchTransactions();
+                    onChanged();
+                } catch (err) {
+                    toast.error(apiError(err, 'Could not adjust credits'));
+                    throw err;
+                } finally {
+                    setSubmitting(false);
+                }
+            },
+        });
+    };
+
+    const resetCycle = () => {
+        const plan = user.billing?.current_plan;
+        if (!plan) {
+            toast.error('Assign a plan first — the reset refills to the plan allowance.');
+            return;
+        }
+        confirm.ask({
+            title: 'Reset the billing cycle?',
+            description: `Sets the balance to ${formatNumber(plan.credits_per_month)} credits (the ${plan.name} allowance), zeroes this month's usage and starts a new cycle today. Any credits above the allowance are lost.`,
+            confirmLabel: 'Reset cycle',
+            destructive: true,
+            onConfirm: async () => {
+                try {
+                    const res = await axiosInstance.post(`/admin/users/${user.id}/reset-billing/`);
+                    toast.success(res.data?.detail ?? 'Billing cycle reset');
+                    void fetchTransactions();
+                    onChanged();
+                } catch (err) {
+                    toast.error(apiError(err, 'Could not reset the billing cycle'));
+                    throw err;
+                }
+            },
+        });
+    };
+
+    const columns = useMemo<DataTableColumn<Transaction>[]>(
+        () => [
+            {
+                id: 'type',
+                header: 'Type',
+                sortValue: (t) => t.transaction_type,
+                cell: (t) => (
+                    <StatusBadge
+                        status={t.transaction_type}
+                        label={TX_LABEL[t.transaction_type] ?? t.transaction_type}
+                        tone={TX_TONE[t.transaction_type] ?? 'neutral'}
+                    />
+                ),
+            },
+            {
+                id: 'amount',
+                header: 'Credits',
+                sortValue: (t) => t.amount,
+                className: 'tabular-nums',
+                cell: (t) => (
+                    <span className={cn('font-medium', t.amount > 0 ? 'text-success' : t.amount < 0 && 'text-destructive')}>
+                        {t.amount > 0 ? '+' : ''}
+                        {formatNumber(t.amount)}
+                    </span>
+                ),
+            },
+            {
+                id: 'description',
+                header: 'Description',
+                cell: (t) => (
+                    <div className="max-w-90 min-w-0">
+                        <p className="truncate">{t.description || '—'}</p>
+                        {t.paystack_payment_reference && (
+                            <p className="text-muted-foreground truncate font-mono text-xs">{t.paystack_payment_reference}</p>
+                        )}
+                    </div>
+                ),
+            },
+            {
+                id: 'date',
+                header: 'Date',
+                sortValue: (t) => t.created_at,
+                cell: (t) => (
+                    <span className="text-muted-foreground whitespace-nowrap" title={formatDateTime(t.created_at)}>
+                        {formatDate(t.created_at)}
+                    </span>
+                ),
+            },
+        ],
+        []
+    );
+
+    if (!user.billing) {
+        return (
+            <Card>
+                <CardHeader>
+                    <CardTitle>No billing profile</CardTitle>
+                    <CardDescription>
+                        This user has no billing profile, so credits can't be adjusted. One is created on sign-up; assigning
+                        a plan from the Plan tab will not create it either — check the account was provisioned correctly.
+                    </CardDescription>
+                </CardHeader>
+            </Card>
+        );
     }
-  }, [userId]);
 
-  useEffect(() => {
-    fetchTransactions();
-  }, [fetchTransactions]);
-
-  const handleAdjust = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const n = parseInt(amount, 10);
-    if (!n || n <= 0) return;
-    setSubmitting(true);
-    setError(null);
-    setSuccess(null);
-    try {
-      await axiosInstance.post('/admin/billing/adjust/', {
-        user_id: userId,
-        amount: mode === 'add' ? n : -n,
-        reason: reason || (mode === 'add' ? 'Admin credit grant' : 'Admin credit deduction'),
-      });
-      setSuccess(`${mode === 'add' ? 'Added' : 'Deducted'} ${n} credits successfully`);
-      setAmount('');
-      setReason('');
-      fetchTransactions();
-      onRefresh();
-    } catch (e: any) {
-      setError(e?.response?.data?.detail ?? `Failed to ${mode} credits`);
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  const handleResetCycle = async () => {
-    setResetting(true);
-    setError(null);
-    setSuccess(null);
-    try {
-      const res = await axiosInstance.post(`/admin/users/${userId}/reset-billing/`);
-      setSuccess(res.data?.detail ?? 'Billing cycle reset successfully');
-      setConfirmReset(false);
-      fetchTransactions();
-      onRefresh();
-    } catch (e: any) {
-      setError(e?.response?.data?.detail ?? 'Failed to reset billing cycle');
-    } finally {
-      setResetting(false);
-    }
-  };
-
-  const credits = user.billing?.credits_remaining ?? 0;
-  const usedThisMonth = user.billing?.credits_used_this_month ?? 0;
-  const planCredits = user.billing?.current_plan?.credits_per_month ?? 0;
-  const usedPct = planCredits > 0 ? Math.min((usedThisMonth / planCredits) * 100, 100) : 0;
-
-  const txLabel = (t: Transaction) =>
-    (
-      {
-        usage: 'Usage',
-        purchase: 'Purchase',
-        grant: 'Grant',
-        deduction: 'Deduction',
-        refund: 'Refund',
-        bonus: 'Bonus',
-        expired: 'Expired',
-        plan_credits: 'Plan Credits',
-        auto_reset: 'Auto Reset',
-        manual_reset: 'Manual Reset',
-      } as Record<string, string>
-    )[t.transaction_type] ?? t.transaction_type;
-
-  return (
-    <div className="grid lg:grid-cols-3 gap-5">
-      <div className="space-y-4">
-        <div className={UCARD}>
-          <div className={`px-4 py-3 ${UBORDER_B}`}>
-            <p className={UHEADER}>Credit Balance</p>
-          </div>
-          <div className="p-5 space-y-4">
-            <div className="text-center">
-              <p className="font-['JetBrains_Mono',monospace] text-4xl font-bold text-emerald-600 dark:text-[#6effc0]">
-                {credits.toLocaleString()}
-              </p>
-              <p className="font-mono text-[9px] text-gray-500 dark:text-[#3b4a41] uppercase tracking-[0.15em] mt-1">
-                Credits Remaining
-              </p>
-            </div>
-
-            <div className={`${UPANEL} rounded-sm p-3 space-y-2`}>
-              <div className="flex justify-between">
-                <span className={ULABEL}>Used This Month</span>
-                <span className="font-mono text-[10px] text-gray-600 dark:text-[#bacbbf]">{usedThisMonth.toLocaleString()}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className={ULABEL}>Plan Allocation</span>
-                <span className="font-mono text-[10px] text-gray-600 dark:text-[#bacbbf]">{planCredits.toLocaleString()}</span>
-              </div>
-              <div className="w-full h-1.5 bg-gray-200 dark:bg-[#080C10] rounded-full overflow-hidden mt-1">
-                <div
-                  className={`h-full rounded-full transition-all ${usedPct > 80 ? 'bg-red-500 dark:bg-[#ff4c4c]' : 'bg-emerald-500 dark:bg-[#6effc0]'}`}
-                  style={{ width: `${usedPct}%` }}
+    return (
+        <div className="space-y-6">
+            <StatCardGrid className="lg:grid-cols-3">
+                <StatCard label="Balance" value={formatNumber(credits)} hint="Credits available now" />
+                <StatCard
+                    label="Used this cycle"
+                    value={formatNumber(user.billing.credits_used_this_month ?? 0)}
+                    hint={
+                        user.billing.current_plan
+                            ? `of ${formatNumber(user.billing.current_plan.credits_per_month)} plan credits`
+                            : undefined
+                    }
                 />
-              </div>
-              <p className="font-mono text-[8px] text-gray-500 dark:text-[#3b4a41] text-right">{usedPct.toFixed(1)}% used</p>
-            </div>
-          </div>
-        </div>
+                <StatCard
+                    label="Cycle started"
+                    value={formatDate(user.billing.credits_reset_date)}
+                    hint={user.billing.current_plan?.name ?? 'No plan'}
+                />
+            </StatCardGrid>
 
-        <div className={UCARD}>
-          <div className={`px-4 py-3 ${UBORDER_B}`}>
-            <p className={UHEADER}>Billing Cycle</p>
-          </div>
-          <div className="p-4 space-y-3">
-            <div className={`${UPANEL} rounded-sm p-3 space-y-2`}>
-              <div className="flex justify-between">
-                <span className={ULABEL}>Cycle Started</span>
-                <span className="font-mono text-[10px] text-gray-600 dark:text-[#bacbbf]">
-                  {user.billing?.plan_start_date
-                    ? new Date(user.billing.plan_start_date).toLocaleDateString('en-GB', {
-                        day: '2-digit',
-                        month: 'short',
-                        year: 'numeric',
-                      })
-                    : '—'}
-                </span>
-              </div>
-              <div className="flex justify-between">
-                <span className={ULABEL}>Last Reset</span>
-                <span className="font-mono text-[10px] text-gray-600 dark:text-[#bacbbf]">
-                  {user.billing?.credits_reset_date
-                    ? new Date(user.billing.credits_reset_date).toLocaleDateString('en-GB', {
-                        day: '2-digit',
-                        month: 'short',
-                        year: 'numeric',
-                      })
-                    : '—'}
-                </span>
-              </div>
-            </div>
+            <div className="grid gap-4 lg:grid-cols-3">
+                <Card>
+                    <CardHeader>
+                        <CardTitle>Adjust credits</CardTitle>
+                        <CardDescription>Grant goodwill credits or claw back an over-allocation.</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        <form onSubmit={submit}>
+                            <FieldGroup>
+                                <Tabs value={mode} onValueChange={(v) => setMode(v as 'add' | 'deduct')}>
+                                    <TabsList className="w-full">
+                                        <TabsTrigger value="add" className="flex-1">
+                                            <Plus />
+                                            Add
+                                        </TabsTrigger>
+                                        <TabsTrigger value="deduct" className="flex-1">
+                                            <Minus />
+                                            Deduct
+                                        </TabsTrigger>
+                                    </TabsList>
+                                </Tabs>
+                                <Field data-invalid={overdraw || undefined}>
+                                    <FieldLabel htmlFor="credit-amount">Amount</FieldLabel>
+                                    <Input
+                                        id="credit-amount"
+                                        type="number"
+                                        min={1}
+                                        step={1}
+                                        inputMode="numeric"
+                                        value={amount}
+                                        onChange={(e) => setAmount(e.target.value)}
+                                        aria-invalid={overdraw || undefined}
+                                        placeholder="e.g. 500"
+                                    />
+                                    <FieldDescription>
+                                        {overdraw
+                                            ? `Can't deduct more than the ${formatNumber(credits)} available.`
+                                            : validAmount
+                                              ? `New balance: ${formatNumber(credits + (mode === 'add' ? n : -n))}`
+                                              : `Current balance: ${formatNumber(credits)}`}
+                                    </FieldDescription>
+                                </Field>
+                                <Field>
+                                    <FieldLabel htmlFor="credit-reason">Reason</FieldLabel>
+                                    <Input
+                                        id="credit-reason"
+                                        value={reason}
+                                        onChange={(e) => setReason(e.target.value)}
+                                        placeholder="Shown in the user's history"
+                                        maxLength={200}
+                                    />
+                                </Field>
+                                <Button
+                                    type="submit"
+                                    variant={mode === 'deduct' ? 'destructive' : 'default'}
+                                    disabled={!validAmount || overdraw || submitting}
+                                >
+                                    {mode === 'add' ? 'Add credits' : 'Deduct credits'}
+                                </Button>
+                            </FieldGroup>
+                        </form>
+                    </CardContent>
+                </Card>
 
-            {!confirmReset ? (
-              <button
-                type="button"
-                onClick={() => setConfirmReset(true)}
-                disabled={!user.billing?.current_plan}
-                className="w-full flex items-center justify-center gap-2 py-2.5 rounded-sm font-mono text-[10px] uppercase tracking-[0.12em] border border-amber-300 text-amber-800 bg-amber-50 hover:bg-amber-100 dark:border-[#f59e0b]/30 dark:text-[#f59e0b] dark:bg-[#f59e0b]/08 dark:hover:bg-[#f59e0b]/15 transition-all disabled:opacity-30 disabled:cursor-not-allowed"
-              >
-                <RotateCcw className="w-3 h-3" /> Reset Billing Cycle
-              </button>
-            ) : (
-              <div className="space-y-2">
-                <p className="font-mono text-[9px] text-gray-600 dark:text-[#bacbbf]/60 leading-relaxed">
-                  This will reset credits to{' '}
-                  <strong className="text-gray-900 dark:text-[#e0e3e8]">{planCredits.toLocaleString()}</strong> (plan
-                  allocation), clear usage, and set the cycle start to now.
-                </p>
-                <div className="flex gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setConfirmReset(false)}
-                    className={`flex-1 py-2 font-mono text-[9px] uppercase tracking-[0.1em] rounded-sm transition-colors ${UBTN_GHOST}`}
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleResetCycle}
-                    disabled={resetting}
-                    className="flex-1 flex items-center justify-center gap-1.5 py-2 bg-amber-500 text-white dark:bg-[#f59e0b] dark:text-[#1c2024] font-mono text-[9px] uppercase tracking-[0.12em] font-bold rounded-sm hover:brightness-105 disabled:opacity-40 transition-all"
-                  >
-                    {resetting ? (
-                      <>
-                        <RefreshCw className="w-3 h-3 animate-spin" /> Resetting…
-                      </>
-                    ) : (
-                      'Confirm Reset'
-                    )}
-                  </button>
+                <div className="space-y-4 lg:col-span-2">
+                    <Card>
+                        <CardHeader>
+                            <CardTitle>Billing cycle</CardTitle>
+                            <CardDescription>
+                                Refill to the plan allowance and start a fresh cycle today — for when a monthly reset was
+                                missed.
+                            </CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                            <Button variant="outline" onClick={resetCycle}>
+                                <RotateCcw />
+                                Reset billing cycle
+                            </Button>
+                        </CardContent>
+                    </Card>
+
+                    <div>
+                        <h3 className="mb-3 text-sm font-medium">Credit history</h3>
+                        <DataTable
+                            data={transactions}
+                            columns={columns}
+                            rowKey={(t) => t.id}
+                            loading={loading}
+                            error={error}
+                            onRetry={() => void fetchTransactions()}
+                            pageSize={15}
+                            searchFilter={(t, q) =>
+                                (t.description ?? '').toLowerCase().includes(q) ||
+                                (TX_LABEL[t.transaction_type] ?? t.transaction_type).toLowerCase().includes(q) ||
+                                (t.paystack_payment_reference ?? '').toLowerCase().includes(q)
+                            }
+                            searchPlaceholder="Search history…"
+                            emptyTitle="No transactions"
+                            emptyDescription="Credit grants, purchases and resets will show here."
+                        />
+                    </div>
                 </div>
-              </div>
-            )}
-          </div>
+            </div>
+
+            {confirm.dialog}
         </div>
-
-        <div className={UCARD}>
-          <div className={`px-4 py-3 ${UBORDER_B}`}>
-            <p className={UHEADER}>Adjust Credits</p>
-          </div>
-          <div className="p-4">
-            {error && <div className={`mb-3 rounded-sm p-2.5 font-mono text-[10px] ${UERR}`}>{error}</div>}
-            {success && <div className={`mb-3 rounded-sm p-2.5 font-mono text-[10px] ${UOK}`}>{success}</div>}
-
-            <div className={`flex ${UPANEL} border border-gray-200 dark:border-[#3b4a41]/40 rounded-sm p-0.5 mb-4`}>
-              {(['add', 'deduct'] as const).map((m) => (
-                <button
-                  key={m}
-                  type="button"
-                  onClick={() => setMode(m)}
-                  className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-sm font-mono text-[10px] uppercase tracking-[0.1em] transition-all ${
-                    mode === m
-                      ? m === 'add'
-                        ? 'bg-emerald-100 text-emerald-800 border border-emerald-200 dark:bg-[#6effc0]/15 dark:text-[#6effc0] dark:border-[#6effc0]/20'
-                        : 'bg-red-50 text-red-700 border border-red-200 dark:bg-[#ff4c4c]/15 dark:text-[#ff4c4c] dark:border-[#ff4c4c]/20'
-                      : 'text-gray-400 hover:text-gray-700 dark:text-[#bacbbf]/40 dark:hover:text-[#bacbbf]'
-                  }`}
-                >
-                  {m === 'add' ? <Plus className="w-3 h-3" /> : <Minus className="w-3 h-3" />}
-                  {m === 'add' ? 'Add' : 'Deduct'}
-                </button>
-              ))}
-            </div>
-
-            <form onSubmit={handleAdjust} className="space-y-3">
-              <div>
-                <label className={`${ULABEL} block mb-1.5`}>Amount</label>
-                <input
-                  type="number"
-                  min="1"
-                  value={amount}
-                  onChange={(e) => setAmount(e.target.value)}
-                  placeholder="e.g. 500"
-                  className={UINPUT}
-                  required
-                />
-              </div>
-              <div>
-                <label className={`${ULABEL} block mb-1.5`}>Reason (optional)</label>
-                <input
-                  value={reason}
-                  onChange={(e) => setReason(e.target.value)}
-                  placeholder="Admin grant, refund, etc."
-                  className={UINPUT}
-                />
-              </div>
-              <button
-                type="submit"
-                disabled={submitting || !amount}
-                className={`w-full flex items-center justify-center gap-2 py-2.5 rounded-sm font-mono text-[10px] uppercase tracking-[0.15em] font-bold transition-all disabled:opacity-40 disabled:cursor-not-allowed ${
-                  mode === 'add'
-                    ? 'bg-emerald-500 text-white dark:bg-[#6effc0] dark:text-[#003824] hover:brightness-105 shadow-sm dark:shadow-[0_0_15px_rgba(110,255,192,0.15)]'
-                    : 'bg-red-50 text-red-700 border border-red-200 dark:bg-[#ff4c4c]/20 dark:text-[#ff4c4c] dark:border-[#ff4c4c]/30 dark:hover:bg-[#ff4c4c]/30'
-                }`}
-              >
-                {submitting ? 'Processing…' : mode === 'add' ? `Add ${amount || '—'} Credits` : `Deduct ${amount || '—'} Credits`}
-              </button>
-            </form>
-          </div>
-        </div>
-      </div>
-
-      <div className="lg:col-span-2">
-        <div className={`${UCARD} overflow-hidden`}>
-          <div className={`flex items-center justify-between px-4 py-3 ${UBORDER_B}`}>
-            <p className={UHEADER}>Transaction History</p>
-            <button type="button" onClick={fetchTransactions} disabled={loading} className={UICON_BTN}>
-              <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
-            </button>
-          </div>
-
-          {loading ? (
-            <div className="p-6 space-y-2">
-              {Array.from({ length: 6 }).map((_, i) => (
-                <div key={i} className={`h-10 ${USKELETON} rounded animate-pulse`} />
-              ))}
-            </div>
-          ) : transactions.length === 0 ? (
-            <div className="p-8 text-center">
-              <p className="font-mono text-xs text-gray-500 dark:text-[#3b4a41]">No transactions found</p>
-            </div>
-          ) : (
-            <div className={UDIVIDE}>
-              <div className={`grid grid-cols-[1fr_100px_80px_130px] gap-3 px-4 py-2 ${UPANEL}`}>
-                {['Description', 'Type', 'Amount', 'Date'].map((h) => (
-                  <span key={h} className={ULABEL}>
-                    {h}
-                  </span>
-                ))}
-              </div>
-              {transactions.map((t) => (
-                <div
-                  key={t.id}
-                  className={`grid grid-cols-[1fr_100px_80px_130px] gap-3 px-4 py-3 ${UROW_HOVER} transition-colors items-center`}
-                >
-                  <span className="font-mono text-[10px] text-gray-600 dark:text-[#bacbbf] truncate">
-                    {t.description ?? '—'}
-                  </span>
-                  <span className="font-mono text-[9px] uppercase tracking-[0.08em] text-gray-400 dark:text-[#bacbbf]/50">
-                    {txLabel(t)}
-                  </span>
-                  <span className={`font-mono text-[11px] font-bold flex items-center gap-1 ${txColor(t)}`}>
-                    {t.amount > 0 ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
-                    {t.amount > 0 ? '+' : ''}
-                    {t.amount.toLocaleString()}
-                  </span>
-                  <span className="font-mono text-[9px] text-gray-500 dark:text-[#3b4a41]">
-                    {new Date(t.created_at).toLocaleDateString('en-GB', {
-                      day: '2-digit',
-                      month: 'short',
-                      year: 'numeric',
-                      hour: '2-digit',
-                      minute: '2-digit',
-                    })}
-                  </span>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
-  );
+    );
 };
 
 export default UserCreditsTab;

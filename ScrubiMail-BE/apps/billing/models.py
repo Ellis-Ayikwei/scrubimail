@@ -1198,3 +1198,73 @@ class ProcessedWebhookEvent(models.Model):
             models.Index(fields=["provider", "event_id"]),
             models.Index(fields=["-created_at"]),
         ]
+
+
+def default_credit_pricing_tiers():
+    # Volume tiers: buying at least ``from`` credits prices the purchase at
+    # ``unit_price`` per credit. Kept a little above the CreditPackage bundles so
+    # the curated packages stay the best deal.
+    return [
+        {"from": 1000, "unit_price": "0.0080"},
+        {"from": 5000, "unit_price": "0.0065"},
+        {"from": 10000, "unit_price": "0.0055"},
+        {"from": 25000, "unit_price": "0.0045"},
+        {"from": 50000, "unit_price": "0.0038"},
+        {"from": 100000, "unit_price": "0.0030"},
+        {"from": 250000, "unit_price": "0.0025"},
+        {"from": 500000, "unit_price": "0.0020"},
+        {"from": 1000000, "unit_price": "0.0016"},
+    ]
+
+
+class CreditPricingConfig(Basemodel):
+    """Admin-managed rules for pay-as-you-go ("enter any amount") credit purchases.
+
+    A single row (``get_solo``). The quote engine in ``credit_pricing.py`` is the
+    only place prices are computed; checkout always re-quotes server-side, so the
+    client never decides how many credits a payment buys.
+    """
+
+    TIERS_MODE_VOLUME = "volume"
+    TIERS_MODE_GRADUATED = "graduated"
+    TIERS_MODE_CHOICES = [
+        # Whole purchase priced at the rate of the tier it reaches.
+        (TIERS_MODE_VOLUME, "Volume"),
+        # Each tier's slice priced at that tier's rate, then summed.
+        (TIERS_MODE_GRADUATED, "Graduated"),
+    ]
+    CURRENCY_CHOICES = [("USD", "USD"), ("GHS", "GHS")]
+
+    singleton_key = models.CharField(max_length=20, unique=True, default="default")
+    is_enabled = models.BooleanField(default=True)
+    currency = models.CharField(max_length=10, choices=CURRENCY_CHOICES, default="USD")
+    tiers_mode = models.CharField(
+        max_length=20, choices=TIERS_MODE_CHOICES, default=TIERS_MODE_VOLUME
+    )
+    tiers = models.JSONField(default=default_credit_pricing_tiers)
+    min_credits = models.PositiveIntegerField(default=1000)
+    max_credits = models.PositiveIntegerField(default=5000000)
+    credit_step = models.PositiveIntegerField(
+        default=100, help_text="Purchases must be a multiple of this many credits"
+    )
+    expiry_days = models.PositiveIntegerField(
+        null=True, blank=True, help_text="Days until purchased credits expire (empty = never)"
+    )
+    updated_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="+",
+    )
+
+    class Meta:
+        db_table = "credit_pricing_config"
+
+    def __str__(self):
+        return f"Credit pricing ({self.tiers_mode}, {self.currency})"
+
+    @classmethod
+    def get_solo(cls):
+        obj, _ = cls.objects.get_or_create(singleton_key="default")
+        return obj

@@ -1,331 +1,370 @@
-import React, { useState } from 'react';
-import { Mail, Calendar, Clock, Shield, CheckCircle, XCircle, Save, X, Edit2 } from 'lucide-react';
-import axiosInstance from '../../../services/axiosInstance';
-import type { AdminUser } from './index';
-import { UCARD, ULABEL, UINPUT, UHEADER, UBORDER_B, UPANEL, UMONO, UMINT, UERR } from './userTheme';
+import React, { useEffect, useState } from 'react';
+import { Copy, Pencil } from 'lucide-react';
+import { toast } from 'sonner';
 
-interface Props {
-  user: AdminUser;
-  onRefresh: () => void;
+import axiosInstance from '@/services/axiosInstance';
+import { StatCard, StatCardGrid } from '@/components/admin';
+import { Button } from '@/components/ui/button';
+import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Field, FieldDescription, FieldGroup, FieldLabel } from '@/components/ui/field';
+import { Input } from '@/components/ui/input';
+import { Progress } from '@/components/ui/progress';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Separator } from '@/components/ui/separator';
+import { Switch } from '@/components/ui/switch';
+import { apiError } from '@/lib/api';
+import { formatCurrency, formatDate, formatDateTime, formatNumber, formatRelative } from '@/lib/format';
+import { OUTCOMES, type Outcome } from '@/lib/validation';
+import {
+    useCurrentAdminId,
+    useCurrentAdminIsSuperuser,
+    type AdminUser,
+    type AdminUserSummary,
+    type UserTabProps,
+} from './types';
+
+const USER_TYPES: Record<string, string> = { customer: 'Customer', admin: 'Admin' };
+
+function profileForm(user: AdminUser) {
+    return {
+        first_name: user.first_name ?? '',
+        last_name: user.last_name ?? '',
+        email: user.email,
+        phone_number: user.phone_number ?? '',
+        user_type: user.user_type ?? 'customer',
+    };
 }
 
-const Field: React.FC<{ label: string; icon?: React.ReactNode; value: React.ReactNode }> = ({ label, icon, value }) => (
-  <div className="flex items-start justify-between py-2.5 border-b border-gray-200 dark:border-[#3b4a41]/20 last:border-0">
-    <div className="flex items-center gap-1.5">
-      {icon && <span className="text-gray-400 dark:text-[#3b4a41]">{icon}</span>}
-      <span className={ULABEL}>{label}</span>
-    </div>
-    <div className={UMONO}>{value}</div>
-  </div>
-);
-
-const UserOverviewTab: React.FC<Props> = ({ user, onRefresh }) => {
-  const [editing, setEditing] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [form, setForm] = useState({
-    first_name: user.first_name ?? '',
-    last_name: user.last_name ?? '',
-    email: user.email,
-    username: user.username ?? '',
-    user_type: user.user_type ?? 'customer',
-    is_active: user.is_active,
-    is_staff: user.is_staff,
-    is_superuser: user.is_superuser,
-  });
-
-  const handleSave = async () => {
-    setSaving(true);
-    setError(null);
-    try {
-      await axiosInstance.patch(`/admin/users/${user.id}/`, form);
-      setEditing(false);
-      onRefresh();
-    } catch (e: any) {
-      setError(e?.response?.data?.detail ?? 'Failed to save changes');
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const fmt = (iso?: string) =>
-    iso
-      ? new Date(iso).toLocaleDateString('en-GB', {
-          day: 'numeric',
-          month: 'short',
-          year: 'numeric',
-          hour: '2-digit',
-          minute: '2-digit',
-        })
-      : 'Never';
-
-  return (
-    <div className="grid lg:grid-cols-3 gap-5">
-      <div className="lg:col-span-2 space-y-4">
-        <div className={UCARD}>
-          <div className={`flex items-center justify-between px-4 py-3 ${UBORDER_B}`}>
-            <p className={UHEADER}>Profile</p>
-            {!editing ? (
-              <button
-                type="button"
-                onClick={() => setEditing(true)}
-                className="flex items-center gap-1 font-mono text-[9px] text-gray-400 hover:text-emerald-600 dark:text-[#bacbbf]/40 dark:hover:text-[#6effc0] transition-colors uppercase tracking-[0.1em]"
-              >
-                <Edit2 className="w-3 h-3" /> Edit
-              </button>
-            ) : (
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setEditing(false);
-                    setError(null);
-                  }}
-                  className="flex items-center gap-1 font-mono text-[9px] text-gray-400 hover:text-red-600 dark:text-[#bacbbf]/40 dark:hover:text-[#ff4c4c] transition-colors uppercase tracking-[0.1em]"
-                >
-                  <X className="w-3 h-3" /> Cancel
-                </button>
-                <button
-                  type="button"
-                  onClick={handleSave}
-                  disabled={saving}
-                  className={`flex items-center gap-1 font-mono text-[9px] ${UMINT} hover:brightness-110 transition-colors uppercase tracking-[0.1em] disabled:opacity-40`}
-                >
-                  <Save className="w-3 h-3" /> {saving ? 'Saving…' : 'Save'}
-                </button>
-              </div>
-            )}
-          </div>
-
-          <div className="p-4">
-            {error && <div className={`mb-4 rounded-sm p-3 font-mono text-[10px] ${UERR}`}>{error}</div>}
-
-            {editing ? (
-              <div className="space-y-3">
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className={`${ULABEL} block mb-1`}>First Name</label>
-                    <input
-                      value={form.first_name}
-                      onChange={(e) => setForm((f) => ({ ...f, first_name: e.target.value }))}
-                      className={UINPUT}
-                    />
-                  </div>
-                  <div>
-                    <label className={`${ULABEL} block mb-1`}>Last Name</label>
-                    <input
-                      value={form.last_name}
-                      onChange={(e) => setForm((f) => ({ ...f, last_name: e.target.value }))}
-                      className={UINPUT}
-                    />
-                  </div>
-                </div>
-                <div>
-                  <label className={`${ULABEL} block mb-1`}>Email</label>
-                  <input
-                    type="email"
-                    value={form.email}
-                    onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
-                    className={UINPUT}
-                  />
-                </div>
-                <div>
-                  <label className={`${ULABEL} block mb-1`}>Username</label>
-                  <input
-                    value={form.username}
-                    onChange={(e) => setForm((f) => ({ ...f, username: e.target.value }))}
-                    className={UINPUT}
-                  />
-                </div>
-                <div>
-                  <label className={`${ULABEL} block mb-1`}>User Type</label>
-                  <select
-                    value={form.user_type}
-                    onChange={(e) => setForm((f) => ({ ...f, user_type: e.target.value }))}
-                    className={UINPUT}
-                  >
-                    <option value="customer">Customer</option>
-                    <option value="admin">Admin</option>
-                  </select>
-                </div>
-
-                <div className="mt-1 pt-3 border-t border-gray-200 dark:border-[#3b4a41]/20">
-                  <p className={`${ULABEL} mb-3`}>Permissions & Role</p>
-                  <div className="space-y-2.5">
-                    {(
-                      [
-                        { key: 'is_active' as const, label: 'Active', desc: 'User can log in and use the platform', color: '#6effc0' },
-                        { key: 'is_staff' as const, label: 'Staff', desc: 'Access to admin panel', color: '#f59e0b' },
-                        { key: 'is_superuser' as const, label: 'Superuser', desc: 'Full permissions — bypasses all checks', color: '#ff4c4c' },
-                      ] as const
-                    ).map(({ key, label, desc, color }) => (
-                      <label
-                        key={key}
-                        className={`flex items-center justify-between py-2 px-3 ${UPANEL} rounded-sm cursor-pointer group`}
-                      >
-                        <div>
-                          <span className="font-mono text-[10px] text-gray-900 group-hover:text-gray-950 dark:text-[#e0e3e8] dark:group-hover:text-white transition-colors">
-                            {label}
-                          </span>
-                          <p className="font-mono text-[8px] text-gray-500 dark:text-[#3b4a41] mt-0.5">{desc}</p>
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => setForm((f) => ({ ...f, [key]: !f[key] }))}
-                          className={`relative w-9 h-5 rounded-full transition-colors shrink-0 ${
-                            form[key] ? '' : 'bg-gray-200 dark:bg-[#3b4a41]'
-                          }`}
-                          style={form[key] ? { backgroundColor: `${color}30` } : undefined}
-                        >
-                          <span
-                            className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full transition-all ${
-                              form[key] ? '' : 'bg-gray-100 dark:bg-[#bacbbf]'
-                            }`}
-                            style={{
-                              backgroundColor: form[key] ? color : undefined,
-                              transform: form[key] ? 'translateX(16px)' : 'translateX(0)',
-                            }}
-                          />
-                        </button>
-                      </label>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            ) : (
-              <div className={`${UPANEL} rounded-sm px-4 py-1`}>
-                <Field label="Email" icon={<Mail className="w-3 h-3" />} value={user.email} />
-                <Field label="Username" icon={<Shield className="w-3 h-3" />} value={user.username ?? '—'} />
-                <Field
-                  label="Name"
-                  icon={<Shield className="w-3 h-3" />}
-                  value={`${user.first_name ?? ''} ${user.last_name ?? ''}`.trim() || '—'}
-                />
-                <Field
-                  label="User Type"
-                  value={
-                    <span className="font-mono text-[10px] px-2 py-0.5 bg-emerald-50 text-emerald-800 border border-emerald-200 dark:bg-[#6effc0]/10 dark:text-[#6effc0] dark:border-[#6effc0]/20 rounded-sm uppercase tracking-[0.08em]">
-                      {user.user_type ?? 'customer'}
-                    </span>
-                  }
-                />
-                <Field
-                  label="Permissions"
-                  value={
-                    <div className="flex items-center gap-1.5 flex-wrap justify-end">
-                      <span
-                        className={`font-mono text-[9px] px-1.5 py-0.5 rounded-sm border ${
-                          user.is_active
-                            ? 'bg-emerald-50 text-emerald-800 border-emerald-200 dark:bg-[#6effc0]/10 dark:text-[#6effc0] dark:border-[#6effc0]/20'
-                            : 'bg-red-50 text-red-700 border-red-200 dark:bg-[#ff4c4c]/10 dark:text-[#ff4c4c] dark:border-[#ff4c4c]/20'
-                        }`}
-                      >
-                        {user.is_active ? 'Active' : 'Inactive'}
-                      </span>
-                      {user.is_staff && (
-                        <span className="font-mono text-[9px] px-1.5 py-0.5 bg-amber-50 text-amber-800 border border-amber-200 dark:bg-[#f59e0b]/10 dark:text-[#f59e0b] dark:border-[#f59e0b]/20 rounded-sm">
-                          Staff
-                        </span>
-                      )}
-                      {user.is_superuser && (
-                        <span className="font-mono text-[9px] px-1.5 py-0.5 bg-red-50 text-red-700 border border-red-200 dark:bg-[#ff4c4c]/10 dark:text-[#ff4c4c] dark:border-[#ff4c4c]/20 rounded-sm">
-                          Superuser
-                        </span>
-                      )}
-                      {!user.is_staff && !user.is_superuser && (
-                        <span className="font-mono text-[9px] text-gray-400 dark:text-[#bacbbf]/50">User</span>
-                      )}
-                    </div>
-                  }
-                />
-              </div>
-            )}
-          </div>
+function Row({ label, children }: { label: string; children: React.ReactNode }) {
+    return (
+        <div className="flex items-start justify-between gap-4 py-2 text-sm">
+            <span className="text-muted-foreground shrink-0">{label}</span>
+            <span className="min-w-0 truncate text-right">{children}</span>
         </div>
-      </div>
+    );
+}
 
-      <div className="space-y-4">
-        <div className={UCARD}>
-          <div className={`px-4 py-3 ${UBORDER_B}`}>
-            <p className={UHEADER}>Account Status</p>
-          </div>
-          <div className="p-4 space-y-3">
-            <div className="flex items-center justify-between">
-              <span className={ULABEL}>Status</span>
-              <div className="flex items-center gap-1.5">
-                {user.is_active ? (
-                  <CheckCircle className={`w-3.5 h-3.5 ${UMINT}`} />
-                ) : (
-                  <XCircle className="w-3.5 h-3.5 text-red-600 dark:text-[#ff4c4c]" />
-                )}
-                <span
-                  className={`font-mono text-[10px] ${user.is_active ? UMINT : 'text-red-600 dark:text-[#ff4c4c]'}`}
-                >
-                  {user.is_active ? 'Active' : 'Suspended'}
-                </span>
-              </div>
-            </div>
+const UserOverviewTab: React.FC<UserTabProps & { summary: AdminUserSummary | null }> = ({ user, summary, onChanged }) => {
+    const currentAdminId = useCurrentAdminId();
+    const actorIsSuperuser = useCurrentAdminIsSuperuser();
+    const isSelf = user.id === currentAdminId;
 
-            <div className={`${UPANEL} rounded-sm px-3 py-2`}>
-              <div className="flex items-center justify-between mb-2">
-                <span className={`${ULABEL} flex items-center gap-1`}>
-                  <Calendar className="w-3 h-3" /> Joined
-                </span>
-                <span className="font-mono text-[9px] text-gray-600 dark:text-[#bacbbf]">{fmt(user.date_joined)}</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className={`${ULABEL} flex items-center gap-1`}>
-                  <Clock className="w-3 h-3" /> Last Login
-                </span>
-                <span className="font-mono text-[9px] text-gray-600 dark:text-[#bacbbf]">{fmt(user.last_login)}</span>
-              </div>
-            </div>
-          </div>
-        </div>
+    const [editing, setEditing] = useState(false);
+    const [saving, setSaving] = useState(false);
+    const [form, setForm] = useState(() => profileForm(user));
+    const [roleSaving, setRoleSaving] = useState<string | null>(null);
 
-        {user.billing && (
-          <div className={UCARD}>
-            <div className={`px-4 py-3 ${UBORDER_B}`}>
-              <p className={UHEADER}>Billing Snapshot</p>
-            </div>
-            <div className="p-4 space-y-2">
-              <div className="flex justify-between items-center">
-                <span className={ULABEL}>Plan</span>
-                <span className={`font-mono text-[10px] ${UMINT}`}>{user.billing.current_plan?.name ?? '—'}</span>
-              </div>
-              <div className="flex justify-between items-center">
-                <span className={ULABEL}>Credits Left</span>
-                <span className="font-mono text-[11px] font-bold text-gray-900 dark:text-[#e0e3e8]">
-                  {(user.billing.credits_remaining ?? 0).toLocaleString()}
-                </span>
-              </div>
-              <div className="flex justify-between items-center">
-                <span className={ULABEL}>Used This Month</span>
-                <span className="font-mono text-[10px] text-gray-600 dark:text-[#bacbbf]">
-                  {(user.billing.credits_used_this_month ?? 0).toLocaleString()}
-                </span>
-              </div>
-              {user.billing.credits_remaining !== undefined && user.billing.current_plan && (
-                <div className="mt-2">
-                  <div className="w-full h-1.5 bg-gray-200 dark:bg-[#101418] rounded-full overflow-hidden">
-                    <div
-                      className="h-full bg-emerald-500 dark:bg-[#6effc0] rounded-full transition-all"
-                      style={{
-                        width: `${Math.min(
-                          (user.billing.credits_remaining / (user.billing.current_plan.credits_per_month || 1)) * 100,
-                          100
-                        )}%`,
-                      }}
-                    />
-                  </div>
+    useEffect(() => {
+        if (!editing) setForm(profileForm(user));
+    }, [user, editing]);
+
+    const set = (key: keyof ReturnType<typeof profileForm>) => (e: React.ChangeEvent<HTMLInputElement>) =>
+        setForm((f) => ({ ...f, [key]: e.target.value }));
+
+    const save = async (e: React.FormEvent) => {
+        e.preventDefault();
+        setSaving(true);
+        try {
+            await axiosInstance.patch(`/admin/users/${user.id}/`, {
+                ...form,
+                email: form.email.trim(),
+                phone_number: form.phone_number.trim() || null,
+            });
+            toast.success('Profile saved');
+            setEditing(false);
+            onChanged();
+        } catch (err) {
+            toast.error(apiError(err, 'Could not save the profile'));
+        } finally {
+            setSaving(false);
+        }
+    };
+
+    const setRole = async (field: 'is_staff' | 'is_superuser', value: boolean) => {
+        setRoleSaving(field);
+        try {
+            await axiosInstance.patch(`/admin/users/${user.id}/`, { [field]: value });
+            toast.success(`${field === 'is_staff' ? 'Staff access' : 'Superuser'} ${value ? 'granted' : 'removed'}`);
+            onChanged();
+        } catch (err) {
+            toast.error(apiError(err, 'Could not change the role'));
+        } finally {
+            setRoleSaving(null);
+        }
+    };
+
+    const copyId = () => {
+        void navigator.clipboard.writeText(user.id).then(() => toast.success('User ID copied'));
+    };
+
+    const billing = user.billing;
+    const planCredits = billing?.current_plan?.credits_per_month ?? 0;
+    const used = billing?.credits_used_this_month ?? 0;
+    const outcomes = summary?.validations.by_outcome ?? {};
+    const outcomeTotal = Object.values(outcomes).reduce((a, b) => a + b, 0);
+
+    return (
+        <div className="space-y-6">
+            <StatCardGrid>
+                <StatCard
+                    label="Credits left"
+                    value={formatNumber(billing?.credits_remaining ?? 0)}
+                    hint={billing?.current_plan ? `${billing.current_plan.name} plan` : 'No plan assigned'}
+                />
+                <StatCard
+                    label="Validations"
+                    loading={!summary}
+                    value={formatNumber(summary?.validations.total ?? 0)}
+                    hint={`${formatNumber(summary?.validations.last_30_days ?? 0)} in the last 30 days`}
+                />
+                <StatCard
+                    label="API keys"
+                    loading={!summary}
+                    value={`${summary?.api_keys.active ?? 0} active`}
+                    hint={`${formatNumber(summary?.api_keys.requests ?? 0)} requests total`}
+                />
+                <StatCard
+                    label="Total paid"
+                    loading={!summary}
+                    value={formatCurrency(summary?.payments.total_paid ?? 0)}
+                    hint={`${summary?.payments.completed ?? 0} payments${
+                        summary?.payments.failed ? ` · ${summary.payments.failed} failed` : ''
+                    }`}
+                />
+            </StatCardGrid>
+
+            <div className="grid gap-4 lg:grid-cols-3">
+                <div className="space-y-4 lg:col-span-2">
+                    <Card>
+                        <CardHeader>
+                            <CardTitle>Profile</CardTitle>
+                            <CardDescription>Name, contact details and account type.</CardDescription>
+                            {!editing && (
+                                <CardAction>
+                                    <Button variant="outline" size="sm" onClick={() => setEditing(true)}>
+                                        <Pencil />
+                                        Edit
+                                    </Button>
+                                </CardAction>
+                            )}
+                        </CardHeader>
+                        <CardContent>
+                            {editing ? (
+                                <form onSubmit={save}>
+                                    <FieldGroup>
+                                        <div className="grid gap-4 sm:grid-cols-2">
+                                            <Field>
+                                                <FieldLabel htmlFor="first_name">First name</FieldLabel>
+                                                <Input id="first_name" value={form.first_name} onChange={set('first_name')} />
+                                            </Field>
+                                            <Field>
+                                                <FieldLabel htmlFor="last_name">Last name</FieldLabel>
+                                                <Input id="last_name" value={form.last_name} onChange={set('last_name')} />
+                                            </Field>
+                                        </div>
+                                        <div className="grid gap-4 sm:grid-cols-2">
+                                            <Field>
+                                                <FieldLabel htmlFor="email">Email</FieldLabel>
+                                                <Input id="email" type="email" required value={form.email} onChange={set('email')} />
+                                                <FieldDescription>Also their sign-in name.</FieldDescription>
+                                            </Field>
+                                            <Field>
+                                                <FieldLabel htmlFor="phone">Phone</FieldLabel>
+                                                <Input id="phone" value={form.phone_number} onChange={set('phone_number')} />
+                                            </Field>
+                                        </div>
+                                        <Field>
+                                            <FieldLabel>Account type</FieldLabel>
+                                            <Select
+                                                items={USER_TYPES}
+                                                value={form.user_type}
+                                                onValueChange={(v) => setForm((f) => ({ ...f, user_type: String(v) }))}
+                                            >
+                                                <SelectTrigger className="w-full sm:w-56">
+                                                    <SelectValue />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                    {Object.entries(USER_TYPES).map(([value, label]) => (
+                                                        <SelectItem key={value} value={value}>
+                                                            {label}
+                                                        </SelectItem>
+                                                    ))}
+                                                </SelectContent>
+                                            </Select>
+                                            <FieldDescription>
+                                                Labels the account only. Admin-panel access is the Staff role below.
+                                            </FieldDescription>
+                                        </Field>
+                                        <div className="flex justify-end gap-2">
+                                            <Button
+                                                type="button"
+                                                variant="ghost"
+                                                onClick={() => setEditing(false)}
+                                                disabled={saving}
+                                            >
+                                                Cancel
+                                            </Button>
+                                            <Button type="submit" disabled={saving}>
+                                                {saving ? 'Saving…' : 'Save changes'}
+                                            </Button>
+                                        </div>
+                                    </FieldGroup>
+                                </form>
+                            ) : (
+                                <div className="divide-y">
+                                    <Row label="Name">
+                                        {[user.first_name, user.last_name].filter(Boolean).join(' ') || '—'}
+                                    </Row>
+                                    <Row label="Email">{user.email}</Row>
+                                    <Row label="Phone">{user.phone_number || '—'}</Row>
+                                    <Row label="Account type">{USER_TYPES[user.user_type ?? ''] ?? user.user_type ?? '—'}</Row>
+                                    <Row label="Groups">
+                                        {user.groups?.length ? user.groups.map((g) => g.name).join(', ') : '—'}
+                                    </Row>
+                                </div>
+                            )}
+                        </CardContent>
+                    </Card>
+
+                    <Card>
+                        <CardHeader>
+                            <CardTitle>Roles</CardTitle>
+                            <CardDescription>
+                                Changes take effect on the user's next request.
+                                {isSelf && ' You cannot remove your own roles.'}
+                            </CardDescription>
+                        </CardHeader>
+                        <CardContent className="space-y-4">
+                            <label className="flex items-center justify-between gap-4">
+                                <span>
+                                    <span className="block text-sm font-medium">Staff</span>
+                                    <span className="text-muted-foreground block text-sm">
+                                        Can sign in to this admin panel and use every admin endpoint.
+                                    </span>
+                                </span>
+                                <Switch
+                                    checked={user.is_staff}
+                                    disabled={roleSaving !== null || (isSelf && user.is_staff)}
+                                    onCheckedChange={(v) => void setRole('is_staff', v)}
+                                />
+                            </label>
+                            <Separator />
+                            <label className="flex items-center justify-between gap-4">
+                                <span>
+                                    <span className="block text-sm font-medium">Superuser</span>
+                                    <span className="text-muted-foreground block text-sm">
+                                        Bypasses every permission check.
+                                        {!actorIsSuperuser && ' Only a superuser can change this.'}
+                                    </span>
+                                </span>
+                                <Switch
+                                    checked={user.is_superuser}
+                                    disabled={roleSaving !== null || !actorIsSuperuser || (isSelf && user.is_superuser)}
+                                    onCheckedChange={(v) => void setRole('is_superuser', v)}
+                                />
+                            </label>
+                        </CardContent>
+                    </Card>
                 </div>
-              )}
+
+                <div className="space-y-4">
+                    <Card>
+                        <CardHeader>
+                            <CardTitle>Account</CardTitle>
+                        </CardHeader>
+                        <CardContent className="divide-y">
+                            <Row label="Status">{user.is_active ? 'Active' : 'Suspended'}</Row>
+                            <Row label="Joined">{formatDate(user.date_joined)}</Row>
+                            <Row label="Last sign-in">
+                                <span title={formatDateTime(user.last_login)}>{formatRelative(user.last_login)}</span>
+                            </Row>
+                            <Row label="Last active">
+                                <span title={formatDateTime(user.last_active)}>{formatRelative(user.last_active)}</span>
+                            </Row>
+                            <Row label="2FA">{summary ? (summary.security.two_factor_enabled ? 'Enabled' : 'Off') : '—'}</Row>
+                            <Row label="Password">
+                                {summary ? (summary.security.has_usable_password ? 'Set' : 'Not set (invite pending)') : '—'}
+                            </Row>
+                            <Row label="User ID">
+                                <button
+                                    type="button"
+                                    onClick={copyId}
+                                    className="hover:text-foreground text-muted-foreground inline-flex items-center gap-1 font-mono text-xs"
+                                >
+                                    {user.id.slice(0, 8)}…
+                                    <Copy className="size-3" />
+                                </button>
+                            </Row>
+                        </CardContent>
+                    </Card>
+
+                    <Card>
+                        <CardHeader>
+                            <CardTitle>This cycle</CardTitle>
+                            <CardDescription>
+                                {billing?.credits_reset_date
+                                    ? `Cycle started ${formatDate(billing.credits_reset_date)}`
+                                    : 'No billing profile'}
+                            </CardDescription>
+                        </CardHeader>
+                        <CardContent className="space-y-2">
+                            <div className="flex justify-between text-sm">
+                                <span className="text-muted-foreground">Used</span>
+                                <span className="tabular-nums">
+                                    {formatNumber(used)}
+                                    {planCredits ? ` / ${formatNumber(planCredits)}` : ''}
+                                </span>
+                            </div>
+                            {planCredits > 0 && <Progress value={Math.min(100, (used / planCredits) * 100)} />}
+                        </CardContent>
+                    </Card>
+
+                    {summary && outcomeTotal > 0 && (
+                        <Card>
+                            <CardHeader>
+                                <CardTitle>Validation outcomes</CardTitle>
+                                <CardDescription>
+                                    Last run {formatRelative(summary.validations.last_at)}
+                                    {summary.validations.bulk_jobs ? ` · ${summary.validations.bulk_jobs} bulk jobs` : ''}
+                                </CardDescription>
+                            </CardHeader>
+                            <CardContent className="space-y-3">
+                                <div className="bg-muted flex h-2 overflow-hidden rounded-full">
+                                    {Object.entries(outcomes)
+                                        .filter(([, n]) => n > 0)
+                                        .map(([key, n]) => (
+                                            <div
+                                                key={key}
+                                                style={{
+                                                    width: `${(n / outcomeTotal) * 100}%`,
+                                                    background: OUTCOMES[key as Outcome]?.color,
+                                                }}
+                                            />
+                                        ))}
+                                </div>
+                                <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
+                                    {Object.entries(outcomes)
+                                        .filter(([, n]) => n > 0)
+                                        .map(([key, n]) => (
+                                            <div key={key} className="flex items-center justify-between gap-2">
+                                                <span className="flex items-center gap-1.5">
+                                                    <span
+                                                        className="size-2 rounded-full"
+                                                        style={{ background: OUTCOMES[key as Outcome]?.color }}
+                                                    />
+                                                    {OUTCOMES[key as Outcome]?.label ?? key}
+                                                </span>
+                                                <span className="text-muted-foreground tabular-nums">{formatNumber(n)}</span>
+                                            </div>
+                                        ))}
+                                </div>
+                            </CardContent>
+                        </Card>
+                    )}
+                </div>
             </div>
-          </div>
-        )}
-      </div>
-    </div>
-  );
+        </div>
+    );
 };
 
 export default UserOverviewTab;

@@ -1,481 +1,490 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  Users,
-  Search,
-  Filter,
-  Download,
-  RefreshCw,
-  Eye,
-  Edit,
-  Trash2,
-  UserCheck,
-  UserX,
-  Mail,
-  Calendar,
-  CreditCard,
-  Activity,
-  AlertTriangle,
-  MoreVertical,
-  Shield,
-  Clock
+    Ban,
+    CircleCheck,
+    Download,
+    ExternalLink,
+    MoreHorizontal,
+    RefreshCw,
+    Send,
+    UserPlus,
+    UserRoundCheck,
+    UserRoundX,
+    Users,
+    UserPlus2 as UserNew,
 } from 'lucide-react';
-import axiosInstance from '../../services/axiosInstance';
+import { toast } from 'sonner';
 
-interface UserGroup {
-  id: number;
-  name: string;
-  user_count?: number;
-}
-
-interface UserPermission {
-  id: number;
-  name: string;
-  codename: string;
-  content_type?: unknown;
-}
-
-interface UserBilling {
-  credits_remaining: number;
-  credits_used_this_month: number;
-  current_plan: { id: number; name: string; price: string; credits_per_month: number } | null;
-}
-
-// Aligned with the backend AdminUserSerializer shape (snake_case).
-interface User {
-  id: string; // UUID string, not a number
-  email: string;
-  first_name?: string;
-  last_name?: string;
-  phone_number?: string;
-  profile_picture?: string | null;
-  user_type?: string;
-  account_status?: string;
-  last_active?: string | null;
-  date_joined: string;
-  is_active: boolean;
-  is_staff: boolean;
-  is_superuser: boolean;
-  groups?: UserGroup[];
-  roles?: string[];
-  user_permissions?: UserPermission[];
-  billing?: UserBilling | null;
-}
+import axiosInstance from '@/services/axiosInstance';
+import {
+    DataTable,
+    type DataTableColumn,
+    PageHeader,
+    StatCard,
+    StatCardGrid,
+    StatusBadge,
+    useConfirm,
+} from '@/components/admin';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from '@/components/ui/dialog';
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuSeparator,
+    DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { Field, FieldDescription, FieldGroup, FieldLabel } from '@/components/ui/field';
+import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Switch } from '@/components/ui/switch';
+import { apiError, asList, downloadCsv } from '@/lib/api';
+import { displayName, formatDate, formatNumber, formatRelative, initialsOf } from '@/lib/format';
+import { useCurrentAdminId, type AdminUser } from './users/types';
 
 interface UserStats {
-  total: number;
-  active: number;
-  new: number;
-  suspended: number;
+    total: number;
+    active: number;
+    new: number;
+    suspended: number;
 }
 
-const getDisplayName = (user: User): string => {
-  const full = [user.first_name, user.last_name].filter(Boolean).join(' ').trim();
-  return full || user.email;
-};
+const STATUS_ITEMS: Record<string, string> = { all: 'All statuses', active: 'Active', suspended: 'Suspended' };
+const ROLE_ITEMS: Record<string, string> = { all: 'All roles', staff: 'Staff', superuser: 'Superusers', customer: 'Customers' };
+
+// send_invite only applies when a password is given; without one the invite is always sent.
+const EMPTY_FORM = { email: '', first_name: '', last_name: '', password: '', is_staff: false, send_invite: false };
 
 const ManageUsers: React.FC = () => {
-  const navigate = useNavigate();
-  const [users, setUsers] = useState<User[]>([]);
-  const [stats, setStats] = useState<UserStats | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [filterStatus, setFilterStatus] = useState<string>('all');
-  const [filterRole, setFilterRole] = useState<string>('all');
+    const navigate = useNavigate();
+    const confirm = useConfirm();
+    const currentAdminId = useCurrentAdminId();
 
-  const fetchUsers = async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      // GET /admin/users/ returns a PLAIN ARRAY (no { results }).
-      const response = await axiosInstance.get('/admin/users/');
-      setUsers(Array.isArray(response.data) ? response.data : []);
-    } catch (err: any) {
-      setError('Failed to fetch users');
-      console.error('Error fetching users:', err);
-    } finally {
-      setLoading(false);
-    }
-  };
+    const [users, setUsers] = useState<AdminUser[]>([]);
+    const [stats, setStats] = useState<UserStats | null>(null);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
+    const [status, setStatus] = useState('all');
+    const [role, setRole] = useState('all');
 
-  const fetchStats = async () => {
-    try {
-      const response = await axiosInstance.get('/admin/users/stats/');
-      const { total, active, new: newUsers, suspended } = response.data ?? {};
-      setStats({
-        total: total ?? 0,
-        active: active ?? 0,
-        new: newUsers ?? 0,
-        suspended: suspended ?? 0,
-      });
-    } catch (err: any) {
-      // Stats are non-critical; cards fall back to values derived from the list.
-      console.error('Error fetching user stats:', err);
-    }
-  };
+    const [createOpen, setCreateOpen] = useState(false);
+    const [form, setForm] = useState(EMPTY_FORM);
+    const [creating, setCreating] = useState(false);
 
-  useEffect(() => {
-    fetchUsers();
-    fetchStats();
-  }, []);
+    const fetchAll = useCallback(async () => {
+        setLoading(true);
+        setError(null);
+        const [usersRes, statsRes] = await Promise.allSettled([
+            axiosInstance.get('/admin/users/'),
+            axiosInstance.get('/admin/users/stats/'),
+        ]);
+        if (usersRes.status === 'fulfilled') setUsers(asList<AdminUser>(usersRes.value.data));
+        else setError(apiError(usersRes.reason, 'Could not load users'));
+        if (statsRes.status === 'fulfilled') setStats(statsRes.value.data);
+        setLoading(false);
+    }, []);
 
-  const handleToggleUserStatus = async (userId: string, isActive: boolean) => {
-    try {
-      await axiosInstance.patch(`/admin/users/${userId}/`, {
-        is_active: !isActive
-      });
-      setUsers(prev => prev.map(user => 
-        user.id === userId ? { ...user, is_active: !isActive } : user
-      ));
-    } catch (err: any) {
-      setError('Failed to update user status');
-    }
-  };
+    useEffect(() => {
+        void fetchAll();
+    }, [fetchAll]);
 
-  const handleToggleStaffStatus = async (userId: string, isStaff: boolean) => {
-    try {
-      await axiosInstance.patch(`/admin/users/${userId}/`, {
-        is_staff: !isStaff
-      });
-      setUsers(prev => prev.map(user => 
-        user.id === userId ? { ...user, is_staff: !isStaff } : user
-      ));
-    } catch (err: any) {
-      setError('Failed to update user role');
-    }
-  };
-
-  const handleDeleteUser = async (userId: string) => {
-    if (!confirm('Are you sure you want to delete this user? This action cannot be undone.')) {
-      return;
-    }
-    
-    try {
-      await axiosInstance.delete(`/admin/users/${userId}/`);
-      setUsers(prev => prev.filter(user => user.id !== userId));
-    } catch (err: any) {
-      setError('Failed to delete user');
-    }
-  };
-
-  const filteredUsers = users.filter(user => {
-    const term = searchTerm.toLowerCase();
-    const matchesSearch = user.email.toLowerCase().includes(term) ||
-                         getDisplayName(user).toLowerCase().includes(term) ||
-                         (user.user_type ?? '').toLowerCase().includes(term);
-
-    const matchesStatus = filterStatus === 'all' || 
-                         (filterStatus === 'active' && user.is_active) ||
-                         (filterStatus === 'inactive' && !user.is_active);
-    
-    const matchesRole = filterRole === 'all' || 
-                       (filterRole === 'admin' && user.is_staff) ||
-                       (filterRole === 'user' && !user.is_staff);
-    
-    return matchesSearch && matchesStatus && matchesRole;
-  });
-
-  const getRoleBadge = (user: User) => {
-    if (user.is_superuser) {
-      return { text: 'Super Admin', color: 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200' };
-    } else if (user.is_staff) {
-      return { text: 'Admin', color: 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200' };
-    } else {
-      return { text: 'User', color: 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200' };
-    }
-  };
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="text-center">
-          <RefreshCw className="w-8 h-8 animate-spin text-[#2ED8A3] mx-auto mb-4" />
-          <p className="text-gray-600 dark:text-gray-300">Loading users...</p>
-        </div>
-      </div>
+    const filtered = useMemo(
+        () =>
+            users.filter((u) => {
+                if (status === 'active' && !u.is_active) return false;
+                if (status === 'suspended' && u.is_active) return false;
+                if (role === 'staff' && !u.is_staff) return false;
+                if (role === 'superuser' && !u.is_superuser) return false;
+                if (role === 'customer' && (u.is_staff || u.is_superuser)) return false;
+                return true;
+            }),
+        [users, status, role]
     );
-  }
 
-  return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex justify-between items-center">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Users Management</h1>
-          <p className="text-gray-500 dark:text-gray-300 mt-1">Manage all users and their permissions</p>
-        </div>
-        <div className="flex space-x-3">
-          <button
-            onClick={fetchUsers}
-            className="flex items-center space-x-2 px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700"
-          >
-            <RefreshCw className="w-4 h-4" />
-            <span>Refresh</span>
-          </button>
-          <button className="flex items-center space-x-2 bg-[#2ED8A3] text-white px-4 py-2 rounded-lg hover:bg-[#00C48C]">
-            <Download className="w-4 h-4" />
-            <span>Export</span>
-          </button>
-        </div>
-      </div>
+    const patchUser = (u: AdminUser, changes: Partial<AdminUser>) =>
+        setUsers((prev) => prev.map((x) => (x.id === u.id ? { ...x, ...changes } : x)));
 
-      {error && (
-        <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4">
-          <div className="flex">
-            <AlertTriangle className="w-5 h-5 text-red-600 dark:text-red-400 mt-0.5" />
-            <div className="ml-3">
-              <p className="text-sm text-red-600 dark:text-red-400">{error}</p>
-            </div>
-          </div>
-        </div>
-      )}
+    const toggleActive = (u: AdminUser) => {
+        const suspending = u.is_active;
+        confirm.ask({
+            title: suspending ? `Suspend ${u.email}?` : `Reactivate ${u.email}?`,
+            description: suspending
+                ? 'Sign-in and API access stop immediately. Nothing is deleted.'
+                : 'Sign-in and API access are restored.',
+            confirmLabel: suspending ? 'Suspend' : 'Reactivate',
+            destructive: suspending,
+            onConfirm: async () => {
+                try {
+                    await axiosInstance.patch(`/admin/users/${u.id}/`, { is_active: !u.is_active });
+                    patchUser(u, { is_active: !u.is_active });
+                    toast.success(suspending ? 'User suspended' : 'User reactivated');
+                } catch (e) {
+                    toast.error(apiError(e, 'Could not update the user'));
+                    throw e;
+                }
+            },
+        });
+    };
 
-      {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
-          <div className="flex items-center">
-            <div className="p-2 bg-blue-100 dark:bg-blue-900 rounded-lg">
-              <Users className="w-6 h-6 text-blue-600 dark:text-blue-400" />
-            </div>
-            <div className="ml-4">
-              <p className="text-sm font-medium text-gray-500 dark:text-gray-300">Total Users</p>
-              <p className="text-2xl font-semibold text-gray-900 dark:text-white">{stats?.total ?? users.length}</p>
-            </div>
-          </div>
-        </div>
-        
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
-          <div className="flex items-center">
-            <div className="p-2 bg-green-100 dark:bg-green-900 rounded-lg">
-              <UserCheck className="w-6 h-6 text-green-600 dark:text-green-400" />
-            </div>
-            <div className="ml-4">
-              <p className="text-sm font-medium text-gray-500 dark:text-gray-300">Active Users</p>
-              <p className="text-2xl font-semibold text-gray-900 dark:text-white">
-                {stats?.active ?? users.filter(u => u.is_active).length}
-              </p>
-            </div>
-          </div>
-        </div>
-        
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
-          <div className="flex items-center">
-            <div className="p-2 bg-purple-100 dark:bg-purple-900 rounded-lg">
-              <Shield className="w-6 h-6 text-purple-600 dark:text-purple-400" />
-            </div>
-            <div className="ml-4">
-              <p className="text-sm font-medium text-gray-500 dark:text-gray-300">Admins</p>
-              <p className="text-2xl font-semibold text-gray-900 dark:text-white">
-                {users.filter(u => u.is_staff).length}
-              </p>
-            </div>
-          </div>
-        </div>
-        
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
-          <div className="flex items-center">
-            <div className="p-2 bg-orange-100 dark:bg-orange-900 rounded-lg">
-              <Activity className="w-6 h-6 text-orange-600 dark:text-orange-400" />
-            </div>
-            <div className="ml-4">
-              <p className="text-sm font-medium text-gray-500 dark:text-gray-300">New This Month</p>
-              <p className="text-2xl font-semibold text-gray-900 dark:text-white">
-                {stats?.new ?? users.filter(u => {
-                  const joinDate = new Date(u.date_joined);
-                  const now = new Date();
-                  const monthAgo = new Date(now.getFullYear(), now.getMonth() - 1, now.getDate());
-                  return joinDate >= monthAgo;
-                }).length}
-              </p>
-            </div>
-          </div>
-        </div>
-      </div>
+    const sendReset = async (u: AdminUser) => {
+        try {
+            const res = await axiosInstance.post(`/admin/users/${u.id}/reset-password/`);
+            if (res.data?.email_sent) toast.success(`Reset link emailed to ${u.email}`);
+            else toast.warning("Email failed to send — open the user's Security tab to copy the link.");
+        } catch (e) {
+            toast.error(apiError(e, 'Could not send the reset link'));
+        }
+    };
 
-      {/* Filters */}
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-              Search
-            </label>
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
-              <input
-                type="text"
-                placeholder="Search by name, email, or company..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-[#2ED8A3] focus:border-transparent"
-              />
-            </div>
-          </div>
-          
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-              Status
-            </label>
-            <select
-              value={filterStatus}
-              onChange={(e) => setFilterStatus(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-[#2ED8A3] focus:border-transparent"
-            >
-              <option value="all">All Status</option>
-              <option value="active">Active</option>
-              <option value="inactive">Inactive</option>
-            </select>
-          </div>
-          
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-              Role
-            </label>
-            <select
-              value={filterRole}
-              onChange={(e) => setFilterRole(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-[#2ED8A3] focus:border-transparent"
-            >
-              <option value="all">All Roles</option>
-              <option value="admin">Admins</option>
-              <option value="user">Users</option>
-            </select>
-          </div>
-        </div>
-      </div>
+    const createUser = async (e: React.FormEvent) => {
+        e.preventDefault();
+        const invite = !form.password || form.send_invite;
+        setCreating(true);
+        try {
+            const res = await axiosInstance.post('/admin/users/create/', {
+                email: form.email.trim(),
+                first_name: form.first_name.trim(),
+                last_name: form.last_name.trim(),
+                is_staff: form.is_staff,
+                password: form.password || undefined,
+                send_reset_link: invite,
+            });
+            const created = res.data as AdminUser & { reset_link_sent?: boolean };
+            toast.success(
+                invite
+                    ? created.reset_link_sent
+                        ? `Created ${created.email} and emailed a set-password link`
+                        : `Created ${created.email}, but the invite email failed — send a reset link from their page`
+                    : `Created ${created.email}`
+            );
+            setCreateOpen(false);
+            setForm(EMPTY_FORM);
+            navigate(`/admin/users/${created.id}`);
+        } catch (err) {
+            toast.error(apiError(err, 'Could not create the user'));
+        } finally {
+            setCreating(false);
+        }
+    };
 
-      {/* Users Table */}
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-            <thead className="bg-gray-50 dark:bg-gray-700">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                  User
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                  Role
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                  Status
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                  Activity
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                  Joined
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                  Actions
-                </th>
-              </tr>
-            </thead>
-            <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-              {filteredUsers.map((user) => {
-                const roleBadge = getRoleBadge(user);
-                return (
-                  <tr key={user.id} className="hover:bg-gray-50 dark:hover:bg-gray-700">
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="flex items-center space-x-3">
-                        <div className="w-10 h-10 bg-gray-200 dark:bg-gray-600 rounded-full flex items-center justify-center">
-                          <span className="text-sm font-medium text-gray-600 dark:text-gray-300">
-                            {getDisplayName(user).charAt(0).toUpperCase()}
-                          </span>
-                        </div>
-                        <div>
-                          <div className="text-sm font-medium text-gray-900 dark:text-white">
-                            {getDisplayName(user)}
-                          </div>
-                          <div className="text-sm text-gray-500 dark:text-gray-300">
-                            {user.email}
-                          </div>
-                          {user.user_type && (
-                            <div className="text-xs text-gray-400 dark:text-gray-400 capitalize">
-                              {user.user_type}
+    const exportCsv = () =>
+        downloadCsv(
+            `users-${new Date().toISOString().slice(0, 10)}.csv`,
+            ['email', 'first_name', 'last_name', 'status', 'staff', 'superuser', 'plan', 'credits', 'joined', 'last_login'],
+            filtered.map((u) => [
+                u.email,
+                u.first_name ?? '',
+                u.last_name ?? '',
+                u.is_active ? 'active' : 'suspended',
+                u.is_staff,
+                u.is_superuser,
+                u.billing?.current_plan?.name ?? '',
+                u.billing?.credits_remaining ?? '',
+                u.date_joined,
+                u.last_login ?? '',
+            ])
+        );
+
+    const columns = useMemo<DataTableColumn<AdminUser>[]>(
+        () => [
+            {
+                id: 'user',
+                header: 'User',
+                sortValue: (u) => displayName(u).toLowerCase(),
+                cell: (u) => {
+                    const name = displayName(u);
+                    return (
+                        <div className="flex min-w-0 items-center gap-3">
+                            <Avatar className="size-8">
+                                {u.profile_picture && <AvatarImage src={u.profile_picture} alt="" />}
+                                <AvatarFallback className="text-xs">{initialsOf(name)}</AvatarFallback>
+                            </Avatar>
+                            <div className="min-w-0">
+                                <p className="truncate font-medium">
+                                    {name}
+                                    {u.id === currentAdminId && <span className="text-muted-foreground font-normal"> (you)</span>}
+                                </p>
+                                <p className="text-muted-foreground truncate text-xs">{u.email}</p>
                             </div>
-                          )}
                         </div>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${roleBadge.color}`}>
-                        {roleBadge.text}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                        user.is_active 
-                          ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
-                          : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
-                      }`}>
-                        {user.is_active ? 'Active' : 'Inactive'}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-300">
-                      <div className="flex items-center space-x-1">
-                        <Activity className="w-3 h-3" />
-                        <span>{user.groups?.length || 0} group{(user.groups?.length || 0) === 1 ? '' : 's'}</span>
-                      </div>
-                      {user.last_active && (
-                        <div className="text-xs text-gray-400 dark:text-gray-400">
-                          Last active: {new Date(user.last_active).toLocaleDateString()}
-                        </div>
-                      )}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-300">
-                      <div className="flex items-center space-x-1">
-                        <Calendar className="w-3 h-3" />
-                        <span>{new Date(user.date_joined).toLocaleDateString()}</span>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                      <div className="flex items-center space-x-2">
-                        <button
-                          onClick={() => navigate(`/admin/users/${user.id}`)}
-                          className="text-blue-600 hover:text-blue-700"
-                          title="View user details"
-                        >
-                          <Eye className="w-4 h-4" />
-                        </button>
-                        <button
-                          onClick={() => handleToggleUserStatus(user.id, user.is_active)}
-                          className={`${
-                            user.is_active 
-                              ? 'text-red-600 hover:text-red-700' 
-                              : 'text-green-600 hover:text-green-700'
-                          }`}
-                        >
-                          {user.is_active ? <UserX className="w-4 h-4" /> : <UserCheck className="w-4 h-4" />}
-                        </button>
-                        {!user.is_superuser && (
-                          <button
-                            onClick={() => handleToggleStaffStatus(user.id, user.is_staff)}
-                            className="text-purple-600 hover:text-purple-700"
-                          >
-                            <Shield className="w-4 h-4" />
-                          </button>
-                        )}
-                        {!user.is_superuser && (
-                          <button
-                            onClick={() => handleDeleteUser(user.id)}
-                            className="text-red-600 hover:text-red-700"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-      </div>
+                    );
+                },
+            },
+            {
+                id: 'status',
+                header: 'Status',
+                sortValue: (u) => (u.is_active ? 1 : 0),
+                cell: (u) => <StatusBadge status={u.is_active ? 'active' : 'suspended'} />,
+            },
+            {
+                id: 'role',
+                header: 'Role',
+                sortValue: (u) => (u.is_superuser ? 2 : u.is_staff ? 1 : 0),
+                cell: (u) =>
+                    u.is_superuser ? (
+                        <Badge variant="destructive">Superuser</Badge>
+                    ) : u.is_staff ? (
+                        <Badge variant="secondary">Staff</Badge>
+                    ) : (
+                        <span className="text-muted-foreground">Customer</span>
+                    ),
+            },
+            {
+                id: 'plan',
+                header: 'Plan',
+                sortValue: (u) => u.billing?.current_plan?.name ?? '',
+                cell: (u) => u.billing?.current_plan?.name ?? <span className="text-muted-foreground">—</span>,
+            },
+            {
+                id: 'credits',
+                header: 'Credits',
+                sortValue: (u) => u.billing?.credits_remaining ?? -1,
+                className: 'tabular-nums',
+                cell: (u) => (u.billing ? formatNumber(u.billing.credits_remaining ?? 0) : '—'),
+            },
+            {
+                id: 'last_login',
+                header: 'Last sign-in',
+                sortValue: (u) => u.last_login ?? '',
+                cell: (u) => <span className="text-muted-foreground whitespace-nowrap">{formatRelative(u.last_login)}</span>,
+            },
+            {
+                id: 'joined',
+                header: 'Joined',
+                sortValue: (u) => u.date_joined,
+                cell: (u) => <span className="text-muted-foreground whitespace-nowrap">{formatDate(u.date_joined)}</span>,
+            },
+            {
+                id: 'actions',
+                header: <span className="sr-only">Actions</span>,
+                className: 'text-right',
+                cell: (u) => (
+                    <div onClick={(e) => e.stopPropagation()}>
+                        <DropdownMenu>
+                            <DropdownMenuTrigger render={<Button variant="ghost" size="icon-sm" aria-label="User actions" />}>
+                                <MoreHorizontal />
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end" className="w-48">
+                                <DropdownMenuItem onClick={() => navigate(`/admin/users/${u.id}`)}>
+                                    <ExternalLink />
+                                    Open
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => navigate(`/admin/users/${u.id}?tab=credits`)}>
+                                    Adjust credits
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => void sendReset(u)}>
+                                    <Send />
+                                    Email password reset
+                                </DropdownMenuItem>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem
+                                    variant={u.is_active ? 'destructive' : 'default'}
+                                    disabled={u.id === currentAdminId}
+                                    onClick={() => toggleActive(u)}
+                                >
+                                    {u.is_active ? <Ban /> : <CircleCheck />}
+                                    {u.is_active ? 'Suspend' : 'Reactivate'}
+                                </DropdownMenuItem>
+                            </DropdownMenuContent>
+                        </DropdownMenu>
+                    </div>
+                ),
+            },
+        ],
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+        [currentAdminId]
+    );
 
-    </div>
-  );
+    const staffCount = users.filter((u) => u.is_staff || u.is_superuser).length;
+
+    return (
+        <div className="space-y-6">
+            <PageHeader
+                title="Users"
+                description="Every account on ScrubiMail. Open a user to manage their credits, plan, keys, security and access."
+                actions={
+                    <>
+                        <Button variant="outline" size="icon" onClick={() => void fetchAll()} disabled={loading} aria-label="Refresh">
+                            <RefreshCw className={loading ? 'animate-spin' : undefined} />
+                        </Button>
+                        <Button variant="outline" onClick={exportCsv} disabled={!filtered.length}>
+                            <Download />
+                            Export
+                        </Button>
+                        <Button onClick={() => setCreateOpen(true)}>
+                            <UserPlus />
+                            New user
+                        </Button>
+                    </>
+                }
+            />
+
+            <StatCardGrid>
+                <StatCard label="Total users" icon={Users} loading={loading && !stats} value={formatNumber(stats?.total ?? users.length)} />
+                <StatCard
+                    label="Active"
+                    icon={UserRoundCheck}
+                    loading={loading && !stats}
+                    value={formatNumber(stats?.active ?? users.filter((u) => u.is_active).length)}
+                />
+                <StatCard
+                    label="Suspended"
+                    icon={UserRoundX}
+                    loading={loading && !stats}
+                    value={formatNumber(stats?.suspended ?? users.filter((u) => !u.is_active).length)}
+                />
+                <StatCard
+                    label="New (30 days)"
+                    icon={UserNew}
+                    loading={loading && !stats}
+                    value={formatNumber(stats?.new ?? 0)}
+                    hint={`${staffCount} staff accounts`}
+                />
+            </StatCardGrid>
+
+            <DataTable
+                data={filtered}
+                columns={columns}
+                rowKey={(u) => u.id}
+                loading={loading && users.length === 0}
+                error={error}
+                onRetry={() => void fetchAll()}
+                onRowClick={(u) => navigate(`/admin/users/${u.id}`)}
+                searchFilter={(u, q) =>
+                    u.email.toLowerCase().includes(q) ||
+                    displayName(u).toLowerCase().includes(q) ||
+                    (u.phone_number ?? '').includes(q) ||
+                    u.id.startsWith(q)
+                }
+                searchPlaceholder="Search name, email, phone or ID…"
+                emptyTitle="No users"
+                emptyDescription="No accounts match these filters."
+                toolbar={
+                    <>
+                        <Select items={STATUS_ITEMS} value={status} onValueChange={(v) => setStatus(String(v))}>
+                            <SelectTrigger className="w-35">
+                                <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                                {Object.entries(STATUS_ITEMS).map(([value, label]) => (
+                                    <SelectItem key={value} value={value}>
+                                        {label}
+                                    </SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                        <Select items={ROLE_ITEMS} value={role} onValueChange={(v) => setRole(String(v))}>
+                            <SelectTrigger className="w-35">
+                                <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                                {Object.entries(ROLE_ITEMS).map(([value, label]) => (
+                                    <SelectItem key={value} value={value}>
+                                        {label}
+                                    </SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                    </>
+                }
+            />
+
+            <Dialog open={createOpen} onOpenChange={setCreateOpen}>
+                <DialogContent className="sm:max-w-lg">
+                    <form onSubmit={createUser} className="grid gap-6">
+                        <DialogHeader>
+                            <DialogTitle>New user</DialogTitle>
+                            <DialogDescription>
+                                They get the free plan and a billing profile automatically.
+                            </DialogDescription>
+                        </DialogHeader>
+                        <FieldGroup>
+                            <Field>
+                                <FieldLabel htmlFor="new-email">Email</FieldLabel>
+                                <Input
+                                    id="new-email"
+                                    type="email"
+                                    required
+                                    autoComplete="off"
+                                    value={form.email}
+                                    onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
+                                />
+                            </Field>
+                            <div className="grid gap-4 sm:grid-cols-2">
+                                <Field>
+                                    <FieldLabel htmlFor="new-first">First name</FieldLabel>
+                                    <Input
+                                        id="new-first"
+                                        value={form.first_name}
+                                        onChange={(e) => setForm((f) => ({ ...f, first_name: e.target.value }))}
+                                    />
+                                </Field>
+                                <Field>
+                                    <FieldLabel htmlFor="new-last">Last name</FieldLabel>
+                                    <Input
+                                        id="new-last"
+                                        value={form.last_name}
+                                        onChange={(e) => setForm((f) => ({ ...f, last_name: e.target.value }))}
+                                    />
+                                </Field>
+                            </div>
+                            <Field>
+                                <FieldLabel htmlFor="new-password">Password (optional)</FieldLabel>
+                                <Input
+                                    id="new-password"
+                                    type="password"
+                                    autoComplete="new-password"
+                                    value={form.password}
+                                    onChange={(e) => setForm((f) => ({ ...f, password: e.target.value }))}
+                                />
+                                <FieldDescription>
+                                    Leave empty to email them a link to choose their own (recommended).
+                                </FieldDescription>
+                            </Field>
+                            <label className="flex items-center justify-between gap-4 text-sm">
+                                Email a set-password link
+                                <Switch
+                                    checked={!form.password || form.send_invite}
+                                    disabled={!form.password}
+                                    onCheckedChange={(v) => setForm((f) => ({ ...f, send_invite: v }))}
+                                />
+                            </label>
+                            <label className="flex items-center justify-between gap-4 text-sm">
+                                <span>
+                                    Staff access
+                                    <span className="text-muted-foreground block">Can sign in to this admin panel.</span>
+                                </span>
+                                <Switch
+                                    checked={form.is_staff}
+                                    onCheckedChange={(v) => setForm((f) => ({ ...f, is_staff: v }))}
+                                />
+                            </label>
+                        </FieldGroup>
+                        <DialogFooter>
+                            <Button type="button" variant="ghost" onClick={() => setCreateOpen(false)}>
+                                Cancel
+                            </Button>
+                            <Button type="submit" disabled={creating || !form.email.trim()}>
+                                {creating ? 'Creating…' : 'Create user'}
+                            </Button>
+                        </DialogFooter>
+                    </form>
+                </DialogContent>
+            </Dialog>
+
+            {confirm.dialog}
+        </div>
+    );
 };
 
 export default ManageUsers;
-

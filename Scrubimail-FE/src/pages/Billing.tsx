@@ -9,6 +9,7 @@ import billingService, {
   TrialStatus,
   ExpiringCreditsInfo
 } from '../services/billingService';
+import CreditCalculator from '../components/CreditCalculator';
 
 interface Plan {
   id: number;
@@ -24,6 +25,12 @@ interface Plan {
 }
 
 type ActiveTab = 'overview' | 'packages' | 'invoices';
+
+const TAB_LABELS: Record<ActiveTab, string> = {
+  overview: 'Overview',
+  packages: 'Buy credits',
+  invoices: 'Invoices',
+};
 
 const CARD =
   'bg-white/95 dark:bg-[#1c2024] border border-gray-200 dark:border-[#3b4a41]/40 rounded-sm shadow-sm dark:shadow-none';
@@ -45,7 +52,14 @@ const Billing = () => {
   const [expiringCredits, setExpiringCredits] = useState<ExpiringCreditsInfo[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<ActiveTab>('overview');
+  const [activeTab, setActiveTab] = useState<ActiveTab>(() =>
+    searchParams.get('tab') === 'packages' ? 'packages' : 'overview'
+  );
+  // Credits picked on the public pricing calculator (?credits=N), carried into checkout.
+  const [calculatorCredits] = useState<number | undefined>(() => {
+    const n = Number(searchParams.get('credits'));
+    return Number.isFinite(n) && n > 0 ? n : undefined;
+  });
   const [promoCode, setPromoCode] = useState('');
   const [promoValidating, setPromoValidating] = useState(false);
   const [promoResult, setPromoResult] = useState<{ valid: boolean; message: string } | null>(null);
@@ -358,7 +372,7 @@ const Billing = () => {
                   : 'border-transparent text-gray-400 hover:text-gray-700 dark:text-[#bacbbf]/50 dark:hover:text-[#bacbbf]'
               }`}
             >
-              {tab.charAt(0).toUpperCase() + tab.slice(1)}
+              {TAB_LABELS[tab]}
             </button>
           ))}
         </div>
@@ -538,6 +552,16 @@ const Billing = () => {
       {/* Packages Tab */}
       {activeTab === 'packages' && (
         <div className="space-y-4">
+          <CreditCalculator
+            initialCredits={calculatorCredits}
+            onCheckout={async (request) => {
+              const result = await billingService.purchaseCredits(request);
+              globalThis.location.href = result.authorization_url;
+            }}
+          />
+
+          <p className={`${LABEL} pt-2`}>Or pick a bundle</p>
+
           {/* Promo code */}
           <div className={`${CARD} p-5`}>
             <p className={`${LABEL} mb-3`}>Promo Code</p>

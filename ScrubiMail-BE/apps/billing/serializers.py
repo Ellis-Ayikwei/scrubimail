@@ -1,4 +1,5 @@
 import uuid
+from decimal import Decimal
 
 from rest_framework import serializers
 from django.utils import timezone
@@ -13,7 +14,9 @@ from .models import (
     PromoCodeRedemption,
     Invoice,
     InvoiceLineItem,
+    CreditPricingConfig,
 )
+from .credit_pricing import CreditPricingError, parse_tiers, validate_rules
 from apps.plan.models import Plan
 import logging
 
@@ -168,22 +171,57 @@ class BillingAnalyticsSerializer(serializers.Serializer):
 
 
 class CreditPurchaseSerializer(serializers.Serializer):
-    """Serializer for credit purchase requests"""
+    """Pay-as-you-go purchase: ask for N credits *or* spend an amount.
 
-    credits = serializers.IntegerField(min_value=1, max_value=10000)
-    amount = serializers.DecimalField(max_digits=10, decimal_places=2)
+    Limits (min/max/step) and the price are enforced by the pricing rules at
+    quote time; this only checks the request shape.
+    """
 
-    def validate_credits(self, value):
-        if value < 1:
-            raise serializers.ValidationError("Credits must be at least 1")
-        if value > 10000:
-            raise serializers.ValidationError("Credits cannot exceed 10,000")
-        return value
+    credits = serializers.IntegerField(min_value=1, required=False)
+    amount = serializers.DecimalField(
+        max_digits=12, decimal_places=2, min_value=Decimal("0.01"), required=False
+    )
 
-    def validate_amount(self, value):
-        if value <= 0:
-            raise serializers.ValidationError("Amount must be greater than 0")
-        return value
+    def validate(self, attrs):
+        if ("credits" in attrs) == ("amount" in attrs):
+            raise serializers.ValidationError("Provide either credits or amount, not both.")
+        return attrs
+
+
+class CreditPricingConfigSerializer(serializers.ModelSerializer):
+    """Admin read/write of the pay-as-you-go pricing rules."""
+
+    updated_by_email = serializers.SerializerMethodField()
+
+    class Meta:
+        model = CreditPricingConfig
+        fields = [
+            "is_enabled",
+            "currency",
+            "tiers_mode",
+            "tiers",
+            "min_credits",
+            "max_credits",
+            "credit_step",
+            "expiry_days",
+            "updated_at",
+            "updated_by_email",
+        ]
+        read_only_fields = ["updated_at", "updated_by_email"]
+
+    def get_updated_by_email(self, obj):
+        return getattr(obj.updated_by, "email", None)
+
+    def validate(self, attrs):
+        get = lambda k: attrs.get(k, getattr(self.instance, k, None))
+        try:
+            tiers = parse_tiers(get("tiers"))
+            validate_rules(tiers, get("min_credits"), get("max_credits"), get("credit_step"))
+        except CreditPricingError as e:
+            raise serializers.ValidationError(str(e))
+        # Store a normalised copy: sorted ints / canonical decimal strings.
+        attrs["tiers"] = [{"from": t.start, "unit_price": str(t.unit_price)} for t in tiers]
+        return attrs
 
 
 class PlanUpgradeSerializer(serializers.Serializer):

@@ -88,7 +88,8 @@ const PromoCodesManagement: React.FC = () => {
     );
     const mostUsed = codes.find(c => c.id === mostUsedId) || null;
 
-    const totalDiscount = redemptions.reduce((sum, r) => sum + r.discount_amount, 0);
+    // DRF serialises DecimalField as a string — coerce before summing.
+    const totalDiscount = redemptions.reduce((sum, r) => sum + (Number(r.discount_amount) || 0), 0);
 
     setStats({
       activeCodes: active,
@@ -250,7 +251,7 @@ const PromoCodesManagement: React.FC = () => {
       title: 'Discount',
       dataIndex: 'discount_amount',
       key: 'discount_amount',
-      render: (amount) => `$${amount.toFixed(2)}`,
+      render: (amount) => `$${(Number(amount) || 0).toFixed(2)}`,
     },
     {
       title: 'Bonus Credits',

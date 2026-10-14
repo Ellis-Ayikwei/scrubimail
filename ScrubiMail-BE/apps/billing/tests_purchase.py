@@ -13,7 +13,7 @@ from decimal import Decimal
 from unittest import mock
 
 from django.contrib.auth import get_user_model
-from django.test import TestCase
+from django.test import TestCase, override_settings
 from rest_framework.test import APIRequestFactory, force_authenticate
 
 from apps.billing.models import BillingProfile, CreditPackage, CreditPackagePurchase
@@ -23,6 +23,12 @@ from apps.billing.views import PurchaseCreditPackageView
 from apps.admin.views import admin_sync_payment
 
 
+@override_settings(
+    CACHES={"default": {"BACKEND": "django.core.cache.backends.locmem.LocMemCache"}},
+    CURRENCYFREAKS_API_KEY="",
+    PAYSTACK_CHARGE_CURRENCY="GHS",
+    PAYSTACK_FX_USD_TO_GHS="15.0",
+)
 class CreditPackagePurchaseFlowTests(TestCase):
     def setUp(self):
         self.factory = APIRequestFactory()
@@ -68,6 +74,12 @@ class CreditPackagePurchaseFlowTests(TestCase):
         self.assertEqual(response.data["reference"], passed_ref)
         # payment_method has no column; it is preserved in metadata.
         self.assertEqual(purchase.metadata.get("payment_method"), "paystack")
+        # The USD catalog price is converted to Paystack's currency ($10 -> GHS 150),
+        # not sent as "10" in the account's default currency.
+        init = fake_paystack.initialize_payment.call_args.kwargs
+        self.assertEqual(init["amount"], Decimal("150.00"))
+        self.assertEqual(init["currency"], "GHS")
+        self.assertEqual(purchase.currency, "USD")
 
     def test_client_supplied_reference_is_used_verbatim(self):
         # When the client supplies a reference, no gateway init happens and the

@@ -265,9 +265,12 @@ const MultiStepLogin: React.FC = () => {
     setCurrentStep('success');
     showMessage('Login successful!', 'success');
     
-    // Redirect after a short delay
+    // Redirect after a short delay — back to where the user came from (e.g. a
+    // pricing-calculator checkout), but only to an in-app path.
+    const from = new URLSearchParams(window.location.search).get('from');
+    const target = from && from.startsWith('/') && !from.startsWith('//') ? from : '/dashboard';
     setTimeout(() => {
-      navigate('/dashboard');
+      navigate(target);
     }, 1500);
   };
 

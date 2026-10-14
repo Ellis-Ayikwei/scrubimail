@@ -2,7 +2,7 @@ from rest_framework import generics, status, permissions
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
 from django.contrib.auth import get_user_model
-from django.db.models import Count, Q, Sum, F
+from django.db.models import Count, Q, Sum, F, Value
 from django.utils import timezone
 from datetime import timedelta
 from apps.User.serializer import UserSerializer, AdminUserSerializer
@@ -108,12 +108,254 @@ class AdminUserDetailView(generics.RetrieveUpdateDestroyAPIView):
 
         return Response(data)
 
+    def perform_update(self, serializer):
+        """Guard the changes that could lock an admin out or escalate privilege.
+
+        - An admin cannot suspend, de-staff or de-superuser their own account
+          (the last admin doing so would lock everyone out of the panel).
+        - Only a superuser may grant or revoke superuser.
+        """
+        from rest_framework.exceptions import PermissionDenied, ValidationError
+
+        instance = serializer.instance
+        incoming = serializer.validated_data
+        actor = self.request.user
+
+        if instance.pk == actor.pk:
+            for field in ("is_active", "is_staff", "is_superuser"):
+                if field in incoming and incoming[field] is False and getattr(instance, field):
+                    raise ValidationError(
+                        {"detail": f"You cannot remove {field.replace('is_', '')} from your own account."}
+                    )
+
+        if "is_superuser" in incoming and incoming["is_superuser"] != instance.is_superuser:
+            if not actor.is_superuser:
+                raise PermissionDenied("Only a superuser can change superuser status.")
+
+        extra = {}
+        # Keep the informational account_status in step with the flag the auth
+        # layer actually enforces (is_active), unless the caller set it explicitly.
+        if "is_active" in incoming and "account_status" not in incoming:
+            extra["account_status"] = "active" if incoming["is_active"] else "suspended"
+        serializer.save(**extra)
+
+    def perform_destroy(self, instance):
+        from rest_framework.exceptions import PermissionDenied, ValidationError
+
+        if instance.pk == self.request.user.pk:
+            raise ValidationError({"detail": "You cannot delete your own account."})
+        if instance.is_superuser and not self.request.user.is_superuser:
+            raise PermissionDenied("Only a superuser can delete a superuser.")
+        instance.delete()
+
 
 class AdminUserCreateView(generics.CreateAPIView):
-    """Create a new user"""
+    """Create a user from the admin panel.
 
-    serializer_class = UserSerializer
+    Body: {email, first_name?, last_name?, phone_number?, user_type?, is_staff?,
+    password?, send_reset_link?}. Without a password the account gets an
+    unusable one and (by default) a reset link is emailed so the user sets their
+    own. Billing profile / free plan provisioning happens in the post_save signal.
+    """
+
+    serializer_class = AdminUserSerializer
     permission_classes = [permissions.IsAdminUser]
+
+    def create(self, request, *args, **kwargs):
+        from django.contrib.auth.password_validation import validate_password
+        from django.core.exceptions import ValidationError as DjangoValidationError
+
+        email = (request.data.get("email") or "").strip().lower()
+        if not email:
+            return Response({"detail": "email is required."}, status=status.HTTP_400_BAD_REQUEST)
+        if User.objects.filter(email__iexact=email).exists():
+            return Response(
+                {"detail": "A user with this email already exists."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        is_staff = bool(request.data.get("is_staff", False))
+        user_type = request.data.get("user_type") or ("admin" if is_staff else "customer")
+        if user_type not in dict(User.USER_TYPE_CHOICES):
+            return Response({"detail": "Invalid user_type."}, status=status.HTTP_400_BAD_REQUEST)
+
+        password = request.data.get("password") or None
+        if password:
+            try:
+                validate_password(password)
+            except DjangoValidationError as exc:
+                return Response({"detail": " ".join(exc.messages)}, status=status.HTTP_400_BAD_REQUEST)
+
+        user = User.objects.create_user(
+            email=email,
+            password=password,
+            first_name=(request.data.get("first_name") or "").strip(),
+            last_name=(request.data.get("last_name") or "").strip(),
+            phone_number=(request.data.get("phone_number") or "").strip() or None,
+            user_type=user_type,
+            is_staff=is_staff,
+        )
+        if not password:
+            user.set_unusable_password()
+            user.save(update_fields=["password"])
+
+        data = AdminUserSerializer(user).data
+        send_link = request.data.get("send_reset_link", not password)
+        if send_link:
+            data["reset_link_sent"], data["reset_url"] = _send_password_reset(user)
+        return Response(data, status=status.HTTP_201_CREATED)
+
+
+def _password_reset_url(user):
+    import os
+    from django.contrib.auth.tokens import PasswordResetTokenGenerator
+    from django.utils.encoding import force_bytes
+    from django.utils.http import urlsafe_base64_encode
+
+    uid = urlsafe_base64_encode(force_bytes(user.pk))
+    token = PasswordResetTokenGenerator().make_token(user)
+    base = (os.getenv("FRONTEND_URL") or "").rstrip("/")
+    return f"{base}/reset-password/{uid}/{token}"
+
+
+def _send_password_reset(user):
+    """Email a reset link. Returns (sent, url) — the URL is handed back to the
+    admin so support can share it by other means when email delivery fails."""
+    from django.conf import settings
+    from django.core.mail import send_mail
+
+    url = _password_reset_url(user)
+    try:
+        send_mail(
+            "Password Reset Request",
+            f"Use this link to reset your password: {url}",
+            getattr(settings, "DEFAULT_FROM_EMAIL", "noreply@example.com"),
+            [user.email],
+            fail_silently=False,
+        )
+        return True, url
+    except Exception:
+        logger.exception("Admin-triggered password reset email failed for %s", user.email)
+        return False, url
+
+
+@api_view(["POST"])
+@permission_classes([permissions.IsAdminUser])
+def admin_send_password_reset(request, user_id):
+    """Email the user a password-reset link; also returns the link."""
+    user = get_object_or_404(User, pk=user_id)
+    sent, url = _send_password_reset(user)
+    return Response(
+        {
+            "detail": "Password reset link sent." if sent
+            else "Email delivery failed — share the link below with the user directly.",
+            "email_sent": sent,
+            "reset_url": url,
+        }
+    )
+
+
+@api_view(["POST"])
+@permission_classes([permissions.IsAdminUser])
+def admin_set_password(request, user_id):
+    """Set a user's password directly. Body: {password, revoke_sessions?}."""
+    from django.contrib.auth.password_validation import validate_password
+    from django.core.exceptions import ValidationError as DjangoValidationError
+
+    user = get_object_or_404(User, pk=user_id)
+    if user.is_superuser and not request.user.is_superuser:
+        return Response(
+            {"detail": "Only a superuser can change a superuser's password."},
+            status=status.HTTP_403_FORBIDDEN,
+        )
+    password = request.data.get("password") or ""
+    try:
+        validate_password(password, user=user)
+    except DjangoValidationError as exc:
+        return Response({"detail": " ".join(exc.messages)}, status=status.HTTP_400_BAD_REQUEST)
+
+    user.set_password(password)
+    user.save(update_fields=["password"])
+    revoked = 0
+    if request.data.get("revoke_sessions", True):
+        revoked = _revoke_refresh_tokens(user)
+    return Response({"detail": "Password updated.", "sessions_revoked": revoked})
+
+
+def _revoke_refresh_tokens(user):
+    """Blacklist every outstanding refresh token so the user's sessions cannot
+    be renewed. Access tokens already issued live until they expire."""
+    from rest_framework_simplejwt.token_blacklist.models import BlacklistedToken, OutstandingToken
+
+    revoked = 0
+    for token in OutstandingToken.objects.filter(user=user, blacklistedtoken__isnull=True):
+        BlacklistedToken.objects.get_or_create(token=token)
+        revoked += 1
+    return revoked
+
+
+@api_view(["POST"])
+@permission_classes([permissions.IsAdminUser])
+def admin_revoke_sessions(request, user_id):
+    """Sign the user out everywhere (refresh tokens + trusted 2FA devices)."""
+    user = get_object_or_404(User, pk=user_id)
+    revoked = _revoke_refresh_tokens(user)
+    devices, _ = TrustedDevice.objects.filter(user=user).delete()
+    return Response(
+        {
+            "detail": f"Revoked {revoked} session(s) and {devices} trusted device(s).",
+            "sessions_revoked": revoked,
+            "trusted_devices_revoked": devices,
+        }
+    )
+
+
+@api_view(["GET"])
+@permission_classes([permissions.IsAdminUser])
+def admin_user_summary(request, user_id):
+    """Everything an admin needs at a glance about one user's activity."""
+    user = get_object_or_404(User, pk=user_id)
+    now = timezone.now()
+    validations = EmailValidation.objects.filter(user=user)
+    outcome_counts = _outcome_counts(validations)
+
+    last_validation = validations.order_by("-created_at").values_list("created_at", flat=True).first()
+    keys = APIKey.objects.filter(user=user)
+    purchases = CreditPackagePurchase.objects.filter(user=user)
+    paid = purchases.filter(status="completed").aggregate(total=Sum("amount_paid"), n=Count("id"))
+
+    try:
+        totp_enabled = TOTPDevice.objects.get(user=user).is_enabled
+    except TOTPDevice.DoesNotExist:
+        totp_enabled = False
+
+    return Response(
+        {
+            "validations": {
+                "total": validations.count(),
+                "last_30_days": validations.filter(created_at__gte=now - timedelta(days=30)).count(),
+                "last_at": last_validation.isoformat() if last_validation else None,
+                "by_outcome": outcome_counts,
+                "bulk_jobs": BulkValidationJob.objects.filter(user=user).count(),
+            },
+            "api_keys": {
+                "total": keys.count(),
+                "active": keys.filter(is_active=True).count(),
+                "requests": keys.aggregate(n=Sum("usage_count"))["n"] or 0,
+            },
+            "payments": {
+                "completed": paid["n"] or 0,
+                "total_paid": float(paid["total"] or 0),
+                "pending": purchases.filter(status="pending").count(),
+                "failed": purchases.filter(status="failed").count(),
+            },
+            "security": {
+                "two_factor_enabled": totp_enabled,
+                "has_usable_password": user.has_usable_password(),
+                "trusted_devices": TrustedDevice.objects.filter(user=user).count(),
+            },
+        }
+    )
 
 
 @api_view(["GET"])
@@ -168,34 +410,221 @@ def admin_billing_stats(request):
     )
 
 
+# ---------------------------------------------------------------------------
+# Validation outcomes
+#
+# A row's `status` is the JOB state (pending/processing/completed/failed). The
+# deliverability verdict lives in metadata.status (valid / invalid / catch_all /
+# unknown / do_not_mail). The admin wants the verdict, so "outcome" below is the
+# verdict for completed rows and the job state for everything else.
+# ---------------------------------------------------------------------------
+
+VERDICT_STATUSES = ("valid", "invalid", "catch_all", "unknown", "do_not_mail")
+JOB_STATUSES = ("pending", "processing", "failed")
+
+_LEGACY_VERDICT_MAP = {
+    "valid": "valid",
+    "invalid": "invalid",
+    "catch-all": "catch_all",
+    "catch_all": "catch_all",
+    "do not mail": "do_not_mail",
+    "unknown": "unknown",
+    "risky": "unknown",
+    "error": "unknown",
+}
+
+
+def _validation_outcome(v):
+    if v.status != "completed":
+        return v.status
+    meta_status = (v.metadata or {}).get("status")
+    if meta_status in VERDICT_STATUSES:
+        return meta_status
+    # Rows written before metadata.status existed carry the verdict here.
+    verdict = (((v.breakdown or {}).get("risk_score") or {}).get("verdict") or "").lower()
+    return _LEGACY_VERDICT_MAP.get(verdict, "unknown")
+
+
+def _outcome_counts(qs):
+    """{outcome: count} over a queryset, aggregated in the database."""
+    counts = {key: 0 for key in VERDICT_STATUSES + JOB_STATUSES}
+    for row in qs.exclude(status="completed").values("status").annotate(n=Count("id")):
+        counts[row["status"]] = counts.get(row["status"], 0) + row["n"]
+    for row in qs.filter(status="completed").values("metadata__status").annotate(n=Count("id")):
+        key = row["metadata__status"] if row["metadata__status"] in VERDICT_STATUSES else "unknown"
+        counts[key] += row["n"]
+    return counts
+
+
+def _serialize_admin_validation(v, user_map):
+    meta = v.metadata or {}
+    risk = (v.breakdown or {}).get("risk_score") or {}
+    vt = meta.get("validation_time")
+    user = user_map.get(v.user_id)
+    outcome = _validation_outcome(v)
+    return {
+        "id": str(v.id),
+        "email": v.email,
+        "status": outcome,
+        "job_status": v.status,
+        "sub_status": meta.get("sub_status"),
+        "score": v.score,
+        "verdict": risk.get("verdict") or outcome.replace("_", " ").title(),
+        "is_valid": outcome == "valid",
+        "job_type": v.job_type,
+        "bulk_job_id": str(v.bulk_job_id) if v.bulk_job_id else None,
+        "processing_ms": round(vt * 1000) if isinstance(vt, (int, float)) else None,
+        "created_at": v.created_at.isoformat(),
+        "user": user,
+        "breakdown": v.breakdown or {},
+        "suggestions": v.suggestions or [],
+        "warnings": v.warnings or [],
+        "metadata": meta,
+    }
+
+
+def _filter_validations(request, qs):
+    params = request.query_params
+    user_id = params.get("user_id")
+    if user_id:
+        qs = qs.filter(user_id=user_id)
+
+    outcome = (params.get("status") or "").strip()
+    if outcome in JOB_STATUSES:
+        qs = qs.filter(status=outcome)
+    elif outcome in VERDICT_STATUSES:
+        qs = qs.filter(status="completed", metadata__status=outcome)
+
+    job_type = (params.get("job_type") or "").strip()
+    if job_type:
+        qs = qs.filter(job_type=job_type)
+
+    search = (params.get("search") or "").strip()
+    if search:
+        qs = qs.filter(Q(email__icontains=search) | Q(user__email__icontains=search))
+
+    days = params.get("days")
+    if days and str(days).isdigit():
+        qs = qs.filter(created_at__gte=timezone.now() - timedelta(days=int(days)))
+    return qs
+
+
+def _bounded_int(value, default, lo, hi):
+    try:
+        return max(lo, min(hi, int(value)))
+    except (TypeError, ValueError):
+        return default
+
+
 @api_view(["GET"])
 @permission_classes([permissions.IsAdminUser])
 def admin_validations_stats(request):
-    """Get validation statistics for admin dashboard"""
-    total_validations = EmailValidation.objects.count()
+    """Validation statistics for the admin. Honours the same filters as the list
+    (user_id, status, job_type, search, days)."""
+    from django.db.models import Avg
+    from django.db.models.functions import Lower, StrIndex, Substr, TruncDate
 
-    # Recent validations
-    recent_validations = EmailValidation.objects.all().order_by("-created_at")[:10]
-    recent_validations_data = EmailValidationSerializer(
-        recent_validations, many=True
-    ).data
+    qs = _filter_validations(request, EmailValidation.objects.all())
+    counts = _outcome_counts(qs)
+    total = sum(counts.values())
+    completed = sum(counts[k] for k in VERDICT_STATUSES)
+
+    avg_score = qs.filter(status="completed").aggregate(a=Avg("score"))["a"]
+
+    # Processing time lives in JSON; average a recent sample in Python rather
+    # than casting JSON in SQL (which errors on any malformed legacy value).
+    times = [
+        m.get("validation_time")
+        for m in qs.filter(status="completed").order_by("-created_at").values_list("metadata", flat=True)[:2000]
+        if isinstance(m, dict)
+    ]
+    times = [t for t in times if isinstance(t, (int, float))]
+    avg_ms = round(sum(times) / len(times) * 1000) if times else None
+
+    domain_expr = Lower(Substr("email", StrIndex("email", Value("@")) + 1))
+    top_domains = []
+    for row in (
+        qs.annotate(domain=domain_expr)
+        .values("domain")
+        .annotate(
+            count=Count("id"),
+            valid=Count("id", filter=Q(status="completed", metadata__status="valid")),
+        )
+        .order_by("-count")[:10]
+    ):
+        top_domains.append(
+            {
+                "domain": row["domain"],
+                "count": row["count"],
+                "valid_rate": round(row["valid"] / row["count"] * 100, 1) if row["count"] else 0,
+            }
+        )
+
+    since = timezone.now() - timedelta(days=30)
+    daily = [
+        {
+            "date": row["day"].isoformat() if row["day"] else None,
+            "validations": row["n"],
+            "valid_count": row["valid"],
+            "invalid_count": row["invalid"],
+        }
+        for row in (
+            qs.filter(created_at__gte=since)
+            .annotate(day=TruncDate("created_at"))
+            .values("day")
+            .annotate(
+                n=Count("id"),
+                valid=Count("id", filter=Q(status="completed", metadata__status="valid")),
+                invalid=Count("id", filter=Q(status="completed", metadata__status="invalid")),
+            )
+            .order_by("day")
+        )
+    ]
 
     return Response(
         {
-            "total_validations": total_validations,
-            "recent_validations": recent_validations_data,
+            "total_validations": total,
+            "completed": completed,
+            "valid_emails": counts["valid"],
+            "invalid_emails": counts["invalid"],
+            "catch_all_emails": counts["catch_all"],
+            "unknown_emails": counts["unknown"],
+            "do_not_mail_emails": counts["do_not_mail"],
+            # "risky" = deliverable-but-unconfirmed buckets, kept for older UIs.
+            "risky_emails": counts["catch_all"] + counts["unknown"] + counts["do_not_mail"],
+            "pending": counts["pending"] + counts["processing"],
+            "failed": counts["failed"],
+            "by_outcome": counts,
+            "success_rate": round(counts["valid"] / completed * 100, 1) if completed else 0,
+            "average_score": round(avg_score, 1) if avg_score is not None else 0,
+            "processing_time_avg_ms": avg_ms,
+            "top_domains": top_domains,
+            "daily_stats": daily,
+            "users_validating": qs.exclude(user__isnull=True).values("user_id").distinct().count(),
+            "bulk_jobs": BulkValidationJob.objects.count(),
+            # Unchanged shape — the dashboard and analytics pages read this.
+            "recent_validations": EmailValidationSerializer(qs.order_by("-created_at")[:10], many=True).data,
         }
     )
 
 
 class AdminBillingListView(generics.ListAPIView):
-    """List all billing records for admin"""
+    """Credit transactions for admin. ?user_id= narrows to one user; ?limit=
+    caps the result (default 500) since the table grows with every validation."""
 
     serializer_class = CreditTransactionSerializer
     permission_classes = [permissions.IsAdminUser]
 
     def get_queryset(self):
-        return CreditTransaction.objects.all().order_by("-created_at")
+        qs = CreditTransaction.objects.select_related("billing_profile").order_by("-created_at")
+        user_id = self.request.query_params.get("user_id")
+        if user_id:
+            qs = qs.filter(billing_profile__user_id=user_id)
+        tx_type = self.request.query_params.get("type")
+        if tx_type:
+            qs = qs.filter(transaction_type=tx_type)
+        limit = _bounded_int(self.request.query_params.get("limit"), 500, 1, 5000)
+        return qs[:limit]
 
 
 class AdminPlansListView(generics.ListCreateAPIView):
@@ -229,13 +658,51 @@ def admin_plans_stats(request):
 
 
 class AdminValidationsListView(generics.ListAPIView):
-    """List all validation records for admin"""
+    """Validation records for admin, newest first.
 
-    serializer_class = EmailValidationSerializer
+    Filters: user_id, status (an outcome: valid/invalid/catch_all/unknown/
+    do_not_mail/pending/processing/failed), job_type, search, days.
+    Paging: limit (default 500, max 5000) and offset. Returns
+    {results, count, limit, offset} — count is the total matching the filters.
+    """
+
     permission_classes = [permissions.IsAdminUser]
 
     def get_queryset(self):
-        return EmailValidation.objects.all().order_by("-created_at")
+        return _filter_validations(self.request, EmailValidation.objects.all()).order_by("-created_at")
+
+    def list(self, request, *args, **kwargs):
+        qs = self.get_queryset()
+        limit = _bounded_int(request.query_params.get("limit"), 500, 1, 5000)
+        offset = _bounded_int(request.query_params.get("offset"), 0, 0, 10**9)
+        rows = list(qs[offset:offset + limit])
+
+        user_ids = {v.user_id for v in rows if v.user_id}
+        user_map = {
+            u.id: {
+                "id": str(u.id),
+                "email": u.email,
+                "name": f"{u.first_name} {u.last_name}".strip() or None,
+            }
+            for u in User.objects.filter(id__in=user_ids)
+        }
+        return Response(
+            {
+                "results": [_serialize_admin_validation(v, user_map) for v in rows],
+                "count": qs.count(),
+                "limit": limit,
+                "offset": offset,
+            }
+        )
+
+
+class AdminAPIKeySerializer(APIKeySerializer):
+    """APIKeySerializer without the plaintext secret. Keys are stored in clear,
+    so listing them returned every user's live credential to the browser; the
+    admin sees prefix/masked_key, and the full key only in the create response."""
+
+    class Meta(APIKeySerializer.Meta):
+        fields = [f for f in APIKeySerializer.Meta.fields if f != "key"]
 
 
 class AdminAPIKeyListView(generics.ListCreateAPIView):
@@ -251,7 +718,7 @@ class AdminAPIKeyListView(generics.ListCreateAPIView):
     def get_serializer_class(self):
         if self.request.method == "POST":
             return APIKeyCreateSerializer
-        return APIKeySerializer
+        return AdminAPIKeySerializer
 
     def get_queryset(self):
         qs = APIKey.objects.select_related("user").order_by("-created_at")
@@ -301,14 +768,14 @@ class AdminAPIKeyListView(generics.ListCreateAPIView):
 class AdminAPIKeyDetailView(generics.RetrieveUpdateDestroyAPIView):
     """Retrieve, update, or revoke (soft-delete) any user's API key, as an admin."""
 
-    serializer_class = APIKeySerializer
+    serializer_class = AdminAPIKeySerializer
     permission_classes = [permissions.IsAdminUser]
     lookup_field = "pk"
 
     def get_serializer_class(self):
         if self.request.method in ["PUT", "PATCH"]:
             return APIKeyUpdateSerializer
-        return APIKeySerializer
+        return AdminAPIKeySerializer
 
     def get_queryset(self):
         return APIKey.objects.select_related("user")

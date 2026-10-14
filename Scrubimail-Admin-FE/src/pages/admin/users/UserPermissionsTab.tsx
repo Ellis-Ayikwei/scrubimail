@@ -1,300 +1,237 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { RefreshCw, Save, Users, Lock, Check, Search } from 'lucide-react';
-import axiosInstance from '../../../services/axiosInstance';
-import { UCARD, UHEADER, UBORDER_B, UPANEL, UINPUT, UMINT, UERR, UOK, UROW_HOVER } from './userTheme';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { Search } from 'lucide-react';
+import { toast } from 'sonner';
+
+import axiosInstance from '@/services/axiosInstance';
+import { ErrorState } from '@/components/admin';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Input } from '@/components/ui/input';
+import { Skeleton } from '@/components/ui/skeleton';
+import { apiError, asList } from '@/lib/api';
+import type { UserTabProps } from './types';
 
 interface GroupItem {
-  id: number;
-  name: string;
-  user_count?: number;
-  permissions?: PermItem[];
+    id: number;
+    name: string;
+    user_count?: number;
+    permission_count?: number;
+    permissions?: PermItem[];
 }
+
 interface PermItem {
-  id: number;
-  name: string;
-  codename: string;
-  content_type?: number;
+    id: number;
+    name: string;
+    codename: string;
 }
 
-interface Props {
-  userId: string;
-}
+const sameSet = (a: Set<number>, b: Set<number>) => a.size === b.size && [...a].every((x) => b.has(x));
 
-const UserPermissionsTab: React.FC<Props> = ({ userId }) => {
-  const [allGroups, setAllGroups] = useState<GroupItem[]>([]);
-  const [userGroupIds, setUserGroupIds] = useState<Set<number>>(new Set());
+const UserPermissionsTab: React.FC<UserTabProps> = ({ user, onChanged }) => {
+    const [allGroups, setAllGroups] = useState<GroupItem[]>([]);
+    const [allPerms, setAllPerms] = useState<PermItem[]>([]);
+    const [savedGroups, setSavedGroups] = useState<Set<number>>(new Set());
+    const [groupIds, setGroupIds] = useState<Set<number>>(new Set());
+    const [savedPerms, setSavedPerms] = useState<Set<number>>(new Set());
+    const [permIds, setPermIds] = useState<Set<number>>(new Set());
+    const [inherited, setInherited] = useState<Set<number>>(new Set());
 
-  const [groupPerms, setGroupPerms] = useState<PermItem[]>([]);
-  const [allPerms, setAllPerms] = useState<PermItem[]>([]);
-  const [userPermIds, setUserPermIds] = useState<Set<number>>(new Set());
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
+    const [saving, setSaving] = useState<'groups' | 'perms' | null>(null);
+    const [search, setSearch] = useState('');
+    const [onlyGranted, setOnlyGranted] = useState(false);
 
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState<'groups' | 'perms' | null>(null);
-  const [msg, setMsg] = useState<{ type: 'ok' | 'err'; text: string } | null>(null);
-  const [permSearch, setPermSearch] = useState('');
+    const load = useCallback(async () => {
+        setLoading(true);
+        setError(null);
+        try {
+            const [groups, userGroups, perms, userPerms] = await Promise.all([
+                axiosInstance.get('/admin/groups/'),
+                axiosInstance.get(`/admin/users/${user.id}/groups/`),
+                axiosInstance.get('/admin/permissions/'),
+                axiosInstance.get(`/admin/users/${user.id}/permissions/`),
+            ]);
+            setAllGroups(asList<GroupItem>(groups.data));
+            setAllPerms(asList<PermItem>(perms.data));
+            const g = new Set(asList<GroupItem>(userGroups.data).map((x) => x.id));
+            const p = new Set<number>((userPerms.data?.direct ?? []).map((x: PermItem) => x.id));
+            setSavedGroups(g);
+            setGroupIds(new Set(g));
+            setSavedPerms(p);
+            setPermIds(new Set(p));
+            setInherited(new Set((userPerms.data?.from_groups ?? []).map((x: PermItem) => x.id)));
+        } catch (e) {
+            setError(apiError(e, 'Could not load groups and permissions'));
+        } finally {
+            setLoading(false);
+        }
+    }, [user.id]);
 
-  const fetch = useCallback(async () => {
-    setLoading(true);
-    try {
-      const [grpRes, userGrpRes, permRes, userPermRes] = await Promise.all([
-        axiosInstance.get('/admin/groups/'),
-        axiosInstance.get(`/admin/users/${userId}/groups/`),
-        axiosInstance.get('/admin/permissions/'),
-        axiosInstance.get(`/admin/users/${userId}/permissions/`),
-      ]);
-      setAllGroups(Array.isArray(grpRes.data) ? grpRes.data : []);
-      setUserGroupIds(new Set((userGrpRes.data as GroupItem[]).map((g) => g.id)));
-      setAllPerms(Array.isArray(permRes.data) ? permRes.data : []);
-      setGroupPerms(userPermRes.data?.from_groups ?? []);
-      setUserPermIds(new Set((userPermRes.data?.direct ?? []).map((p: PermItem) => p.id)));
-    } catch {
-      /* ignore */
-    } finally {
-      setLoading(false);
-    }
-  }, [userId]);
+    useEffect(() => {
+        void load();
+    }, [load]);
 
-  useEffect(() => {
-    fetch();
-  }, [fetch]);
+    const toggle = (setter: React.Dispatch<React.SetStateAction<Set<number>>>, id: number) =>
+        setter((prev) => {
+            const next = new Set(prev);
+            if (next.has(id)) next.delete(id);
+            else next.add(id);
+            return next;
+        });
 
-  const saveGroups = async () => {
-    setSaving('groups');
-    setMsg(null);
-    try {
-      await axiosInstance.put(`/admin/users/${userId}/groups/`, { group_ids: [...userGroupIds] });
-      setMsg({ type: 'ok', text: 'Groups updated.' });
-      fetch();
-    } catch (e: any) {
-      setMsg({ type: 'err', text: e?.response?.data?.detail ?? 'Failed to update groups' });
-    } finally {
-      setSaving(null);
-    }
-  };
+    const save = async (kind: 'groups' | 'perms') => {
+        setSaving(kind);
+        try {
+            if (kind === 'groups') {
+                await axiosInstance.put(`/admin/users/${user.id}/groups/`, { group_ids: [...groupIds] });
+                toast.success('Groups updated');
+            } else {
+                await axiosInstance.put(`/admin/users/${user.id}/permissions/`, { permission_ids: [...permIds] });
+                toast.success('Permissions updated');
+            }
+            await load();
+            onChanged();
+        } catch (e) {
+            toast.error(apiError(e, 'Could not save'));
+        } finally {
+            setSaving(null);
+        }
+    };
 
-  const savePerms = async () => {
-    setSaving('perms');
-    setMsg(null);
-    try {
-      await axiosInstance.put(`/admin/users/${userId}/permissions/`, { permission_ids: [...userPermIds] });
-      setMsg({ type: 'ok', text: 'Permissions updated.' });
-      fetch();
-    } catch (e: any) {
-      setMsg({ type: 'err', text: e?.response?.data?.detail ?? 'Failed to update permissions' });
-    } finally {
-      setSaving(null);
-    }
-  };
+    const visiblePerms = useMemo(() => {
+        const q = search.trim().toLowerCase();
+        return allPerms.filter((p) => {
+            if (onlyGranted && !permIds.has(p.id) && !inherited.has(p.id)) return false;
+            return !q || p.name.toLowerCase().includes(q) || p.codename.toLowerCase().includes(q);
+        });
+    }, [allPerms, search, onlyGranted, permIds, inherited]);
 
-  const toggleGroup = (id: number) => {
-    setUserGroupIds((prev) => {
-      const next = new Set(prev);
-      next.has(id) ? next.delete(id) : next.add(id);
-      return next;
-    });
-  };
-
-  const togglePerm = (id: number) => {
-    setUserPermIds((prev) => {
-      const next = new Set(prev);
-      next.has(id) ? next.delete(id) : next.add(id);
-      return next;
-    });
-  };
-
-  const groupPermIds = new Set(groupPerms.map((p) => p.id));
-
-  const filteredPerms = permSearch
-    ? allPerms.filter(
-        (p) =>
-          p.name.toLowerCase().includes(permSearch.toLowerCase()) ||
-          p.codename.toLowerCase().includes(permSearch.toLowerCase())
-      )
-    : allPerms;
-
-  if (loading) {
-    return (
-      <div className="space-y-3">
-        {[1, 2].map((i) => (
-          <div
-            key={i}
-            className="h-32 bg-gray-100 dark:bg-[#1c2024] border border-gray-200 dark:border-[#3b4a41]/40 rounded-sm animate-pulse"
-          />
-        ))}
-      </div>
-    );
-  }
-
-  return (
-    <div className="space-y-5">
-      {msg && (
-        <div
-          className={`rounded-sm p-3 font-mono text-xs border ${
-            msg.type === 'ok' ? UOK : UERR
-          }`}
-        >
-          {msg.text}
-        </div>
-      )}
-
-      <div className={UCARD}>
-        <div className={`flex items-center justify-between px-4 py-3 ${UBORDER_B}`}>
-          <div className="flex items-center gap-2">
-            <Users className={`w-3.5 h-3.5 ${UMINT}`} />
-            <p className={UHEADER}>Groups</p>
-          </div>
-          <button
-            type="button"
-            onClick={saveGroups}
-            disabled={saving === 'groups'}
-            className="flex items-center gap-1.5 px-2.5 py-1.5 bg-emerald-50 border border-emerald-200 text-emerald-800 dark:bg-[#6effc0]/10 dark:border-[#6effc0]/20 dark:text-[#6effc0] rounded-sm font-mono text-[9px] uppercase tracking-[0.1em] hover:bg-emerald-100 dark:hover:bg-[#6effc0]/20 transition-all disabled:opacity-40"
-          >
-            {saving === 'groups' ? <RefreshCw className="w-3 h-3 animate-spin" /> : <Save className="w-3 h-3" />}
-            Save Groups
-          </button>
-        </div>
-
-        {allGroups.length === 0 ? (
-          <div className="p-8 text-center">
-            <p className="font-mono text-xs text-gray-500 dark:text-[#3b4a41]">No groups defined yet</p>
-          </div>
-        ) : (
-          <div className="p-4 grid sm:grid-cols-2 lg:grid-cols-3 gap-2">
-            {allGroups.map((g) => {
-              const active = userGroupIds.has(g.id);
-              return (
-                <button
-                  key={g.id}
-                  type="button"
-                  onClick={() => toggleGroup(g.id)}
-                  className={`flex items-center gap-3 px-3 py-2.5 rounded-sm border text-left transition-all ${
-                    active
-                      ? 'border-emerald-300 bg-emerald-50 dark:border-[#6effc0]/40 dark:bg-[#6effc0]/8'
-                      : 'border-gray-200 bg-white dark:border-[#3b4a41]/30 dark:bg-[#101418] hover:border-gray-300 dark:hover:border-[#3b4a41]/60'
-                  }`}
-                >
-                  <div
-                    className={`w-4 h-4 rounded-sm border flex items-center justify-center shrink-0 transition-colors ${
-                      active
-                        ? 'bg-emerald-500 border-emerald-500 dark:bg-[#6effc0] dark:border-[#6effc0]'
-                        : 'border-gray-300 dark:border-[#3b4a41]'
-                    }`}
-                  >
-                    {active && <Check className="w-3 h-3 text-white dark:text-[#003824]" />}
-                  </div>
-                  <div className="min-w-0">
-                    <p
-                      className={`font-mono text-[10px] truncate ${
-                        active ? UMINT : 'text-gray-700 dark:text-[#bacbbf]'
-                      }`}
-                    >
-                      {g.name}
-                    </p>
-                    {g.permissions && g.permissions.length > 0 && (
-                      <p className="font-mono text-[8px] text-gray-400 dark:text-[#3b4a41] mt-0.5">
-                        {g.permissions.length} permissions
-                      </p>
-                    )}
-                  </div>
-                </button>
-              );
-            })}
-          </div>
-        )}
-      </div>
-
-      <div className={UCARD}>
-        <div className={`flex items-center justify-between px-4 py-3 ${UBORDER_B}`}>
-          <div className="flex items-center gap-2">
-            <Lock className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
-            <p className={UHEADER}>Direct Permissions</p>
-            <span className="font-mono text-[9px] px-1.5 py-0.5 bg-gray-200 text-gray-600 dark:bg-[#3b4a41]/30 dark:text-[#bacbbf]/60 rounded-sm">
-              {userPermIds.size} assigned
-            </span>
-          </div>
-          <button
-            type="button"
-            onClick={savePerms}
-            disabled={saving === 'perms'}
-            className="flex items-center gap-1.5 px-2.5 py-1.5 bg-emerald-50 border border-emerald-200 text-emerald-800 dark:bg-[#6effc0]/10 dark:border-[#6effc0]/20 dark:text-[#6effc0] rounded-sm font-mono text-[9px] uppercase tracking-[0.1em] hover:bg-emerald-100 dark:hover:bg-[#6effc0]/20 transition-all disabled:opacity-40"
-          >
-            {saving === 'perms' ? <RefreshCw className="w-3 h-3 animate-spin" /> : <Save className="w-3 h-3" />}
-            Save Permissions
-          </button>
-        </div>
-
-        <div className={`px-4 py-3 ${UBORDER_B} ${UPANEL}`}>
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 dark:text-[#3b4a41]" />
-            <input
-              value={permSearch}
-              onChange={(e) => setPermSearch(e.target.value)}
-              placeholder="Filter permissions…"
-              className={`${UINPUT} pl-9`}
-            />
-          </div>
-        </div>
-
-        <div className="max-h-[420px] overflow-y-auto divide-y divide-gray-200 dark:divide-[#3b4a41]/15">
-          {filteredPerms.map((p) => {
-            const isDirect = userPermIds.has(p.id);
-            const isFromGroup = groupPermIds.has(p.id);
-            return (
-              <label
-                key={p.id}
-                className={`flex items-center gap-3 px-4 py-2.5 ${UROW_HOVER} transition-colors cursor-pointer`}
-              >
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    togglePerm(p.id);
-                  }}
-                  aria-pressed={isDirect}
-                  aria-label={isDirect ? 'Remove direct permission' : 'Add direct permission'}
-                  className={`p-0 w-4 h-4 rounded-sm border flex items-center justify-center shrink-0 transition-colors ${
-                    isDirect
-                      ? 'bg-amber-500 border-amber-500 dark:bg-amber-500 dark:border-amber-500'
-                      : isFromGroup
-                        ? 'bg-emerald-200 border-emerald-300 dark:bg-[#6effc0]/30 dark:border-[#6effc0]/40'
-                        : 'border-gray-300 dark:border-[#3b4a41] hover:border-gray-400 dark:hover:border-[#bacbbf]/40'
-                  }`}
-                >
-                  {(isDirect || isFromGroup) && <Check className="w-3 h-3 text-white dark:text-[#003824]" />}
-                </button>
-                <div className="min-w-0 flex-1">
-                  <p
-                    className={`font-mono text-[10px] ${
-                      isDirect
-                        ? 'text-amber-700 dark:text-amber-400'
-                        : isFromGroup
-                          ? 'text-emerald-700 dark:text-[#6effc0]/70'
-                          : 'text-gray-700 dark:text-[#bacbbf]'
-                    }`}
-                  >
-                    {p.codename}
-                  </p>
-                  <p className="font-mono text-[8px] text-gray-400 dark:text-[#3b4a41] truncate">{p.name}</p>
-                </div>
-                {isFromGroup && !isDirect && (
-                  <span className="font-mono text-[7px] px-1.5 py-0.5 bg-emerald-50 text-emerald-800 border border-emerald-200 dark:bg-[#6effc0]/10 dark:text-[#6effc0]/80 dark:border-[#6effc0]/15 rounded-sm shrink-0">
-                    via group
-                  </span>
-                )}
-              </label>
-            );
-          })}
-          {filteredPerms.length === 0 && (
-            <div className="p-6 text-center">
-              <p className="font-mono text-xs text-gray-500 dark:text-[#3b4a41]">
-                {permSearch ? 'No matching permissions' : 'No permissions available'}
-              </p>
+    if (error) return <ErrorState description={error} onRetry={() => void load()} />;
+    if (loading) {
+        return (
+            <div className="space-y-4">
+                <Skeleton className="h-40" />
+                <Skeleton className="h-80" />
             </div>
-          )}
+        );
+    }
+
+    const groupsDirty = !sameSet(groupIds, savedGroups);
+    const permsDirty = !sameSet(permIds, savedPerms);
+
+    return (
+        <div className="space-y-4">
+            {user.is_superuser && (
+                <p className="text-muted-foreground rounded-xl border px-4 py-3 text-sm">
+                    This user is a superuser and passes every permission check regardless of the settings below.
+                </p>
+            )}
+
+            <Card>
+                <CardHeader>
+                    <CardTitle>Groups</CardTitle>
+                    <CardDescription>Users inherit every permission of their groups.</CardDescription>
+                    <CardAction className="flex gap-2">
+                        {groupsDirty && (
+                            <Button variant="ghost" size="sm" onClick={() => setGroupIds(new Set(savedGroups))}>
+                                Discard
+                            </Button>
+                        )}
+                        <Button size="sm" onClick={() => void save('groups')} disabled={!groupsDirty || saving !== null}>
+                            {saving === 'groups' ? 'Saving…' : 'Save groups'}
+                        </Button>
+                    </CardAction>
+                </CardHeader>
+                <CardContent>
+                    {allGroups.length === 0 ? (
+                        <p className="text-muted-foreground text-sm">No groups yet. Create them under Groups & Permissions.</p>
+                    ) : (
+                        <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                            {allGroups.map((g) => (
+                                <label
+                                    key={g.id}
+                                    className="hover:bg-muted/50 has-data-checked:border-primary/40 has-data-checked:bg-primary/5 flex cursor-pointer items-center gap-3 rounded-xl border px-3 py-2.5"
+                                >
+                                    <Checkbox checked={groupIds.has(g.id)} onCheckedChange={() => toggle(setGroupIds, g.id)} />
+                                    <span className="min-w-0 flex-1">
+                                        <span className="block truncate text-sm font-medium">{g.name}</span>
+                                        <span className="text-muted-foreground block text-xs">
+                                            {g.permission_count ?? g.permissions?.length ?? 0} permissions
+                                            {g.user_count != null ? ` · ${g.user_count} users` : ''}
+                                        </span>
+                                    </span>
+                                </label>
+                            ))}
+                        </div>
+                    )}
+                </CardContent>
+            </Card>
+
+            <Card>
+                <CardHeader>
+                    <CardTitle>Direct permissions</CardTitle>
+                    <CardDescription>
+                        {permIds.size} granted directly · {inherited.size} inherited from groups (saved state)
+                    </CardDescription>
+                    <CardAction className="flex gap-2">
+                        {permsDirty && (
+                            <Button variant="ghost" size="sm" onClick={() => setPermIds(new Set(savedPerms))}>
+                                Discard
+                            </Button>
+                        )}
+                        <Button size="sm" onClick={() => void save('perms')} disabled={!permsDirty || saving !== null}>
+                            {saving === 'perms' ? 'Saving…' : 'Save permissions'}
+                        </Button>
+                    </CardAction>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                    <div className="flex flex-wrap items-center gap-3">
+                        <div className="relative min-w-0 flex-1 sm:max-w-xs">
+                            <Search className="text-muted-foreground pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2" />
+                            <Input
+                                value={search}
+                                onChange={(e) => setSearch(e.target.value)}
+                                placeholder="Filter permissions…"
+                                className="pl-8"
+                                aria-label="Filter permissions"
+                            />
+                        </div>
+                        <label className="flex items-center gap-2 text-sm">
+                            <Checkbox checked={onlyGranted} onCheckedChange={(v) => setOnlyGranted(Boolean(v))} />
+                            Only granted
+                        </label>
+                    </div>
+
+                    <div className="max-h-[440px] divide-y overflow-y-auto rounded-xl border">
+                        {visiblePerms.length === 0 && (
+                            <p className="text-muted-foreground p-6 text-center text-sm">No matching permissions.</p>
+                        )}
+                        {visiblePerms.map((p) => {
+                            const direct = permIds.has(p.id);
+                            const viaGroup = inherited.has(p.id);
+                            return (
+                                <label key={p.id} className="hover:bg-muted/40 flex cursor-pointer items-center gap-3 px-3 py-2">
+                                    <Checkbox checked={direct} onCheckedChange={() => toggle(setPermIds, p.id)} />
+                                    <span className="min-w-0 flex-1">
+                                        <span className="block truncate font-mono text-xs">{p.codename}</span>
+                                        <span className="text-muted-foreground block truncate text-xs">{p.name}</span>
+                                    </span>
+                                    {viaGroup && (
+                                        <Badge variant="secondary" className="shrink-0">
+                                            via group
+                                        </Badge>
+                                    )}
+                                </label>
+                            );
+                        })}
+                    </div>
+                </CardContent>
+            </Card>
         </div>
-      </div>
-    </div>
-  );
+    );
 };
 
 export default UserPermissionsTab;

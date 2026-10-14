@@ -1,278 +1,325 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { Shield, ShieldOff, Smartphone, RefreshCw, Trash2, CheckCircle, XCircle } from 'lucide-react';
-import axiosInstance from '../../../services/axiosInstance';
-import { UCARD, ULABEL, UHEADER, UBORDER_B, UPANEL, UDIVIDE, UROW_HOVER, UICON_BTN, UMINT, UERR, UOK } from './userTheme';
+import React, { useCallback, useEffect, useState } from 'react';
+import { Copy, KeyRound, LogOut, Send, ShieldOff, Smartphone } from 'lucide-react';
+import { toast } from 'sonner';
 
-interface TrustedDevice {
-  id: string;
-  device_name: string;
-  created_at: string;
-  last_used?: string;
-}
+import axiosInstance from '@/services/axiosInstance';
+import { ErrorState, StatusBadge, useConfirm } from '@/components/admin';
+import { Button } from '@/components/ui/button';
+import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from '@/components/ui/dialog';
+import { Field, FieldDescription, FieldGroup, FieldLabel } from '@/components/ui/field';
+import { Input } from '@/components/ui/input';
+import { Skeleton } from '@/components/ui/skeleton';
+import { Switch } from '@/components/ui/switch';
+import { apiError } from '@/lib/api';
+import { formatDate, formatRelative } from '@/lib/format';
+import { useCurrentAdminIsSuperuser, type UserTabProps } from './types';
 
 interface SecurityData {
-  totp: {
-    enabled: boolean;
-    backup_codes_remaining: number;
-  };
-  trusted_devices: TrustedDevice[];
+    totp: { enabled: boolean; backup_codes_remaining: number };
+    trusted_devices: Array<{ id: string; device_name: string; created_at: string; last_used?: string | null }>;
 }
 
-interface Props {
-  userId: string;
-}
+const UserSecurityTab: React.FC<UserTabProps> = ({ user, onChanged }) => {
+    const confirm = useConfirm();
+    const actorIsSuperuser = useCurrentAdminIsSuperuser();
+    const [data, setData] = useState<SecurityData | null>(null);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
 
-const UserSecurityTab: React.FC<Props> = ({ userId }) => {
-  const [data, setData] = useState<SecurityData | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [actionPending, setActionPending] = useState<string | null>(null);
-  const [confirmAction, setConfirmAction] = useState<string | null>(null);
-  const [messages, setMessages] = useState<Record<string, string | null>>({});
+    const [resetUrl, setResetUrl] = useState<string | null>(null);
+    const [sendingReset, setSendingReset] = useState(false);
 
-  const setMsg = (key: string, msg: string | null) => setMessages((prev) => ({ ...prev, [key]: msg }));
+    const [pwOpen, setPwOpen] = useState(false);
+    const [password, setPassword] = useState('');
+    const [confirmPassword, setConfirmPassword] = useState('');
+    const [signOut, setSignOut] = useState(true);
+    const [settingPw, setSettingPw] = useState(false);
 
-  const fetch = useCallback(async () => {
-    setLoading(true);
-    try {
-      const res = await axiosInstance.get(`/admin/users/${userId}/security/`);
-      setData(res.data);
-    } catch {
-      setData(null);
-    } finally {
-      setLoading(false);
-    }
-  }, [userId]);
+    const fetchSecurity = useCallback(async () => {
+        setLoading(true);
+        setError(null);
+        try {
+            const res = await axiosInstance.get<SecurityData>(`/admin/users/${user.id}/security/`);
+            setData(res.data);
+        } catch (e) {
+            setError(apiError(e, 'Could not load security settings'));
+        } finally {
+            setLoading(false);
+        }
+    }, [user.id]);
 
-  useEffect(() => {
-    fetch();
-  }, [fetch]);
+    useEffect(() => {
+        void fetchSecurity();
+    }, [fetchSecurity]);
 
-  const runAction = async (key: string, url: string) => {
-    setActionPending(key);
-    setMsg(key, null);
-    try {
-      const res = await axiosInstance.post(url);
-      setMsg(key, res.data?.detail ?? 'Done');
-      fetch();
-    } catch (e: any) {
-      setMsg(key, `Error: ${e?.response?.data?.detail ?? 'Request failed'}`);
-    } finally {
-      setActionPending(null);
-      setConfirmAction(null);
-    }
-  };
+    const post = (url: string, success: string) => async () => {
+        try {
+            const res = await axiosInstance.post(url);
+            toast.success(res.data?.detail ?? success);
+            void fetchSecurity();
+            onChanged();
+        } catch (e) {
+            toast.error(apiError(e));
+            throw e;
+        }
+    };
 
-  const fmt = (iso?: string) =>
-    iso ? new Date(iso).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '—';
+    const disable2fa = () =>
+        confirm.ask({
+            title: 'Turn off two-factor authentication?',
+            description:
+                'Use this when the user has lost their authenticator and backup codes. Their backup codes are deleted and they can sign in with just their password until they set 2FA up again.',
+            confirmLabel: 'Turn off 2FA',
+            destructive: true,
+            onConfirm: post(`/admin/users/${user.id}/disable-2fa/`, '2FA disabled'),
+        });
 
-  if (loading) {
+    const revokeDevices = () =>
+        confirm.ask({
+            title: 'Forget all trusted devices?',
+            description: 'Every device will be asked for a 2FA code at next sign-in.',
+            confirmLabel: 'Forget devices',
+            destructive: true,
+            onConfirm: post(`/admin/users/${user.id}/revoke-trusted-devices/`, 'Trusted devices revoked'),
+        });
+
+    const revokeSessions = () =>
+        confirm.ask({
+            title: 'Sign this user out everywhere?',
+            description:
+                'Their refresh tokens are revoked and trusted devices forgotten, so every session must sign in again once its current access token expires (within two hours).',
+            confirmLabel: 'Sign out everywhere',
+            destructive: true,
+            onConfirm: post(`/admin/users/${user.id}/revoke-sessions/`, 'Sessions revoked'),
+        });
+
+    const sendReset = async () => {
+        setSendingReset(true);
+        try {
+            const res = await axiosInstance.post(`/admin/users/${user.id}/reset-password/`);
+            setResetUrl(res.data?.reset_url ?? null);
+            if (res.data?.email_sent) toast.success(`Reset link emailed to ${user.email}`);
+            else toast.warning('Email failed to send. Share the link below with the user directly.');
+        } catch (e) {
+            toast.error(apiError(e, 'Could not create a reset link'));
+        } finally {
+            setSendingReset(false);
+        }
+    };
+
+    const mismatch = confirmPassword.length > 0 && password !== confirmPassword;
+
+    const setNewPassword = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (mismatch || !password) return;
+        setSettingPw(true);
+        try {
+            const res = await axiosInstance.post(`/admin/users/${user.id}/set-password/`, {
+                password,
+                revoke_sessions: signOut,
+            });
+            toast.success(
+                res.data?.sessions_revoked ? `Password set · ${res.data.sessions_revoked} session(s) signed out` : 'Password set'
+            );
+            setPwOpen(false);
+            setPassword('');
+            setConfirmPassword('');
+            onChanged();
+        } catch (err) {
+            toast.error(apiError(err, 'Could not set the password'));
+        } finally {
+            setSettingPw(false);
+        }
+    };
+
+    if (error && !data) return <ErrorState description={error} onRetry={() => void fetchSecurity()} />;
+
+    const blockedPw = user.is_superuser && !actorIsSuperuser;
+
     return (
-      <div className="space-y-3">
-        {[1, 2].map((i) => (
-          <div
-            key={i}
-            className="h-28 bg-gray-100 dark:bg-[#1c2024] border border-gray-200 dark:border-[#3b4a41]/40 rounded-sm animate-pulse"
-          />
-        ))}
-      </div>
-    );
-  }
-
-  const totp = data?.totp;
-  const devices = data?.trusted_devices ?? [];
-
-  return (
-    <div className="space-y-4 max-w-2xl">
-      <div className={UCARD}>
-        <div className={`px-4 py-3 ${UBORDER_B} flex items-center justify-between`}>
-          <p className={UHEADER}>Two-Factor Authentication (TOTP)</p>
-          <button type="button" onClick={fetch} disabled={loading} className={UICON_BTN}>
-            <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
-          </button>
-        </div>
-
-        <div className="p-5">
-          <div className="flex items-start justify-between gap-4">
-            <div className="flex items-start gap-4">
-              <div
-                className={`p-3 rounded-sm border ${
-                  totp?.enabled
-                    ? 'bg-emerald-50 border-emerald-200 dark:bg-[#6effc0]/10 dark:border-[#6effc0]/30'
-                    : 'bg-gray-100 border-gray-200 dark:bg-[#3b4a41]/10 dark:border-[#3b4a41]/30'
-                }`}
-              >
-                {totp?.enabled ? (
-                  <Shield className={`w-5 h-5 ${UMINT}`} />
-                ) : (
-                  <ShieldOff className="w-5 h-5 text-gray-400 dark:text-[#3b4a41]" />
-                )}
-              </div>
-              <div>
-                <div className="flex items-center gap-2 mb-1">
-                  {totp?.enabled ? (
-                    <CheckCircle className={`w-3.5 h-3.5 ${UMINT}`} />
-                  ) : (
-                    <XCircle className="w-3.5 h-3.5 text-gray-300 dark:text-[#bacbbf]/30" />
-                  )}
-                  <span
-                    className={`font-mono text-sm font-bold ${
-                      totp?.enabled ? UMINT : 'text-gray-500 dark:text-[#bacbbf]/50'
-                    }`}
-                  >
-                    {totp?.enabled ? '2FA Enabled' : '2FA Not Enabled'}
-                  </span>
-                </div>
-                {totp?.enabled && (
-                  <p className="font-mono text-[10px] text-gray-600 dark:text-[#bacbbf]/60">
-                    {totp.backup_codes_remaining} backup code{totp.backup_codes_remaining !== 1 ? 's' : ''} remaining
-                  </p>
-                )}
-                {messages['disable_2fa'] && (
-                  <p
-                    className={`font-mono text-[10px] mt-2 ${
-                      messages['disable_2fa'].startsWith('Error')
-                        ? 'text-red-600 dark:text-[#ff4c4c]'
-                        : UMINT
-                    }`}
-                  >
-                    {messages['disable_2fa']}
-                  </p>
-                )}
-              </div>
-            </div>
-
-            {totp?.enabled && (
-              <div className="shrink-0">
-                {confirmAction !== 'disable_2fa' ? (
-                  <button
-                    type="button"
-                    onClick={() => setConfirmAction('disable_2fa')}
-                    className="px-3 py-2 font-mono text-[9px] uppercase tracking-[0.1em] border border-red-200 text-red-700 bg-red-50 hover:bg-red-100 dark:border-[#ff4c4c]/30 dark:text-[#ff4c4c] dark:bg-[#ff4c4c]/08 dark:hover:bg-[#ff4c4c]/15 rounded-sm transition-all"
-                  >
-                    Disable 2FA
-                  </button>
-                ) : (
-                  <div className="flex items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setConfirmAction(null)}
-                      className="px-2.5 py-1.5 font-mono text-[9px] uppercase text-gray-400 border border-gray-300 dark:text-[#bacbbf]/40 dark:border-[#3b4a41]/40 rounded-sm hover:text-gray-700 dark:hover:text-[#bacbbf] transition-colors"
-                    >
-                      Cancel
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => runAction('disable_2fa', `/admin/users/${userId}/disable-2fa/`)}
-                      disabled={actionPending === 'disable_2fa'}
-                      className="flex items-center gap-1.5 px-3 py-1.5 bg-red-600 text-white dark:bg-[#ff4c4c] font-mono text-[9px] uppercase tracking-[0.1em] font-bold rounded-sm disabled:opacity-40 transition-all"
-                    >
-                      {actionPending === 'disable_2fa' ? (
-                        <>
-                          <RefreshCw className="w-3 h-3 animate-spin" /> Working…
-                        </>
-                      ) : (
-                        'Confirm Disable'
-                      )}
-                    </button>
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
-
-      <div className={UCARD}>
-        <div className={`flex items-center justify-between px-4 py-3 ${UBORDER_B}`}>
-          <div className="flex items-center gap-2">
-            <p className={UHEADER}>Trusted Devices</p>
-            <span className="font-mono text-[9px] px-1.5 py-0.5 bg-gray-200 text-gray-600 dark:bg-[#3b4a41]/30 dark:text-[#bacbbf]/60 rounded-sm">
-              {devices.length}
-            </span>
-          </div>
-          {devices.length > 0 && (
-            <div className="shrink-0">
-              {confirmAction !== 'revoke_devices' ? (
-                <button
-                  type="button"
-                  onClick={() => setConfirmAction('revoke_devices')}
-                  className="flex items-center gap-1.5 px-2.5 py-1.5 font-mono text-[9px] uppercase tracking-[0.1em] border border-red-200 text-red-700 bg-red-50 hover:bg-red-100 dark:border-[#ff4c4c]/30 dark:text-[#ff4c4c] dark:bg-[#ff4c4c]/08 dark:hover:bg-[#ff4c4c]/15 rounded-sm transition-all"
-                >
-                  <Trash2 className="w-3 h-3" /> Revoke All
-                </button>
-              ) : (
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setConfirmAction(null)}
-                    className="px-2.5 py-1.5 font-mono text-[9px] uppercase text-gray-400 border border-gray-300 dark:text-[#bacbbf]/40 dark:border-[#3b4a41]/40 rounded-sm hover:text-gray-700 dark:hover:text-[#bacbbf] transition-colors"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => runAction('revoke_devices', `/admin/users/${userId}/revoke-trusted-devices/`)}
-                    disabled={actionPending === 'revoke_devices'}
-                    className="flex items-center gap-1.5 px-3 py-1.5 bg-red-600 text-white dark:bg-[#ff4c4c] font-mono text-[9px] uppercase tracking-[0.1em] font-bold rounded-sm disabled:opacity-40 transition-all"
-                  >
-                    {actionPending === 'revoke_devices' ? (
-                      <>
-                        <RefreshCw className="w-3 h-3 animate-spin" /> Working…
-                      </>
-                    ) : (
-                      'Confirm Revoke'
+        <div className="grid gap-4 lg:grid-cols-2">
+            <Card>
+                <CardHeader>
+                    <CardTitle>Password</CardTitle>
+                    <CardDescription>
+                        Prefer the reset link — the user chooses their own password and you never see it.
+                    </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                    <div className="flex flex-wrap gap-2">
+                        <Button onClick={() => void sendReset()} disabled={sendingReset}>
+                            <Send />
+                            {sendingReset ? 'Sending…' : 'Email reset link'}
+                        </Button>
+                        <Button variant="outline" onClick={() => setPwOpen(true)} disabled={blockedPw}>
+                            <KeyRound />
+                            Set password
+                        </Button>
+                    </div>
+                    {blockedPw && (
+                        <p className="text-muted-foreground text-sm">Only a superuser can set a superuser's password.</p>
                     )}
-                  </button>
-                </div>
-              )}
-            </div>
-          )}
+                    {resetUrl && (
+                        <div className="space-y-1.5">
+                            <p className="text-muted-foreground text-xs">Reset link (valid until the password changes):</p>
+                            <div className="flex items-center gap-2">
+                                <code className="bg-muted min-w-0 flex-1 truncate rounded-lg px-3 py-2 font-mono text-xs">
+                                    {resetUrl}
+                                </code>
+                                <Button
+                                    variant="outline"
+                                    size="icon"
+                                    aria-label="Copy reset link"
+                                    onClick={() =>
+                                        void navigator.clipboard.writeText(resetUrl).then(() => toast.success('Link copied'))
+                                    }
+                                >
+                                    <Copy />
+                                </Button>
+                            </div>
+                        </div>
+                    )}
+                </CardContent>
+            </Card>
+
+            <Card>
+                <CardHeader>
+                    <CardTitle>Sessions</CardTitle>
+                    <CardDescription>
+                        Force a sign-out after a suspected compromise or a password change.
+                    </CardDescription>
+                </CardHeader>
+                <CardContent>
+                    <Button variant="outline" onClick={revokeSessions}>
+                        <LogOut />
+                        Sign out everywhere
+                    </Button>
+                </CardContent>
+            </Card>
+
+            <Card>
+                <CardHeader>
+                    <CardTitle>Two-factor authentication</CardTitle>
+                    <CardDescription>
+                        {loading ? (
+                            <Skeleton className="h-4 w-40" />
+                        ) : data?.totp.enabled ? (
+                            `Enabled · ${data.totp.backup_codes_remaining} backup codes left`
+                        ) : (
+                            'Not set up. Only the user can enable it.'
+                        )}
+                    </CardDescription>
+                    <CardAction>
+                        {!loading && <StatusBadge status={data?.totp.enabled ? 'enabled' : 'inactive'} label={data?.totp.enabled ? 'On' : 'Off'} />}
+                    </CardAction>
+                </CardHeader>
+                {data?.totp.enabled && (
+                    <CardContent>
+                        <Button variant="destructive" onClick={disable2fa}>
+                            <ShieldOff />
+                            Turn off 2FA
+                        </Button>
+                    </CardContent>
+                )}
+            </Card>
+
+            <Card>
+                <CardHeader>
+                    <CardTitle>Trusted devices</CardTitle>
+                    <CardDescription>Devices that skip the 2FA prompt.</CardDescription>
+                    {(data?.trusted_devices.length ?? 0) > 0 && (
+                        <CardAction>
+                            <Button variant="ghost" size="sm" className="text-destructive" onClick={revokeDevices}>
+                                Forget all
+                            </Button>
+                        </CardAction>
+                    )}
+                </CardHeader>
+                <CardContent>
+                    {loading ? (
+                        <Skeleton className="h-12" />
+                    ) : !data?.trusted_devices.length ? (
+                        <p className="text-muted-foreground text-sm">No trusted devices.</p>
+                    ) : (
+                        <ul className="divide-y">
+                            {data.trusted_devices.map((d) => (
+                                <li key={d.id} className="flex items-center gap-3 py-2 text-sm">
+                                    <Smartphone className="text-muted-foreground size-4 shrink-0" />
+                                    <span className="min-w-0 flex-1 truncate">{d.device_name || 'Unnamed device'}</span>
+                                    <span className="text-muted-foreground shrink-0 text-xs">
+                                        added {formatDate(d.created_at)}
+                                        {d.last_used ? ` · used ${formatRelative(d.last_used)}` : ''}
+                                    </span>
+                                </li>
+                            ))}
+                        </ul>
+                    )}
+                </CardContent>
+            </Card>
+
+            <Dialog open={pwOpen} onOpenChange={setPwOpen}>
+                <DialogContent>
+                    <form onSubmit={setNewPassword} className="grid gap-6">
+                        <DialogHeader>
+                            <DialogTitle>Set a new password</DialogTitle>
+                            <DialogDescription>
+                                For {user.email}. Tell them through a channel other than email, and ask them to change it.
+                            </DialogDescription>
+                        </DialogHeader>
+                        <FieldGroup>
+                            <Field>
+                                <FieldLabel htmlFor="new-password">New password</FieldLabel>
+                                <Input
+                                    id="new-password"
+                                    type="password"
+                                    autoComplete="new-password"
+                                    required
+                                    value={password}
+                                    onChange={(e) => setPassword(e.target.value)}
+                                />
+                                <FieldDescription>At least 8 characters, not common or all-numeric.</FieldDescription>
+                            </Field>
+                            <Field data-invalid={mismatch || undefined}>
+                                <FieldLabel htmlFor="confirm-password">Confirm password</FieldLabel>
+                                <Input
+                                    id="confirm-password"
+                                    type="password"
+                                    autoComplete="new-password"
+                                    required
+                                    aria-invalid={mismatch || undefined}
+                                    value={confirmPassword}
+                                    onChange={(e) => setConfirmPassword(e.target.value)}
+                                />
+                                {mismatch && <FieldDescription>Passwords don't match.</FieldDescription>}
+                            </Field>
+                            <label className="flex items-center justify-between gap-4 text-sm">
+                                Sign them out of existing sessions
+                                <Switch checked={signOut} onCheckedChange={setSignOut} />
+                            </label>
+                        </FieldGroup>
+                        <DialogFooter>
+                            <Button type="button" variant="ghost" onClick={() => setPwOpen(false)}>
+                                Cancel
+                            </Button>
+                            <Button type="submit" disabled={settingPw || mismatch || !password}>
+                                {settingPw ? 'Saving…' : 'Set password'}
+                            </Button>
+                        </DialogFooter>
+                    </form>
+                </DialogContent>
+            </Dialog>
+
+            {confirm.dialog}
         </div>
-
-        {messages['revoke_devices'] && (
-          <div
-            className={`mx-4 mt-3 p-2.5 rounded-sm font-mono text-[10px] border ${
-              messages['revoke_devices'].startsWith('Error') ? UERR : UOK
-            }`}
-          >
-            {messages['revoke_devices']}
-          </div>
-        )}
-
-        {devices.length === 0 ? (
-          <div className="p-8 text-center">
-            <Smartphone className="w-6 h-6 text-gray-400 dark:text-[#3b4a41] mx-auto mb-2" />
-            <p className="font-mono text-xs text-gray-500 dark:text-[#3b4a41]">No trusted devices</p>
-          </div>
-        ) : (
-          <div className={UDIVIDE}>
-            <div className={`grid grid-cols-[1fr_120px_120px] gap-3 px-4 py-2 ${UPANEL}`}>
-              {['Device', 'Added', 'Last Used'].map((h) => (
-                <span key={h} className={ULABEL}>
-                  {h}
-                </span>
-              ))}
-            </div>
-            {devices.map((d) => (
-              <div
-                key={d.id}
-                className={`grid grid-cols-[1fr_120px_120px] gap-3 px-4 py-3 ${UROW_HOVER} transition-colors items-center`}
-              >
-                <div className="flex items-center gap-2">
-                  <Smartphone className="w-3.5 h-3.5 text-gray-400 dark:text-[#3b4a41] shrink-0" />
-                  <span className="font-mono text-[10px] text-gray-600 dark:text-[#bacbbf] truncate">
-                    {d.device_name || 'Unknown device'}
-                  </span>
-                </div>
-                <span className="font-mono text-[9px] text-gray-400 dark:text-[#bacbbf]/50">{fmt(d.created_at)}</span>
-                <span className="font-mono text-[9px] text-gray-400 dark:text-[#bacbbf]/50">{fmt(d.last_used)}</span>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-    </div>
-  );
+    );
 };
 
 export default UserSecurityTab;

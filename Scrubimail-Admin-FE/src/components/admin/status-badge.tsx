@@ -47,6 +47,8 @@ const TONE_BY_STATUS: Record<string, StatusTone> = {
     inactive: 'neutral',
     unknown: 'neutral',
     risky: 'warning',
+    catch_all: 'warning',
+    do_not_mail: 'danger',
     unverified: 'warning',
 };
 

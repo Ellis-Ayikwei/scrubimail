@@ -5,7 +5,6 @@ import ProtectedRoute from '../components/ProtectedRoute';
 const AdminDashboard = lazy(() => import('../pages/admin/Dashboard'));
 const AdminAnalytics = lazy(() => import('../pages/admin/Analytics'));
 const AdminReports = lazy(() => import('../pages/admin/Reports'));
-const AdminUsers = lazy(() => import('../pages/admin/Users'));
 const AdminProducts = lazy(() => import('../pages/admin/Products'));
 const AdminOrders = lazy(() => import('../pages/admin/Orders'));
 const AdminCategories = lazy(() => import('../pages/admin/Categories'));
@@ -31,6 +30,7 @@ const UserDetail = lazy(() => import('../pages/admin/users/index'));
 
 // New Billing Management pages
 const CreditPackagesManagement = lazy(() => import('../pages/admin/CreditPackagesManagement'));
+const CreditPricingManagement = lazy(() => import('../pages/admin/CreditPricingManagement'));
 const PromoCodesManagement = lazy(() => import('../pages/admin/promo-codes/PromoCodesManagement'));
 const InvoicesManagement = lazy(() => import('../pages/admin/InvoicesManagement'));
 const UsageAlertsDashboard = lazy(() => import('../pages/admin/UsageAlertsDashboard'));
@@ -132,7 +132,7 @@ const routes = [
         path: '/admin/users',
         element: (
             <ProtectedRoute>
-                <AdminUsers />
+                <ManageUsers />
             </ProtectedRoute>
         ),
         layout: 'admin',
@@ -324,6 +324,15 @@ const routes = [
         element: (
             <ProtectedRoute>
                 <CreditPackagesManagement />
+            </ProtectedRoute>
+        ),
+        layout: 'admin',
+    },
+    {
+        path: '/admin/billing/credit-pricing',
+        element: (
+            <ProtectedRoute>
+                <CreditPricingManagement />
             </ProtectedRoute>
         ),
         layout: 'admin',

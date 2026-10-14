@@ -14,6 +14,7 @@ import {
   Loader2,
 } from 'lucide-react';
 import billingService from '../services/billingService';
+import CreditCalculator from '../components/CreditCalculator';
 
 interface Plan {
   id: number;
@@ -446,6 +447,30 @@ const Pricing: React.FC = () => {
             ))}
           </div>
         )}
+      </div>
+
+      {/* Pay-as-you-go calculator */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mb-20">
+        <div className="text-left mb-8">
+          <div className="font-['Space_Grotesk',sans-serif] text-[10px] uppercase tracking-[0.3em] text-emerald-700 dark:text-[#6effc0] mb-2">
+            Pay_As_You_Go
+          </div>
+          <h2 className="font-['Epilogue',sans-serif] text-3xl font-bold text-gray-900 dark:text-white">
+            Need a one-off batch? Buy exactly what you need.
+          </h2>
+          <p className="text-sm text-gray-600 dark:text-[#94a3b8] mt-2 max-w-2xl">
+            Enter how many validations you need — or how much you want to spend — and see the price update
+            instantly. The more you buy, the less each validation costs.
+          </p>
+        </div>
+        <CreditCalculator
+          ctaLabel={(q) => (isAuthenticated ? undefined : `Continue with ${q.credits.toLocaleString()} credits`)}
+          onCheckout={(_request, quote) => {
+            // Checkout happens on the billing page, which re-prices on the server.
+            const target = `/billing?tab=packages&credits=${quote.credits}`;
+            navigate(isAuthenticated ? target : `/login?from=${encodeURIComponent(target)}`);
+          }}
+        />
       </div>
 
       {/* Features Section */}

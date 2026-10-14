@@ -1,4 +1,5 @@
 import axiosInstance from './axiosInstance';
+import type { CreditPricingRules } from '../utils/creditPricing';
 
 /** Normalize Django / Paystack error payloads for UI messages. */
 export function parseBillingApiError(error: any): string {
@@ -400,16 +401,30 @@ class BillingService {
     }
   }
 
-  // Keep old method for backwards compat
-  async purchaseCredits(amount: number, paymentMethod: string): Promise<any> {
+  // ========== Pay-as-you-go credits ==========
+
+  async getCreditPricing(): Promise<CreditPricingRules> {
     try {
-      const response = await axiosInstance.post('/purchase-credits/', {
-        amount,
-        payment_method: paymentMethod
-      });
+      const response = await axiosInstance.get('/credit-pricing/');
       return response.data;
     } catch (error: any) {
-      throw new Error(error.response?.data?.detail || 'Failed to purchase credits');
+      throw new Error(parseBillingApiError(error) || 'Failed to load credit pricing');
+    }
+  }
+
+  /** Start checkout for N credits *or* an amount to spend; the server sets the price. */
+  async purchaseCredits(request: { credits: number } | { amount: number }): Promise<{
+    authorization_url: string;
+    reference: string;
+    charge_amount: string;
+    charge_currency: string;
+    quote: { credits: number; total: string; currency: string };
+  }> {
+    try {
+      const response = await axiosInstance.post('/purchase-credits/', request);
+      return response.data;
+    } catch (error: any) {
+      throw new Error(parseBillingApiError(error) || 'Failed to purchase credits');
     }
   }
 
