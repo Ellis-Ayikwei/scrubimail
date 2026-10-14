@@ -22,7 +22,7 @@ from apps.validation.serializers import EmailValidationSerializer
 from apps.plan.serializers import PlanSerializer
 from apps.apikey.models import APIKey
 from apps.apikey.serializers import APIKeySerializer, APIKeyCreateSerializer, APIKeyUpdateSerializer
-from apps.Authentication.models import TOTPDevice, TrustedDevice
+from apps.Authentication.models import SocialAccount, TOTPDevice, TrustedDevice
 from django.contrib.auth.models import Group, Permission
 from django.shortcuts import get_object_or_404
 from apps.User.serializer import GroupSerializer, GroupDetailSerializer, PermissionSerializer
@@ -795,7 +795,7 @@ class AdminAPIKeyDetailView(generics.RetrieveUpdateDestroyAPIView):
 @api_view(["GET"])
 @permission_classes([permissions.IsAdminUser])
 def admin_user_security(request, user_id):
-    """Get 2FA and trusted device status for a user."""
+    """Get 2FA, trusted device, and linked OAuth status for a user."""
     try:
         user = User.objects.get(pk=user_id)
     except User.DoesNotExist:
@@ -813,10 +813,21 @@ def admin_user_security(request, user_id):
     trusted_devices = TrustedDevice.objects.filter(user=user).values(
         "id", "device_name", "created_at", "last_used"
     )
+    social_accounts = SocialAccount.objects.filter(user=user).order_by("provider").values(
+        "provider", "email", "created_at"
+    )
 
     return Response({
         "totp": totp_data,
         "trusted_devices": list(trusted_devices),
+        "social_accounts": [
+            {
+                "provider": account["provider"],
+                "email": account["email"],
+                "linked_at": account["created_at"],
+            }
+            for account in social_accounts
+        ],
     })
 
 

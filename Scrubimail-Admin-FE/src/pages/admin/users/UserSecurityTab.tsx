@@ -25,6 +25,7 @@ import { useCurrentAdminIsSuperuser, type UserTabProps } from './types';
 interface SecurityData {
     totp: { enabled: boolean; backup_codes_remaining: number };
     trusted_devices: Array<{ id: string; device_name: string; created_at: string; last_used?: string | null }>;
+    social_accounts: Array<{ provider: string; email: string; linked_at: string }>;
 }
 
 const UserSecurityTab: React.FC<UserTabProps> = ({ user, onChanged }) => {
@@ -229,6 +230,34 @@ const UserSecurityTab: React.FC<UserTabProps> = ({ user, onChanged }) => {
                         </Button>
                     </CardContent>
                 )}
+            </Card>
+
+            <Card>
+                <CardHeader>
+                    <CardTitle>Connected sign-in providers</CardTitle>
+                    <CardDescription>OAuth accounts currently linked to this user.</CardDescription>
+                </CardHeader>
+                <CardContent>
+                    {loading ? (
+                        <Skeleton className="h-12" />
+                    ) : !data?.social_accounts.length ? (
+                        <p className="text-muted-foreground text-sm">No OAuth providers connected.</p>
+                    ) : (
+                        <ul className="divide-y">
+                            {data.social_accounts.map((account) => (
+                                <li key={account.provider} className="flex items-center gap-3 py-2 text-sm">
+                                    <span className="font-medium capitalize">{account.provider}</span>
+                                    <span className="text-muted-foreground min-w-0 flex-1 truncate">
+                                        {account.email || 'Email not provided'}
+                                    </span>
+                                    <span className="text-muted-foreground shrink-0 text-xs">
+                                        connected {formatDate(account.linked_at)}
+                                    </span>
+                                </li>
+                            ))}
+                        </ul>
+                    )}
+                </CardContent>
             </Card>
 
             <Card>

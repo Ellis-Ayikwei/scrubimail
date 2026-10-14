@@ -14,6 +14,7 @@ const OAuthCallback = () => {
   const signIn = useSignIn();
   const [status, setStatus] = useState<'loading' | 'success' | 'error' | 'twofactor'>('loading');
   const [error, setError] = useState<string | null>(null);
+  const [linkRequired, setLinkRequired] = useState(false);
   const [totpToken, setTotpToken] = useState('');
   const [verifying, setVerifying] = useState(false);
 
@@ -74,6 +75,7 @@ const OAuthCallback = () => {
       const errorParam = searchParams.get('error');
 
       if (errorParam) {
+        setLinkRequired(errorParam === 'link_required');
         setError(
           OAUTH_ERROR_MESSAGES[errorParam] || `OAuth authentication failed: ${errorParam}`
         );
@@ -151,6 +153,21 @@ const OAuthCallback = () => {
               <div className="flex items-start gap-2 text-sm text-red-600 dark:text-red-400">
                 <AlertCircle className="mt-0.5 size-4 shrink-0" />
                 <span>{error}</span>
+              </div>
+            )}
+
+            {linkRequired && (
+              <div className="space-y-3 rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+                <p>
+                  Sign in with the existing account first, then open Security and connect this provider from the user account settings.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => navigate('/login', { replace: true })}
+                  className="w-full rounded-lg bg-[#2ED8A3] px-4 py-2 font-medium text-white hover:bg-[#00C48C]"
+                >
+                  Back to sign in
+                </button>
               </div>
             )}
 

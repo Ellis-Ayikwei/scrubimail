@@ -128,7 +128,7 @@ const Register = () => {
     try {
       setSsoError(null);
       setSsoLoading(providerId);
-      await ssoService.startLogin(providerId);
+      await ssoService.startSignup(providerId);
     } catch (err: any) {
       // Failing silently here left the button looking inert.
       console.error('OAuth login error:', err);

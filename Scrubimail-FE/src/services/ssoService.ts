@@ -63,7 +63,7 @@ export const OAUTH_ERROR_MESSAGES: Record<string, string> = {
   unverified_email:
     "Your email isn't verified with that provider. Verify it there, or sign in another way.",
   link_required:
-    'An account with this email already exists. Sign in with your password, then link this provider from your account settings.',
+    'An account with this email already exists. Sign in to that account first, then open Security and choose Connect next to this provider.',
   already_linked: 'That provider account is linked to a different user.',
   invalid_provider: 'That sign-in provider is not supported.',
   provider_unavailable: 'That sign-in provider is not configured on this server.',
@@ -103,11 +103,15 @@ class SSOService {
    */
   async initiateOAuthLogin(
     provider: ProviderId,
-    redirectUri?: string
+    redirectUri?: string,
+    intent?: 'signup'
   ): Promise<OAuthLoginResponse> {
     const params = new URLSearchParams();
     if (redirectUri) {
       params.append('redirect_uri', redirectUri);
+    }
+    if (intent) {
+      params.append('intent', intent);
     }
 
     const response = await axiosInstance.get(
@@ -124,9 +128,24 @@ class SSOService {
 
   /** Kick off sign-in (or linking) end to end. */
   async startLogin(provider: ProviderId, redirectUri?: string): Promise<void> {
+    return this.startOAuth(provider, redirectUri);
+  }
+
+  /** Start OAuth from the registration page. The backend still applies the
+   * same verified-email and existing-account safeguards as normal sign-in. */
+  async startSignup(provider: ProviderId, redirectUri?: string): Promise<void> {
+    return this.startOAuth(provider, redirectUri, 'signup');
+  }
+
+  private async startOAuth(
+    provider: ProviderId,
+    redirectUri?: string,
+    intent?: 'signup'
+  ): Promise<void> {
     const data = await this.initiateOAuthLogin(
       provider,
-      redirectUri ?? this.defaultRedirectUri()
+      redirectUri ?? this.defaultRedirectUri(),
+      intent
     );
     if (!data.authorization_url) {
       throw new Error('The server did not return an authorization URL.');

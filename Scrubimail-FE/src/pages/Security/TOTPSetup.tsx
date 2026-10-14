@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
+import { Github, Gitlab, Chrome } from 'lucide-react';
 import totpService, { TOTPSetupResponse, TOTPStatusResponse } from '../../services/totpService';
+import ssoService, { ProviderId, LinkedAccount } from '../../services/ssoService';
 import { showMessage } from './notifications';
 
 const TOTPSetup: React.FC = () => {
@@ -10,9 +12,14 @@ const TOTPSetup: React.FC = () => {
     const [disablePassword, setDisablePassword] = useState('');
     const [showBackupCodes, setShowBackupCodes] = useState(false);
     const [activeTab, setActiveTab] = useState<'setup' | 'disable'>('setup');
+    const [linkedAccounts, setLinkedAccounts] = useState<LinkedAccount[]>([]);
+    const [availableProviders, setAvailableProviders] = useState<ProviderId[]>([]);
+    const [oauthLoading, setOauthLoading] = useState(true);
+    const providerIcons = { github: Github, gitlab: Gitlab, google: Chrome } as const;
 
     useEffect(() => {
         fetchTOTPStatus();
+        void fetchOAuthAccounts();
     }, []);
 
     const fetchTOTPStatus = async () => {
@@ -21,6 +28,37 @@ const TOTPSetup: React.FC = () => {
             setTotpStatus(status);
         } catch (error: any) {
             console.error('Failed to fetch TOTP status:', error);
+        }
+    };
+
+    const fetchOAuthAccounts = async () => {
+        try {
+            const accounts = await ssoService.getLinkedAccounts();
+            setLinkedAccounts(accounts.linked);
+            setAvailableProviders(accounts.available);
+        } catch (error) {
+            console.error('Failed to fetch connected sign-in providers:', error);
+        } finally {
+            setOauthLoading(false);
+        }
+    };
+
+    const connectProvider = async (provider: ProviderId) => {
+        try {
+            await ssoService.linkProvider(provider);
+        } catch (error: any) {
+            showMessage(error.response?.data?.error?.message || 'Could not connect provider', 'error');
+        }
+    };
+
+    const disconnectProvider = async (provider: ProviderId) => {
+        if (!window.confirm(`Disconnect your ${provider} account?`)) return;
+        try {
+            await ssoService.unlinkProvider(provider);
+            showMessage(`${provider} disconnected`, 'success');
+            await fetchOAuthAccounts();
+        } catch (error: any) {
+            showMessage(error.response?.data?.error?.message || 'Could not disconnect provider', 'error');
         }
     };
 
@@ -118,6 +156,55 @@ const TOTPSetup: React.FC = () => {
     return (
         <div className="max-w-4xl mx-auto p-6">
             <h1 className="text-2xl md:text-3xl font-bold mb-6">Two-Factor Authentication (2FA)</h1>
+
+            <div className="mb-6 p-6 bg-white dark:bg-gray-800 rounded-lg shadow">
+                <h2 className="text-xl font-semibold mb-2">Connected sign-in providers</h2>
+                <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+                    Connect an OAuth account to sign in without a password. You can disconnect it later if another sign-in method remains.
+                </p>
+                {oauthLoading ? (
+                    <p className="text-sm text-gray-500">Loading connected providers…</p>
+                ) : (
+                    <div className="space-y-3">
+                        {linkedAccounts.map((account) => {
+                            const Icon = providerIcons[account.provider];
+                            return (
+                                <div key={account.provider} className="flex items-center gap-3 border-b border-gray-200 dark:border-gray-700 pb-3">
+                                    {Icon && <Icon className="w-5 h-5" />}
+                                    <div className="min-w-0 flex-1">
+                                        <p className="font-medium capitalize">{account.provider}</p>
+                                        <p className="text-sm text-gray-500 truncate">{account.email || 'Email not provided'}</p>
+                                    </div>
+                                    <button
+                                        type="button"
+                                        onClick={() => void disconnectProvider(account.provider)}
+                                        className="px-3 py-1.5 text-sm text-red-600 border border-red-200 rounded hover:bg-red-50 dark:hover:bg-red-900/20"
+                                    >
+                                        Disconnect
+                                    </button>
+                                </div>
+                            );
+                        })}
+                        {availableProviders.map((provider) => {
+                            const Icon = providerIcons[provider];
+                            return (
+                                <button
+                                    key={provider}
+                                    type="button"
+                                    onClick={() => void connectProvider(provider)}
+                                    className="flex items-center gap-3 w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700"
+                                >
+                                    {Icon && <Icon className="w-5 h-5" />}
+                                    <span className="font-medium capitalize">Connect {provider}</span>
+                                </button>
+                            );
+                        })}
+                        {!linkedAccounts.length && !availableProviders.length && (
+                            <p className="text-sm text-gray-500">No OAuth providers are currently available.</p>
+                        )}
+                    </div>
+                )}
+            </div>
 
             {/* Status Badge */}
             <div className="mb-6 p-4 bg-white dark:bg-gray-800 rounded-lg shadow">
@@ -338,4 +425,3 @@ const TOTPSetup: React.FC = () => {
 };
 
 export default TOTPSetup;
-

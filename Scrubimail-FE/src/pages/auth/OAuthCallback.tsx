@@ -14,6 +14,7 @@ const OAuthCallback: React.FC = () => {
   const signIn = useSignIn();
   const [status, setStatus] = useState<Status>('loading');
   const [message, setMessage] = useState('Completing sign-in...');
+  const [linkRequired, setLinkRequired] = useState(false);
   const [totpToken, setTotpToken] = useState('');
   const [backupCode, setBackupCode] = useState('');
   const [useBackupCode, setUseBackupCode] = useState(false);
@@ -24,11 +25,22 @@ const OAuthCallback: React.FC = () => {
   const pendingCode = useRef<string | null>(null);
   const wasLinking = useRef(false);
 
-  const fail = (msg: string) => {
+  const fail = (msg: string, autoRedirect = true) => {
     setStatus('error');
     setMessage(msg);
     ssoService.clearCallbackFromUrl();
-    setTimeout(() => navigate('/login', { replace: true }), 3500);
+    if (autoRedirect) {
+      setTimeout(() => navigate('/login', { replace: true }), 3500);
+    }
+  };
+
+  const failWithCode = (code: string) => {
+    const requiresLinking = code === 'link_required';
+    setLinkRequired(requiresLinking);
+    fail(
+      OAUTH_ERROR_MESSAGES[code] || 'Sign-in failed. Please try again.',
+      !requiresLinking
+    );
   };
 
   const finish = (data: any, provider?: string | null) => {
@@ -48,7 +60,7 @@ const OAuthCallback: React.FC = () => {
       setMessage(
         provider ? `${provider} linked to your account.` : 'Provider linked to your account.'
       );
-      setTimeout(() => navigate('/settings/security', { replace: true }), 1500);
+      setTimeout(() => navigate('/security', { replace: true }), 1500);
       return;
     }
     setMessage(provider ? `Successfully signed in with ${provider}!` : 'Successfully signed in!');
@@ -63,7 +75,7 @@ const OAuthCallback: React.FC = () => {
       wasLinking.current = linked;
 
       if (error) {
-        return fail(OAUTH_ERROR_MESSAGES[error] || 'Sign-in failed. Please try again.');
+        return failWithCode(error);
       }
       if (!code) {
         return fail('No sign-in code found. Please try logging in again.');
@@ -169,6 +181,21 @@ const OAuthCallback: React.FC = () => {
             <h3 className={`text-lg font-semibold ${getStatusColor()}`}>{getStatusTitle()}</h3>
 
             <p className="text-[#333333]/70 dark:text-gray-400">{message}</p>
+
+            {status === 'error' && linkRequired && (
+              <div className="space-y-3 pt-2">
+                <p className="text-sm text-[#333333]/70 dark:text-gray-400">
+                  Sign in with your existing account, then go to <strong>Security</strong> and connect this provider there.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => navigate('/login', { replace: true })}
+                  className="w-full rounded-lg bg-[#2ED8A3] px-4 py-2 font-medium text-white hover:bg-[#00C48C]"
+                >
+                  Sign in to link this account
+                </button>
+              </div>
+            )}
 
             {status === 'loading' && (
               <div className="mt-4">

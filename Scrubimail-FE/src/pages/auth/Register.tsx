@@ -107,7 +107,7 @@ const Register = () => {
     try {
       setSsoError(null);
       setSsoLoading(providerId);
-      await ssoService.startLogin(providerId);
+      await ssoService.startSignup(providerId);
     } catch (err: any) {
       console.error('OAuth error:', err);
       setSsoError(err?.message || 'Could not start sign-in with that provider.');

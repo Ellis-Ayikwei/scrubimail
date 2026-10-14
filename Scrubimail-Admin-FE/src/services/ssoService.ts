@@ -33,7 +33,7 @@ export const OAUTH_ERROR_MESSAGES: Record<string, string> = {
   unverified_email:
     "Your email isn't verified with that provider. Verify it there, or sign in another way.",
   link_required:
-    'An account with this email already exists. Sign in with your password, then link this provider from your account settings.',
+    'An account with this email already exists. Sign in to that account first, then open Security and choose Connect next to this provider.',
   already_linked: 'That provider account is linked to a different user.',
   invalid_provider: 'That sign-in provider is not supported.',
   provider_unavailable: 'That sign-in provider is not configured on this server.',
@@ -71,8 +71,20 @@ class SSOService {
    *  backend's OAUTH_ALLOWED_REDIRECT_URIS allowlist — the admin SPA runs on a
    *  different port than the customer app, so it needs its own entry. */
   async startLogin(provider: ProviderId): Promise<void> {
+    return this.startOAuth(provider);
+  }
+
+  async startSignup(provider: ProviderId): Promise<void> {
+    return this.startOAuth(provider, 'signup');
+  }
+
+  private async startOAuth(provider: ProviderId, intent?: 'signup'): Promise<void> {
+    const query = new URLSearchParams({
+      redirect_uri: this.defaultRedirectUri(),
+      ...(intent ? { intent } : {}),
+    });
     const response = await authAxiosInstance.get(
-      `/oauth/${provider}/login/?redirect_uri=${encodeURIComponent(this.defaultRedirectUri())}`
+      `/oauth/${provider}/login/?${query.toString()}`
     );
     const url = response.data?.authorization_url;
     if (!url) throw new Error('The server did not return an authorization URL.');
