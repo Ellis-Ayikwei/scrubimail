@@ -81,8 +81,8 @@ const Register = () => {
     }
   ];
 
-  // Only offer what this deployment actually has credentials for.
-  const visibleSsoProviders = ssoProviders.filter((p) => availableProviders.includes(p.id));
+  // Keep provider options visible while checking deployment configuration.
+  const visibleSsoProviders = ssoProviders;
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -201,7 +201,7 @@ const Register = () => {
         {/* Registration Form */}
         <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl border border-gray-200 dark:border-gray-700 p-8">
           {/* SSO Providers */}
-          {visibleSsoProviders.length > 0 && (
+          {(
             <div className="mb-6">
               <div className="flex justify-center space-x-3">
                 {visibleSsoProviders.map((provider) => {
@@ -211,7 +211,7 @@ const Register = () => {
                       key={provider.id}
                       type="button"
                       onClick={() => handleSSO(provider.id)}
-                      disabled={loading || ssoLoading !== null}
+                      disabled={loading || ssoLoading !== null || !availableProviders.includes(provider.id)}
                       className={`flex-1 p-3 rounded-lg border-2 transition-all duration-200 ${provider.color} ${provider.textColor} hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed`}
                     >
                       <div className="flex items-center justify-center space-x-2">
@@ -220,7 +220,9 @@ const Register = () => {
                         ) : (
                           <IconComponent className="w-4 h-4" />
                         )}
-                        <span className="text-sm font-medium">{provider.name}</span>
+                        <span className="text-sm font-medium">
+                          {availableProviders.includes(provider.id) ? provider.name : 'Unavailable'}
+                        </span>
                       </div>
                     </button>
                   );

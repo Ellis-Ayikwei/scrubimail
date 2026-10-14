@@ -21,8 +21,8 @@ import { RootState } from '../../store/index';
 import AuthFooter from '../../components/AuthFooter';
 import ssoService, { ProviderId } from '../../services/ssoService';
 
-// Icons are a presentation detail; which of these are actually offered comes
-// from the server, so a provider without credentials is never shown.
+// Provider availability is still checked by the server, but the options stay
+// visible while that check is loading.
 const SSO_PROVIDERS: { id: ProviderId; label: string; Icon: typeof Github }[] = [
   { id: 'github', label: 'GitHub', Icon: Github },
   { id: 'gitlab', label: 'GitLab', Icon: Gitlab },
@@ -245,16 +245,16 @@ Content-Type: application/json
             </div>
 
             <div className="p-6 space-y-5">
-              {availableProviders.length > 0 && (
+              {(
                 <>
                   <div className="grid grid-cols-2 gap-2">
-                    {SSO_PROVIDERS.filter(({ id }) => availableProviders.includes(id)).map(
+                    {SSO_PROVIDERS.map(
                       ({ id, label, Icon }) => (
                         <button
                           key={id}
                           type="button"
                           onClick={() => handleSSO(id)}
-                          disabled={loading || ssoLoading !== null}
+                          disabled={loading || ssoLoading !== null || !availableProviders.includes(id)}
                           className="flex items-center justify-center gap-2 py-2.5 bg-gray-50 dark:bg-[#101418] border border-gray-200 dark:border-[#3b4a41]/40 rounded-sm font-mono text-[10px] text-gray-600 dark:text-[#bacbbf]/70 hover:border-emerald-300 dark:hover:border-[#6effc0]/30 hover:text-gray-900 dark:hover:text-[#e0e3e8] transition-all disabled:opacity-40 disabled:cursor-not-allowed uppercase tracking-[0.1em]"
                         >
                           {ssoLoading === id ? (
@@ -262,7 +262,7 @@ Content-Type: application/json
                           ) : (
                             <Icon className="w-3.5 h-3.5" />
                           )}{' '}
-                          {label}
+                          {availableProviders.includes(id) ? label : 'Unavailable'}
                         </button>
                       )
                     )}

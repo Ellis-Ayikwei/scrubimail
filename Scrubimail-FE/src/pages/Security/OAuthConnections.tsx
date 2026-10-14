@@ -4,6 +4,7 @@ import ssoService, { LinkedAccount, ProviderId } from '../../services/ssoService
 import { showMessage } from './notifications';
 
 const icons = { github: Github, gitlab: Gitlab, google: Chrome } as const;
+const providers: ProviderId[] = ['github', 'gitlab', 'google'];
 
 const OAuthConnections: React.FC = () => {
   const [linked, setLinked] = useState<LinkedAccount[]>([]);
@@ -66,13 +67,13 @@ const OAuthConnections: React.FC = () => {
         </div>
       </div>
       <div className="p-4 space-y-2">
-        {loading ? (
+        {loading && (
           <div className="flex items-center gap-2 text-[10px] text-[#bacbbf]/60 font-mono">
-            <Loader2 className="w-3.5 h-3.5 animate-spin" /> Loading connections...
+            <Loader2 className="w-3.5 h-3.5 animate-spin" /> Checking provider status...
           </div>
-        ) : (
-          <>
-            {linked.map((account) => {
+        )}
+        <>
+          {linked.map((account) => {
               const Icon = icons[account.provider];
               return (
                 <div key={account.provider} className="flex items-center gap-3 border border-[#3b4a41]/40 bg-[#101418] rounded-sm px-3 py-2.5">
@@ -92,27 +93,26 @@ const OAuthConnections: React.FC = () => {
                   </button>
                 </div>
               );
-            })}
-            {available.map((provider) => {
+          })}
+          {providers.map((provider) => {
               const Icon = icons[provider];
+              const configured = available.includes(provider);
               return (
                 <button
                   key={provider}
                   type="button"
                   onClick={() => void connect(provider)}
-                  disabled={busy !== null}
+                  disabled={busy !== null || !configured}
                   className="flex items-center gap-3 w-full border border-[#6effc0]/25 bg-[#6effc0]/5 text-[#6effc0] rounded-sm px-3 py-2.5 text-left hover:bg-[#6effc0]/10 disabled:opacity-40"
                 >
                   {busy === provider ? <Loader2 className="w-4 h-4 animate-spin" /> : <Icon className="w-4 h-4" />}
-                  <span className="uppercase tracking-[0.1em] text-[9px] font-bold">Connect {provider}</span>
+                  <span className="uppercase tracking-[0.1em] text-[9px] font-bold">
+                    {configured ? `Connect ${provider}` : `${provider} unavailable`}
+                  </span>
                 </button>
               );
-            })}
-            {!linked.length && !available.length && (
-              <p className="text-[10px] text-[#bacbbf]/60 font-mono">No OAuth providers are available.</p>
-            )}
-          </>
-        )}
+          })}
+        </>
       </div>
     </section>
   );
