@@ -20,6 +20,7 @@ const OAuthCallback = () => {
 
   // Held so the 2FA form can re-submit it; the challenge does not consume it.
   const pendingCode = useRef<string | null>(null);
+  const callbackStarted = useRef(false);
 
   const completeSignIn = (data: any) => {
     const { user, access_token, refresh_token } = data || {};
@@ -69,6 +70,9 @@ const OAuthCallback = () => {
   };
 
   useEffect(() => {
+    if (callbackStarted.current) return;
+    callbackStarted.current = true;
+
     const handleOAuthCallback = async () => {
       // Backend redirects here with an opaque one-time `code` (never tokens in the URL).
       const code = searchParams.get('code');

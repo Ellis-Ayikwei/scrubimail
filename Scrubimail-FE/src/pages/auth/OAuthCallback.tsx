@@ -24,6 +24,7 @@ const OAuthCallback: React.FC = () => {
   // does not consume it server-side, so it stays valid for the rest of its TTL.
   const pendingCode = useRef<string | null>(null);
   const wasLinking = useRef(false);
+  const callbackStarted = useRef(false);
 
   const fail = (msg: string, autoRedirect = true) => {
     setStatus('error');
@@ -68,6 +69,9 @@ const OAuthCallback: React.FC = () => {
   };
 
   useEffect(() => {
+    if (callbackStarted.current) return;
+    callbackStarted.current = true;
+
     const handleCallback = async () => {
       // The browser lands here with only a single-use `code` (or an `error`) —
       // never tokens. We exchange the code for tokens over POST.
