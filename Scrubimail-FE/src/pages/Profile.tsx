@@ -22,6 +22,7 @@ import {
 } from 'lucide-react';
 import { userService, UserProfile, PasswordChangeRequest, NotificationPreferences, ComprehensiveProfile } from '../services/userService';
 import { billingService, BillingProfile } from '../services/billingService';
+import OAuthConnections from './Security/OAuthConnections';
 
 const Profile: React.FC = () => {
   const [activeTab, setActiveTab] = useState('profile');
@@ -393,6 +394,7 @@ const Profile: React.FC = () => {
           {/* Security Tab */}
           {activeTab === 'security' && (
             <div className="space-y-5">
+              <OAuthConnections />
               <div className="flex items-center justify-between">
                 <p className="uppercase tracking-[0.12em] text-[9px] text-[#3b4a41]">Security Settings</p>
                 <Link
