@@ -1,11 +1,11 @@
 import React, { useEffect, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
-import { Eye, EyeOff, Loader2, AlertCircle, Github, Gitlab, Chrome } from 'lucide-react';
+import { Eye, EyeOff, Loader2, AlertCircle, Github, Chrome } from 'lucide-react';
 import { useDispatch, useSelector } from 'react-redux';
 import useSignIn from 'react-auth-kit/hooks/useSignIn';
 import { LoginUser } from '../../store/authSlice';
 import { RootState } from '../../store/index';
-import ssoService, { ProviderId, OAUTH_ERROR_MESSAGES } from '../../services/ssoService';
+import ssoService, { OAUTH_UI_PROVIDERS, ProviderId, OAUTH_ERROR_MESSAGES } from '../../services/ssoService';
 import {
   Card,
   CardContent,
@@ -23,7 +23,6 @@ const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 // Icons are presentation; which providers are offered comes from the server.
 const SSO_PROVIDERS: { id: ProviderId; label: string; Icon: typeof Github }[] = [
   { id: 'github', label: 'GitHub', Icon: Github },
-  { id: 'gitlab', label: 'GitLab', Icon: Gitlab },
   { id: 'google', label: 'Google', Icon: Chrome },
 ];
 
@@ -73,7 +72,7 @@ const Login = () => {
     }
   };
 
-  const visibleProviders = SSO_PROVIDERS.filter((p) => availableProviders.includes(p.id));
+  const visibleProviders = SSO_PROVIDERS.filter((p) => OAUTH_UI_PROVIDERS.includes(p.id));
 
   const validateEmail = (value: string): string | undefined => {
     if (!value.trim()) return 'Email address is required';
@@ -179,7 +178,7 @@ const Login = () => {
                       type="button"
                       variant="outline"
                       onClick={() => handleSSO(id)}
-                      disabled={loading || ssoLoading !== null}
+                      disabled={loading || ssoLoading !== null || !availableProviders.includes(id)}
                     >
                       {ssoLoading === id ? (
                         <Loader2 className="size-4 animate-spin" />

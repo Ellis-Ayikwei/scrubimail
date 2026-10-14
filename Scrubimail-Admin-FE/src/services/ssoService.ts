@@ -1,6 +1,7 @@
 import authAxiosInstance from './authAxiosInstance';
 
 export type ProviderId = 'github' | 'gitlab' | 'google';
+export const OAUTH_UI_PROVIDERS: ProviderId[] = ['github', 'google'];
 
 export interface OAuthProvider {
   name: string;

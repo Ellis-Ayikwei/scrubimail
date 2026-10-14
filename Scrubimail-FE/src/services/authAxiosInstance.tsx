@@ -1,7 +1,7 @@
 import axios from 'axios';
 import { apiUrl } from './axiosInstance';
 
-export const authApiUrl = apiUrl + 'auth';
+export const authApiUrl = `${apiUrl.replace(/\/$/, '')}/auth`;
 
 export const getCookie = (name: string): string | undefined => {
     try {

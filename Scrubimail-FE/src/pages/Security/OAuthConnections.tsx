@@ -1,10 +1,10 @@
 import React, { useEffect, useState } from 'react';
 import { Chrome, Github, Gitlab, Link2, Loader2, Unlink } from 'lucide-react';
-import ssoService, { LinkedAccount, ProviderId } from '../../services/ssoService';
+import ssoService, { LinkedAccount, OAUTH_UI_PROVIDERS, ProviderId } from '../../services/ssoService';
 import { showMessage } from './notifications';
 
 const icons = { github: Github, gitlab: Gitlab, google: Chrome } as const;
-const providers: ProviderId[] = ['github', 'gitlab', 'google'];
+const providers = OAUTH_UI_PROVIDERS;
 
 const OAuthConnections: React.FC = () => {
   const [linked, setLinked] = useState<LinkedAccount[]>([]);

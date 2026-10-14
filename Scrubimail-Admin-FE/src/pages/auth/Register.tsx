@@ -11,12 +11,11 @@ import {
   CheckCircle,
   Github,
   Chrome,
-  Gitlab
 } from 'lucide-react';
 import { useDispatch, useSelector } from 'react-redux';
 import { RegisterUser } from '../../store/authSlice';
 import { RootState } from '../../store/index';
-import ssoService, { ProviderId } from '../../services/ssoService';
+import ssoService, { OAUTH_UI_PROVIDERS, ProviderId } from '../../services/ssoService';
 
 const Register = () => {
   const [formData, setFormData] = useState({
@@ -64,14 +63,6 @@ const Register = () => {
       textColor: 'text-white'
     },
     {
-      id: 'gitlab',
-      name: 'GitLab',
-      icon: Gitlab,
-      description: 'Sign up with your GitLab account',
-      color: 'bg-orange-600 hover:bg-orange-700',
-      textColor: 'text-white'
-    },
-    {
       id: 'google',
       name: 'Google',
       icon: Chrome,
@@ -82,7 +73,7 @@ const Register = () => {
   ];
 
   // Keep provider options visible while checking deployment configuration.
-  const visibleSsoProviders = ssoProviders;
+  const visibleSsoProviders = ssoProviders.filter((p) => OAUTH_UI_PROVIDERS.includes(p.id));
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;

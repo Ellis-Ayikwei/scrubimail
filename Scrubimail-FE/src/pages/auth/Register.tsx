@@ -11,7 +11,6 @@ import {
   AlertCircle,
   CheckCircle,
   Github,
-  Gitlab,
   Chrome,
   Zap,
 } from 'lucide-react';
@@ -19,13 +18,12 @@ import { useDispatch, useSelector } from 'react-redux';
 import { RegisterUser } from '../../store/authSlice';
 import { RootState } from '../../store/index';
 import AuthFooter from '../../components/AuthFooter';
-import ssoService, { ProviderId } from '../../services/ssoService';
+import ssoService, { OAUTH_UI_PROVIDERS, ProviderId } from '../../services/ssoService';
 
 // Provider availability is still checked by the server, but the options stay
 // visible while that check is loading.
 const SSO_PROVIDERS: { id: ProviderId; label: string; Icon: typeof Github }[] = [
   { id: 'github', label: 'GitHub', Icon: Github },
-  { id: 'gitlab', label: 'GitLab', Icon: Gitlab },
   { id: 'google', label: 'Google', Icon: Chrome },
 ];
 
@@ -248,7 +246,7 @@ Content-Type: application/json
               {(
                 <>
                   <div className="grid grid-cols-2 gap-2">
-                    {SSO_PROVIDERS.map(
+                    {SSO_PROVIDERS.filter(({ id }) => OAUTH_UI_PROVIDERS.includes(id)).map(
                       ({ id, label, Icon }) => (
                         <button
                           key={id}

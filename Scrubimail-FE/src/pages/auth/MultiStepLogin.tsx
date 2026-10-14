@@ -15,14 +15,13 @@ import {
   Smartphone,
   Github,
   Chrome,
-  Gitlab,
   Home,
   Zap
 } from 'lucide-react';
 import { LoginUser } from '../../store/authSlice';
 import { showMessage } from '../../utils/notifications';
 import { getDeviceInfo } from '../../utils/DeviceFingerPrint';
-import ssoService, { ProviderId, OAUTH_ERROR_MESSAGES } from '../../services/ssoService';
+import ssoService, { OAUTH_UI_PROVIDERS, ProviderId, OAUTH_ERROR_MESSAGES } from '../../services/ssoService';
 import useSignIn from 'react-auth-kit/hooks/useSignIn';
 import totpService from '../../services/totpService';
 import AuthFooter from '../../components/AuthFooter';
@@ -105,14 +104,6 @@ const MultiStepLogin: React.FC = () => {
       textColor: 'text-white'
     },
     {
-      id: 'gitlab',
-      name: 'GitLab',
-      icon: Gitlab,
-      description: 'Sign in with your GitLab account',
-      color: 'bg-orange-600 hover:bg-orange-700',
-      textColor: 'text-white'
-    },
-    {
       id: 'google',
       name: 'Google',
       icon: Chrome,
@@ -122,7 +113,7 @@ const MultiStepLogin: React.FC = () => {
     }
   ];
 
-  const visibleSsoProviders = ssoProviders.filter((p) => availableProviders.includes(p.id));
+  const visibleSsoProviders = ssoProviders.filter((p) => OAUTH_UI_PROVIDERS.includes(p.id));
 
   const handleSSO = async (providerId: ProviderId) => {
     try {
@@ -356,7 +347,7 @@ Connecting to scrubi-terminal-1...
                       <button
                         key={provider.id}
                         onClick={() => handleSSO(provider.id)}
-                        disabled={!!loading || ssoLoading !== null}
+                        disabled={!!loading || ssoLoading !== null || !availableProviders.includes(provider.id)}
                         className="flex items-center justify-center gap-2 px-4 py-2.5 bg-[#1c2024] border border-[#3b4a41]/30 rounded-sm hover:border-[#6effc0]/40 hover:text-[#6effc0] transition-all text-[#bacbbf] disabled:opacity-40"
                       >
                         {ssoLoading === provider.id ? (
